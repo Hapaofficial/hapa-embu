@@ -1,0 +1,384 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07101d"><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icon.svg">
+<title>HAPA — Embu Super App</title>
+<style>
+:root{
+ --bg:#07101d;--panel:#0f1b2d;--panel2:#15243a;--line:#263a55;--text:#f8fafc;
+ --muted:#9fb0c7;--brand:#f6c90e;--green:#35d07f;--danger:#ff6b6b;--shadow:0 24px 80px rgba(0,0,0,.34)
+}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Inter,Arial,sans-serif;background:radial-gradient(circle at 10% 0,#132641 0,#07101d 38%);color:var(--text)}
+button,input,select{font:inherit}.shell{max-width:1280px;margin:auto;padding:20px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:15px;position:sticky;top:0;z-index:20;padding:12px 0;background:linear-gradient(180deg,rgba(7,16,29,.97),rgba(7,16,29,.72),transparent)}
+.brand{font-size:30px;font-weight:1000;letter-spacing:-1px}.badge{background:var(--brand);color:#141414;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:900}.status{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 5px rgba(53,208,127,.12)}
+.tabs{display:flex;gap:8px;overflow:auto;padding-bottom:10px}.tab{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 14px;border-radius:13px;font-weight:800;cursor:pointer}.tab.active{background:var(--brand);color:#111;border-color:var(--brand)}
+.screen{display:none}.screen.active{display:block}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:stretch}.panel{background:linear-gradient(180deg,var(--panel),#0c1727);border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:var(--shadow)}
+h1{font-size:54px;line-height:1;margin:0 0 14px;letter-spacing:-2px}h2{margin:0 0 12px}h3{margin:0 0 8px}.muted{color:var(--muted)}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.btn{border:0;border-radius:14px;padding:13px 16px;font-weight:900;cursor:pointer}.primary{background:var(--brand);color:#111}.secondary{background:var(--panel2);color:white;border:1px solid var(--line)}.danger{background:var(--danger);color:white}
+.map{height:370px;border-radius:22px;position:relative;overflow:hidden;background:
+linear-gradient(35deg,transparent 46%,rgba(255,255,255,.11) 47% 51%,transparent 52%),
+linear-gradient(125deg,transparent 44%,rgba(255,255,255,.10) 45% 49%,transparent 50%),#17273d}
+.map:before,.map:after{content:"";position:absolute;border:2px solid rgba(246,201,14,.34);border-radius:50%;width:230px;height:230px;left:44%;top:22%;transform:translate(-50%,-50%)}.map:after{width:390px;height:390px}
+.pin{position:absolute;border:0;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:23px;box-shadow:0 8px 25px rgba(0,0,0,.35);cursor:pointer}.p1{left:18%;top:20%}.p2{right:18%;top:34%}.p3{left:49%;bottom:17%}.you{left:43%;top:43%;background:var(--brand)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}.service{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:17px;cursor:pointer;text-align:left;color:var(--text)}.service:hover{transform:translateY(-2px)}.service span{font-size:30px;display:block}.service b{display:block;margin-top:9px}.service small{color:var(--muted)}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:12px}.field label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}.field input,.field select{width:100%;padding:13px;background:#091422;border:1px solid var(--line);border-radius:13px;color:white}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}.price{font-size:24px;font-weight:900}.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.list{display:grid;gap:10px}.listitem{background:var(--panel2);border:1px solid var(--line);border-radius:15px;padding:13px}.statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:var(--panel2);border-radius:16px;padding:15px}.stat strong{font-size:27px;display:block;margin-top:6px}.toast{position:fixed;right:18px;bottom:18px;background:#fff;color:#111;padding:14px 17px;border-radius:14px;box-shadow:var(--shadow);display:none;max-width:360px;z-index:50}.footer{padding:30px 0;color:var(--muted);font-size:13px}
+@media(max-width:900px){.hero,.formgrid{grid-template-columns:1fr}.grid,.cards{grid-template-columns:1fr 1fr}.statgrid{grid-template-columns:1fr 1fr}h1{font-size:42px}.map{height:310px}}
+@media(max-width:560px){.shell{padding:12px}.grid,.cards{grid-template-columns:1fr}.panel{padding:15px}.topbar{align-items:flex-start}.status{display:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div><div class="brand">HAPA</div><div class="muted">Everything local • Embu, Kenya</div></div>
+    <div id="apiState" class="status">Connecting…</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab" data-tab="login">Login</button><button class="tab active" data-tab="customer">Customer</button>
+    <button class="tab" data-tab="driver">Driver</button>
+    <button class="tab" data-tab="merchant">Merchant</button>
+    <button class="tab" data-tab="market">Marketplace</button>
+    <button class="tab" data-tab="partners">Partners</button>
+    <button class="tab" data-tab="admin">Admin</button>
+  </div>
+
+
+  <section id="screen-login" class="screen">
+    <div class="hero">
+      <div class="panel">
+        <span class="badge">SECURE ACCESS</span>
+        <h1 style="margin-top:16px">Welcome to HAPA.</h1>
+        <p class="muted">Demo login using one of the seeded phone numbers and any 4-digit PIN.</p>
+        <div class="list">
+          <div class="listitem">Customer: +254700000001</div>
+          <div class="listitem">Driver: +254700000002</div>
+          <div class="listitem">Merchant: +254700000003</div>
+          <div class="listitem">Admin: +254700000004</div>
+        </div>
+      </div>
+      <div class="panel">
+        <form onsubmit="loginUser(event)">
+          <div class="field"><label>Phone number</label><input name="phone" value="+254700000001" required></div>
+          <div class="field"><label>4-digit PIN</label><input name="pin" value="1234" maxlength="4" required></div>
+          <button class="btn primary">Login</button>
+        </form>
+        <div id="loginResult" class="muted" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-customer" class="screen active">
+    <div class="hero">
+      <div class="panel">
+        <span class="badge">HAPA EMBU MVP</span>
+        <h1 style="margin-top:16px">One app for everyday life.</h1>
+        <p class="muted">Book a car or boda, order food, send a package and discover local products.</p>
+        <div class="actions">
+          <button class="btn primary" onclick="requestRide('boda')">Request boda</button>
+          <button class="btn secondary" onclick="requestRide('car')">Request car</button>
+          <button class="btn secondary" onclick="requestRide('courier')">Send package</button>
+        </div>
+
+        <div class="panel" style="margin-top:14px">
+          <div class="row"><div><span class="muted">HAPA Wallet</span><div class="price" id="walletBalance">KES 0</div></div><button class="btn secondary" onclick="toast('Top-up flow prepared for M-Pesa integration')">Top up</button></div>
+        </div>
+
+        <div class="statgrid" style="margin-top:22px">
+          <div class="stat"><span class="muted">Rides</span><strong id="stat-rides">0</strong></div>
+          <div class="stat"><span class="muted">Orders</span><strong id="stat-orders">0</strong></div>
+          <div class="stat"><span class="muted">Partners</span><strong id="stat-leads">0</strong></div>
+          <div class="stat"><span class="muted">Drivers online</span><strong id="stat-onlineDrivers">0</strong></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="map">
+          <button class="pin p1" onclick="requestRide('boda')">🏍️</button>
+          <button class="pin p2" onclick="requestRide('car')">🚗</button>
+          <button class="pin p3" onclick="requestRide('courier')">📦</button>
+          <button class="pin you">📍</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <button class="service" onclick="requestRide('car')"><span>🚗</span><b>Car</b><small>Comfort ride in Embu</small></button>
+      <button class="service" onclick="requestRide('boda')"><span>🏍️</span><b>Boda</b><small>Fast and affordable</small></button>
+      <button class="service" onclick="showTab('merchant')"><span>🍕</span><b>Food</b><small>Order local meals</small></button>
+      <button class="service" onclick="showTab('market')"><span>🛍️</span><b>Marketplace</b><small>Buy and sell locally</small></button>
+    </div>
+
+    <div class="panel" style="margin-top:18px">
+      <h2>Nearby drivers</h2>
+      <div id="driversList" class="list"></div>
+    </div>
+  </section>
+
+  <section id="screen-driver" class="screen">
+    <div class="panel">
+      <div class="row"><div><h2>Driver workspace</h2><p class="muted">Accept and complete customer requests.</p></div><span class="badge">ONLINE</span></div>
+      <div class="statgrid" style="margin-bottom:16px"><div class="stat"><span class="muted">Completed</span><strong id="earnCompleted">0</strong></div><div class="stat"><span class="muted">Gross</span><strong id="earnGross">KES 0</strong></div><div class="stat"><span class="muted">Platform fee</span><strong id="earnFee">KES 0</strong></div><div class="stat"><span class="muted">Net earnings</span><strong id="earnNet">KES 0</strong></div></div><div id="ridesList" class="list"></div>
+    </div>
+  </section>
+
+  <section id="screen-merchant" class="screen">
+    <div class="hero">
+      <div class="panel">
+        <h2>Peter's Kitchen</h2>
+        <p class="muted">Customer ordering screen.</p>
+        <div id="foodList" class="cards"></div>
+        <div class="panel" style="margin-top:14px">
+          <h3>Your cart</h3>
+          <div id="cart" class="muted">Cart is empty</div>
+          <button class="btn primary" style="margin-top:12px" onclick="placeOrder()">Place order</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Incoming orders</h2>
+        <div id="ordersList" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-market" class="screen">
+    <div class="hero">
+      <div class="panel"><h2>Local marketplace</h2><div id="marketList" class="cards"></div></div>
+      <div class="panel">
+        <h2>Create listing</h2>
+        <form onsubmit="addListing(event)">
+          <div class="field"><label>Title</label><input name="title" required></div>
+          <div class="field"><label>Price (KES)</label><input type="number" name="price" required></div>
+          <div class="field"><label>Seller</label><input name="seller" required></div>
+          <div class="field"><label>Category</label><select name="category"><option>Electronics</option><option>Property</option><option>Food</option><option>Services</option><option>Other</option></select></div>
+          <button class="btn primary">Publish listing</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-partners" class="screen">
+    <div class="hero">
+      <div class="panel">
+        <h1>Join HAPA Embu.</h1>
+        <p class="muted">Register as a driver, boda rider, restaurant, shop or service provider.</p>
+      </div>
+      <div class="panel">
+        <form onsubmit="registerPartner(event)">
+          <div class="field"><label>Full name</label><input name="name" required></div>
+          <div class="field"><label>Phone / WhatsApp</label><input name="phone" required></div>
+          <div class="field"><label>Partner type</label><select name="type"><option>Driver</option><option>Boda rider</option><option>Restaurant</option><option>Shop</option><option>Service provider</option></select></div>
+          <div class="field"><label>Vehicle or business details</label><input name="details"></div>
+          <button class="btn primary">Register interest</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-admin" class="screen">
+    <div class="panel">
+      <div class="row"><div><h2>HAPA Admin</h2><p class="muted">Launch operations overview.</p></div><div class="actions"><a class="btn secondary" href="/api/partners/export.csv">Export CSV</a><button class="btn danger" onclick="resetDemo()">Reset demo</button></div></div>
+      <div class="statgrid">
+        <div class="stat"><span class="muted">Rides</span><strong id="stat-rides">0</strong></div>
+        <div class="stat"><span class="muted">Orders</span><strong id="stat-orders">0</strong></div>
+        <div class="stat"><span class="muted">Partner leads</span><strong id="stat-leads">0</strong></div>
+        <div class="stat"><span class="muted">Drivers online</span><strong id="stat-onlineDrivers">0</strong></div>
+      </div>
+      <div class="hero" style="margin-top:16px">
+        <div class="panel"><h3>Partner registrations</h3><div id="adminLeads" class="list"></div></div>
+        <div class="panel"><h3>Activity</h3><div id="adminActivity" class="list"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">HAPA v0.1 • Local full-stack MVP • Embu, Kenya</div>
+</div>
+<div id="toast" class="toast"></div>
+<script>
+const API='/api';
+let currentUser=null;
+async function loginUser(e){
+ e.preventDefault();
+ const data=Object.fromEntries(new FormData(e.target).entries());
+ try{
+   const result=await api('/login',{method:'POST',body:JSON.stringify(data)});
+   currentUser=result.user;
+   localStorage.setItem('hapaSession',JSON.stringify(result));
+   document.getElementById('loginResult').innerHTML=`Logged in as <b>${result.user.name}</b> (${result.user.role})`;
+   toast('Login successful');
+   if(result.user.role==='driver') showTab('driver');
+   else if(result.user.role==='merchant') showTab('merchant');
+   else if(result.user.role==='admin') showTab('admin');
+   else showTab('customer');
+   loadWallet();
+ }catch(err){toast(err.message)}
+}
+async function loadWallet(){
+ try{
+   const wallets=await api('/wallets');
+   const uid=currentUser?.id||'u1';
+   const w=wallets.find(x=>x.userId===uid)||{balance:0,currency:'KES'};
+   const el=document.getElementById('walletBalance');
+   if(el) el.textContent=`${w.currency} ${Number(w.balance).toLocaleString()}`;
+ }catch(e){}
+}
+
+let bootstrap={drivers:[],marketplace:[],restaurants:[],stats:{}};
+let cart=[];
+
+function toast(msg){
+ const el=document.getElementById('toast'); el.textContent=msg; el.style.display='block';
+ setTimeout(()=>el.style.display='none',3200);
+}
+async function api(path, options={}){
+ const res=await fetch(API+path,{headers:{'Content-Type':'application/json'},...options});
+ const data=await res.json();
+ if(!res.ok) throw new Error(data.error||'Request failed');
+ return data;
+}
+function showTab(name){
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+ 
+async function loadEarnings(){
+ try{
+   const e=await api('/earnings');
+   document.getElementById('earnCompleted').textContent=e.completedRides;
+   document.getElementById('earnGross').textContent='KES '+e.gross;
+   document.getElementById('earnFee').textContent='KES '+e.platformFee;
+   document.getElementById('earnNet').textContent='KES '+e.net;
+ }catch(err){}
+}
+async function updateOrder(id,status){
+ try{await api('/orders/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOrders();toast('Order '+status);}catch(e){toast(e.message)}
+}
+async function approvePartner(id,status){
+ try{await api('/partners/'+id,{method:'PATCH',body:JSON.stringify({status})});loadAdmin();toast('Partner '+status);}catch(e){toast(e.message)}
+}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+const savedSession=localStorage.getItem('hapaSession');
+if(savedSession){try{currentUser=JSON.parse(savedSession).user;}catch(e){}}
+
+document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+ document.getElementById('screen-'+name).classList.add('active');
+ document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+ if(name==='driver'){loadRides();loadEarnings();}
+ if(name==='merchant') loadOrders();
+ if(name==='admin') loadAdmin();
+}
+async function init(){
+ try{
+   bootstrap=await api('/bootstrap');
+   document.getElementById('apiState').innerHTML='<span class="dot"></span> API connected';
+   renderMarketplace(); renderFood(); renderDrivers(); renderStats(); loadWallet();
+ }catch(e){
+   document.getElementById('apiState').textContent='API offline';
+   toast('Start server with: node server/server.js');
+ }
+}
+function renderDrivers(){
+ const box=document.getElementById('driversList');
+ box.innerHTML=bootstrap.drivers.map(d=>`<div class="listitem row"><div><b>${d.name}</b><div class="muted">${d.type} • ⭐ ${d.rating}</div></div><span class="badge">${d.online?'ONLINE':'OFFLINE'}</span></div>`).join('');
+}
+function renderStats(){
+ const s=bootstrap.stats||{};
+ ['rides','orders','leads','onlineDrivers'].forEach(k=>{
+   const el=document.getElementById('stat-'+k); if(el) el.textContent=s[k]??0;
+ });
+}
+async function requestRide(type){
+ const destination=prompt('Destination in Embu:');
+ if(!destination) return;
+ try{
+   const ride=await api('/rides',{method:'POST',body:JSON.stringify({type,destination,customerName:'Demo Customer'})});
+   toast(`${type.toUpperCase()} requested • Estimated fare KES ${ride.fareEstimate}`);
+   bootstrap=await api('/bootstrap'); renderStats();
+ }catch(e){toast(e.message)}
+}
+function renderFood(){
+ const r=bootstrap.restaurants[0];
+ const box=document.getElementById('foodList');
+ if(!r){box.innerHTML='<p>No restaurant data</p>';return}
+ box.innerHTML=r.items.map(i=>`<div class="card"><h3>${i.name}</h3><div class="row"><span class="price">KES ${i.price}</span><button class="btn primary" onclick="addToCart('${i.id}','${i.name}',${i.price})">Add</button></div></div>`).join('');
+}
+function addToCart(id,name,price){
+ const found=cart.find(x=>x.id===id); if(found) found.qty++; else cart.push({id,name,price,qty:1});
+ renderCart(); toast(name+' added');
+}
+function renderCart(){
+ const box=document.getElementById('cart');
+ if(!cart.length){box.innerHTML='<span class="muted">Cart is empty</span>';return}
+ const total=cart.reduce((s,x)=>s+x.price*x.qty,0);
+ box.innerHTML=cart.map(x=>`<div>${x.qty} × ${x.name} — KES ${x.price*x.qty}</div>`).join('')+`<hr><b>Total: KES ${total}</b>`;
+}
+async function placeOrder(){
+ if(!cart.length) return toast('Add something first');
+ try{
+   const o=await api('/orders',{method:'POST',body:JSON.stringify({restaurantId:'r1',customerName:'Demo Customer',items:cart})});
+   cart=[];renderCart();toast(`Order ${o.id} received • KES ${o.total}`);bootstrap=await api('/bootstrap');renderStats();
+ }catch(e){toast(e.message)}
+}
+function renderMarketplace(){
+ const box=document.getElementById('marketList');
+ box.innerHTML=bootstrap.marketplace.map(i=>`<div class="card"><span class="muted">${i.category}</span><h3>${i.title}</h3><p>${i.seller}</p><div class="price">KES ${Number(i.price).toLocaleString()}</div></div>`).join('');
+}
+async function addListing(e){
+ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries());
+ try{await api('/marketplace',{method:'POST',body:JSON.stringify(data)});e.target.reset();bootstrap=await api('/bootstrap');renderMarketplace();toast('Listing published');}catch(err){toast(err.message)}
+}
+async function registerPartner(e){
+ e.preventDefault(); const data=Object.fromEntries(new FormData(e.target).entries());
+ try{await api('/partners',{method:'POST',body:JSON.stringify(data)});e.target.reset();toast('Partner registration saved');bootstrap=await api('/bootstrap');renderStats();}catch(err){toast(err.message)}
+}
+async function loadRides(){
+ try{
+ const rides=await api('/rides'); const box=document.getElementById('ridesList');
+ box.innerHTML=rides.length?rides.map(r=>`<div class="listitem"><div class="row"><b>${r.type.toUpperCase()} • ${r.destination}</b><span class="badge">${r.status}</span></div><div class="muted">KES ${r.fareEstimate} • ${new Date(r.createdAt).toLocaleString()}</div><div class="actions"><button class="btn primary" onclick="updateRide('${r.id}','accepted')">Accept</button><button class="btn secondary" onclick="updateRide('${r.id}','completed')">Complete</button></div></div>`).join(''):'<p class="muted">No ride requests yet.</p>';
+ }catch(e){toast(e.message)}
+}
+async function updateRide(id,status){
+ try{await api('/rides/'+id,{method:'PATCH',body:JSON.stringify({status})});loadRides();toast('Ride '+status);}catch(e){toast(e.message)}
+}
+async function loadOrders(){
+ try{
+ const orders=await api('/orders'); const box=document.getElementById('ordersList');
+ box.innerHTML=orders.length?orders.map(o=>`<div class="listitem"><div class="row"><b>${o.id}</b><span class="badge">${o.status}</span></div><div>${o.items.map(x=>`${x.qty}× ${x.name}`).join(', ')}</div><div class="price">KES ${o.total}</div><div class="actions"><button class="btn secondary" onclick="updateOrder('${o.id}','preparing')">Preparing</button><button class="btn primary" onclick="updateOrder('${o.id}','ready')">Ready</button><button class="btn secondary" onclick="updateOrder('${o.id}','completed')">Complete</button></div></div>`).join(''):'<p class="muted">No food orders yet.</p>';
+ }catch(e){toast(e.message)}
+}
+async function loadAdmin(){
+ try{
+ const [b,leads,rides,orders]=await Promise.all([api('/bootstrap'),api('/partners'),api('/rides'),api('/orders')]);
+ bootstrap=b;renderStats();
+ document.getElementById('adminLeads').innerHTML=leads.length?leads.map(l=>`<div class="listitem"><div class="row"><b>${l.name} • ${l.type}</b><span class="badge">${l.status||'new'}</span></div><div class="muted">${l.phone} • ${l.details||''}</div><div class="actions"><button class="btn primary" onclick="approvePartner('${l.id}','approved')">Approve</button><button class="btn secondary" onclick="approvePartner('${l.id}','rejected')">Reject</button></div></div>`).join(''):'<p class="muted">No partner leads.</p>';
+ document.getElementById('adminActivity').innerHTML=`<div class="listitem">Rides: <b>${rides.length}</b></div><div class="listitem">Orders: <b>${orders.length}</b></div>`;
+ }catch(e){toast(e.message)}
+}
+async function resetDemo(){
+ if(!confirm('Clear rides, orders and leads?'))return;
+ await api('/admin/reset-demo',{method:'POST'});bootstrap=await api('/bootstrap');renderStats();loadAdmin();toast('Demo data reset');
+}
+
+async function loadEarnings(){
+ try{
+   const e=await api('/earnings');
+   document.getElementById('earnCompleted').textContent=e.completedRides;
+   document.getElementById('earnGross').textContent='KES '+e.gross;
+   document.getElementById('earnFee').textContent='KES '+e.platformFee;
+   document.getElementById('earnNet').textContent='KES '+e.net;
+ }catch(err){}
+}
+async function updateOrder(id,status){
+ try{await api('/orders/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOrders();toast('Order '+status);}catch(e){toast(e.message)}
+}
+async function approvePartner(id,status){
+ try{await api('/partners/'+id,{method:'PATCH',body:JSON.stringify({status})});loadAdmin();toast('Partner '+status);}catch(e){toast(e.message)}
+}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}
+const savedSession=localStorage.getItem('hapaSession');
+if(savedSession){try{currentUser=JSON.parse(savedSession).user;}catch(e){}}
+
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+init();
+</script>
+</body>
+</html>

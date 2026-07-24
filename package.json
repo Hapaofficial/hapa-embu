@@ -1,0 +1,13 @@
+{
+  "name": "hapa-embu-platform",
+  "version": "0.5.0",
+  "private": true,
+  "description": "HAPA Embu root-ready Render deployment",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node server/server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

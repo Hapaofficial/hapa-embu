@@ -1,0 +1,147 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "name": "Demo Customer",
+      "phone": "+254700000001",
+      "role": "customer"
+    },
+    {
+      "id": "u2",
+      "name": "Demo Driver",
+      "phone": "+254700000002",
+      "role": "driver"
+    },
+    {
+      "id": "u3",
+      "name": "Peter's Kitchen",
+      "phone": "+254700000003",
+      "role": "merchant"
+    },
+    {
+      "id": "u4",
+      "name": "HAPA Admin",
+      "phone": "+254700000004",
+      "role": "admin"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "d1",
+      "name": "James",
+      "type": "boda",
+      "lat": -0.5312,
+      "lng": 37.4501,
+      "online": true,
+      "rating": 4.8
+    },
+    {
+      "id": "d2",
+      "name": "Kevin",
+      "type": "car",
+      "lat": -0.5368,
+      "lng": 37.4544,
+      "online": true,
+      "rating": 4.9
+    },
+    {
+      "id": "d3",
+      "name": "Moses",
+      "type": "courier",
+      "lat": -0.5282,
+      "lng": 37.4463,
+      "online": true,
+      "rating": 4.7
+    }
+  ],
+  "rides": [],
+  "orders": [],
+  "marketplace": [
+    {
+      "id": "m1",
+      "title": "Used Samsung A54",
+      "price": 32000,
+      "seller": "Brian",
+      "category": "Electronics"
+    },
+    {
+      "id": "m2",
+      "title": "Two-bedroom house for rent",
+      "price": 18000,
+      "seller": "Faith",
+      "category": "Property"
+    },
+    {
+      "id": "m3",
+      "title": "Fresh eggs \u2014 tray",
+      "price": 480,
+      "seller": "Green Farm",
+      "category": "Food"
+    }
+  ],
+  "restaurants": [
+    {
+      "id": "r1",
+      "name": "Peter's Kitchen",
+      "rating": 4.7,
+      "eta": "25\u201335 min",
+      "items": [
+        {
+          "id": "f1",
+          "name": "Large Pizza",
+          "price": 950
+        },
+        {
+          "id": "f2",
+          "name": "Loaded Chips",
+          "price": 450
+        },
+        {
+          "id": "f3",
+          "name": "Chicken & Chips",
+          "price": 650
+        }
+      ]
+    }
+  ],
+  "partnerLeads": [],
+  "sessions": [],
+  "wallets": [
+    {
+      "userId": "u1",
+      "balance": 1250,
+      "currency": "KES"
+    },
+    {
+      "userId": "u2",
+      "balance": 4820,
+      "currency": "KES"
+    },
+    {
+      "userId": "u3",
+      "balance": 15640,
+      "currency": "KES"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n1",
+      "userId": "u1",
+      "title": "Welcome to HAPA",
+      "body": "Your account is ready.",
+      "read": false
+    },
+    {
+      "id": "n2",
+      "userId": "u2",
+      "title": "Driver account active",
+      "body": "You can now accept ride requests.",
+      "read": false
+    }
+  ],
+  "commissions": {
+    "ridePercent": 15,
+    "foodPercent": 12,
+    "marketplacePercent": 5
+  }
+}
