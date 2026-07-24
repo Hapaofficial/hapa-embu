@@ -1,8 +1,7 @@
 services:
   - type: web
     name: hapa-embu
-    runtime: node
+    env: node
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
-    autoDeploy: true

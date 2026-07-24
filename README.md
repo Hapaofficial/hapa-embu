@@ -1,32 +1,19 @@
-# HAPA Embu v0.5 — Root Ready
+# HAPA Embu v1.0
 
-This package is prepared so the application files can live directly in the GitHub repository root.
+Working MVP with user registration, login, roles, owner dashboard, internal wallet, demo payments, rides and food orders.
 
-## Render settings
-
-- Root Directory: leave empty
+## Render
+- Root Directory: empty
 - Build Command: `npm install`
 - Start Command: `npm start`
 
-## Upload to GitHub
+## Owner login
+- Email: `owner@hapa.co.ke`
+- Password: `HapaOwner2026!`
 
-Open this folder and upload its CONTENTS to the repository root. Do not upload the ZIP file itself and do not create another HAPA_ROOT_READY_v0_5 folder inside the repository.
+Change production credentials in Render environment variables:
+- `OWNER_EMAIL`
+- `OWNER_PASSWORD`
+- `JWT_SECRET`
 
-Expected repository root:
-
-- package.json
-- server/
-- apps/
-- database/
-- docs/
-- render.yaml
-- Dockerfile
-
-## Local start
-
-```bash
-npm install
-npm start
-```
-
-Health check: `/api/health`
+Payments run in demo mode until real M-Pesa/card credentials are configured.
