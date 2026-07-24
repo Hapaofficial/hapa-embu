@@ -1,8 +1,7 @@
 {
   "name": "hapa-embu",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
-  "description": "HAPA Embu production core with PostgreSQL, secure accounts, approvals, owner dashboard and persistent wallet",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,12 +10,9 @@
     "node": ">=20"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cookie-parser": "^1.4.7",
     "express": "^4.21.2",
-    "express-rate-limit": "^7.5.0",
-    "helmet": "^8.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.13.3"
+    "pg": "^8.13.3",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
   }
 }
