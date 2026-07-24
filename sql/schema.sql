@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users(
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities JSONB NOT NULL DEFAULT '{"driver":false,"merchant":false,"professional":false}'::jsonb;
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 UPDATE users
 SET role = 'customer',
     status = 'pending'
@@ -18,7 +19,7 @@ WHERE role = 'partner';
 
 
 
-ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked'));
