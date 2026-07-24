@@ -1,1 +1,29 @@
-{"users":[],"transactions":[],"orders":[],"rides":[],"settings":{"currency":"KES","platformFeePct":10}}
+{
+  "users": [],
+  "transactions": [],
+  "orders": [],
+  "rides": [],
+  "settings": {
+    "appName": "HAPA",
+    "tagline": "Everything local \u2014 Embu, Kenya",
+    "currency": "KES",
+    "timezone": "Africa/Nairobi",
+    "language": "en",
+    "supportEmail": "",
+    "supportPhone": "",
+    "businessAddress": "Embu, Kenya",
+    "platformFeePct": 10,
+    "servicePrices": {
+      "boda": 150,
+      "car": 350,
+      "courier": 200
+    },
+    "payments": {
+      "mode": "demo",
+      "walletEnabled": true,
+      "mpesaEnabled": false,
+      "cardEnabled": false,
+      "cashEnabled": true
+    }
+  }
+}

@@ -1,10 +1,15 @@
 {
-  "name": "hapa-embu-v1",
-  "version": "1.0.0",
+  "name": "hapa-embu",
+  "version": "1.2.0",
   "private": true,
-  "type": "commonjs",
-  "scripts": {"start": "node server.js"},
-  "engines": {"node": ">=20"},
+  "description": "HAPA Embu - accounts, owner settings, wallet and payment configuration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2",
