@@ -17,14 +17,6 @@ SET role = 'customer',
     status = 'pending'
 WHERE role = 'partner';
 
-UPDATE users
-SET role = 'customer',
-    status = 'active',
-    token_version = token_version + 1
-WHERE LOWER(email) = LOWER('Moreentrader@gmail.com');
-
-
-
 
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
