@@ -12,15 +12,25 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN NOT NULL DEFAU
 ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities JSONB NOT NULL DEFAULT '{"driver":false,"merchant":false,"professional":false}'::jsonb;
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-UPDATE users SET capabilities=jsonb_set(capabilities,'{driver}','true',true) WHERE role='driver';
-UPDATE users SET capabilities=jsonb_set(capabilities,'{merchant}','true',true) WHERE role='merchant';
 UPDATE users
 SET role = 'customer',
-    status = CASE WHEN status='blocked' THEN 'rejected' ELSE status END
-WHERE role IN ('partner','driver','merchant');
+    status = 'pending'
+WHERE role = 'partner';
+
+UPDATE users
+SET role = 'customer',
+    status = CASE WHEN status = 'blocked' THEN 'blocked' ELSE 'active' END
+WHERE LOWER(email) = LOWER('Moreentrader@gmail.com');
+
+
+
+
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked'));
+UPDATE users SET capabilities=jsonb_set(capabilities,'{driver}','true',true),role='customer' WHERE role='driver';
+UPDATE users SET capabilities=jsonb_set(capabilities,'{merchant}','true',true),role='customer' WHERE role='merchant';
+UPDATE users SET role='customer',status=CASE WHEN status='blocked' THEN 'rejected' ELSE status END WHERE role='partner';
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users(lower(email)) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_uq ON users(phone) WHERE phone IS NOT NULL;
 

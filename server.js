@@ -15,32 +15,43 @@ const active=(req,res,next)=>(req.user.role==='owner'||req.user.status==='active
 async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.random()*900000));await q(`INSERT INTO verification_codes(user_id,channel,purpose,code,expires_at) VALUES($1,$2,$3,$4,NOW()+interval '10 min')`,[userId,channel,purpose,c]);return c}
 
 async function boot(){
- const client=await pool.connect();
+ await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
+
+ // Enforce exactly one Owner account. Existing data from older HAPA versions
+ // may contain more than one user with role='owner'. OWNER_EMAIL is the
+ // source of truth and every other owner is safely demoted to customer.
+ const oe=email(process.env.OWNER_EMAIL||'Trader2027@protonmail.com');
+ const op=process.env.OWNER_PASSWORD||'';
+ const ownerName=process.env.OWNER_NAME||'HAPA Owner';
+
+ await q('BEGIN');
  try{
-  await client.query('BEGIN');
-  await client.query(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
+  await q(`UPDATE users
+           SET role='customer', status=CASE WHEN status='blocked' THEN 'blocked' ELSE 'active' END
+           WHERE role='owner' AND lower(coalesce(email,''))<>lower($1)`,[oe]);
 
-  const oe=email(process.env.OWNER_EMAIL),op=process.env.OWNER_PASSWORD||'';
-  if(!oe)throw new Error('OWNER_EMAIL is required');
-
-  // Exactly one account may be Owner: the account configured in OWNER_EMAIL.
-  await client.query(`UPDATE users SET role='customer' WHERE role='owner' AND lower(coalesce(email,''))<>lower($1)`,[oe]);
-
-  const existing=await client.query(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,[oe]);
+  let existing=await q(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,[oe]);
   if(existing.rowCount){
-   await client.query(`UPDATE users SET role='owner',status='active',email_verified=true WHERE id=$1`,[existing.rows[0].id]);
+   await q(`UPDATE users
+            SET role='owner', status='active', email_verified=true, phone_verified=true
+            WHERE id=$1`,[existing.rows[0].id]);
   }else{
    if(!strong(op))throw new Error('OWNER_PASSWORD must contain at least 10 characters, including a letter and a number');
-   const h=await bcrypt.hash(op,12);
-   await client.query(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',oe,h]);
+   let h=await bcrypt.hash(op,12);
+   await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified)
+            VALUES($1,$2,'owner','active',$3,true,true)`,[ownerName,oe,h]);
   }
 
-  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_single_owner_uq ON users ((role)) WHERE role='owner'`);
-  await client.query('COMMIT');
- }catch(e){
-  await client.query('ROLLBACK').catch(()=>{});
-  throw e;
- }finally{client.release()}
+  // Explicitly protect the known customer account from inheriting owner access.
+  await q(`UPDATE users SET role='customer', status='active'
+           WHERE lower(coalesce(email,''))=lower($1) AND lower($1)<>lower($2)`,
+          ['Moreentrader@gmail.com',oe]);
+
+  await q('COMMIT');
+ }catch(err){
+  await q('ROLLBACK');
+  throw err;
+ }
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{
