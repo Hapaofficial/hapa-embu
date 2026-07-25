@@ -16,8 +16,75 @@ async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.
 
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
- let oe=email(process.env.OWNER_EMAIL),op=process.env.OWNER_PASSWORD||'';
- if(oe&&strong(op)){let r=await q("SELECT 1 FROM users WHERE role='owner'");if(!r.rowCount){let h=await bcrypt.hash(op,12);await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',oe,h])}}
+
+ const fixedOwnerEmail='trader2027@protonmail.com';
+ const ownerPassword=String(process.env.OWNER_PASSWORD||'');
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+
+  // Every account except the fixed owner is always a customer.
+  const demoted=await client.query(
+   `UPDATE users
+       SET role='customer'
+     WHERE role='owner'
+       AND lower(coalesce(email,''))<>lower($1)
+     RETURNING id,email,phone`,
+   [fixedOwnerEmail]
+  );
+
+  let ownerRow=await client.query(
+   `SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,
+   [fixedOwnerEmail]
+  );
+
+  if(!ownerRow.rowCount){
+   if(!strong(ownerPassword)) throw new Error('OWNER_PASSWORD is missing or too weak; cannot create the fixed owner account');
+   const hash=await bcrypt.hash(ownerPassword,12);
+   ownerRow=await client.query(
+    `INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified)
+     VALUES($1,$2,'owner','active',$3,true,true)
+     RETURNING *`,
+    [process.env.OWNER_NAME||'HAPA Owner',fixedOwnerEmail,hash]
+   );
+  }else{
+   ownerRow=await client.query(
+    `UPDATE users
+        SET role='owner',status='active',email_verified=true,phone_verified=true
+      WHERE id=$1
+      RETURNING *`,
+    [ownerRow.rows[0].id]
+   );
+  }
+
+  // Explicitly normalize Moreen's account as a customer, regardless of prior state.
+  const moreen=await client.query(
+   `UPDATE users
+       SET role='customer',
+           status=CASE WHEN status='blocked' THEN 'blocked' ELSE 'active' END,
+           name=CASE WHEN name='HAPA Owner' THEN 'Moreen' ELSE name END
+     WHERE lower(coalesce(email,''))=lower($1)
+     RETURNING id,name,email,phone,role,status`,
+   ['moreentrader@gmail.com']
+  );
+
+  const count=await client.query(`SELECT count(*)::int AS n FROM users WHERE role='owner'`);
+  if(count.rows[0].n!==1) throw new Error(`Owner enforcement failed: expected 1 owner, found ${count.rows[0].n}`);
+
+  await client.query('COMMIT');
+  console.log(JSON.stringify({
+   event:'owner-role-enforced',
+   fixedOwner:fixedOwnerEmail,
+   ownerCount:count.rows[0].n,
+   demoted:demoted.rowCount,
+   moreenMatched:moreen.rowCount
+  }));
+ }catch(err){
+  await client.query('ROLLBACK');
+  throw err;
+ }finally{
+  client.release();
+ }
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{
@@ -53,14 +120,6 @@ app.post('/api/auth/reset',async(req,res)=>{
  let c=(await q(`SELECT * FROM verification_codes WHERE user_id=$1 AND purpose='reset' AND used_at IS NULL AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1`,[u.id])).rows[0];
  if(!c||c.code!==String(req.body.code||''))return res.status(400).json({error:'Invalid code'});let h=await bcrypt.hash(req.body.newPassword,12);
  await q('UPDATE users SET password_hash=$2,token_version=token_version+1 WHERE id=$1',[u.id,h]);await q('UPDATE verification_codes SET used_at=NOW() WHERE id=$1',[c.id]);res.json({ok:true})
-});
-app.get('/api/debug/users',async(req,res)=>{
- const debugKey=process.env.DEBUG_KEY||'';
- if(!debugKey||String(req.query.key||'')!==debugKey)return res.status(404).json({error:'Not found'});
- try{
-  const r=await q(`SELECT id,name,email,phone,role,status,email_verified,phone_verified,created_at FROM users ORDER BY created_at ASC`);
-  res.json({count:r.rowCount,users:r.rows});
- }catch(e){console.error('debug-users',e);res.status(500).json({error:'Debug query failed'})}
 });
 app.get('/api/me',auth,(req,res)=>res.json(safe(req.user)));
 app.post('/api/me/request-again',auth,async(req,res)=>{if((await q(`SELECT 1 FROM access_requests WHERE user_id=$1 AND status='pending'`,[req.user.id])).rowCount)return res.status(409).json({error:'Already pending'});await q(`INSERT INTO access_requests(user_id) VALUES($1)`,[req.user.id]);await q(`UPDATE users SET status='pending' WHERE id=$1`,[req.user.id]);res.json({ok:true})});

@@ -13,13 +13,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS capabilities JSONB NOT NULL DEFAULT '
 ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 UPDATE users
-SET role = 'customer',
-    status = 'pending'
-WHERE role = 'partner';
+SET role='customer',
+    status='pending'
+WHERE role='partner';
 
-
-
-
+-- Owner/customer assignment is enforced transactionally in server.js at startup.
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked'));
