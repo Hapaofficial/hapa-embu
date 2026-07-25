@@ -9,49 +9,33 @@ const strong=p=>String(p||'').length>=10&&/[A-Za-z]/.test(p)&&/\d/.test(p);
 const safe=u=>({id:u.id,name:u.name,email:u.email,phone:u.phone,role:u.role,status:u.status,wallet:+u.wallet_balance||0,
  profilePhotoUrl:u.profile_photo_url,emailVerified:u.email_verified,phoneVerified:u.phone_verified,capabilities:u.capabilities||{}});
 const tok=u=>jwt.sign({sub:u.id,tv:+u.token_version||0},secret,{expiresIn:'7d',issuer:'hapa'});
-async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||r.rows[0].status==='blocked')throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
+async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||r.rows[0].status==='blocked'||+d.tv!==+r.rows[0].token_version)throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
 const owner=(req,res,next)=>req.user.role==='owner'?next():res.status(403).json({error:'Owner only'});
 const active=(req,res,next)=>(req.user.role==='owner'||req.user.status==='active')?next():res.status(403).json({error:'Account not active'});
 async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.random()*900000));await q(`INSERT INTO verification_codes(user_id,channel,purpose,code,expires_at) VALUES($1,$2,$3,$4,NOW()+interval '10 min')`,[userId,channel,purpose,c]);return c}
 
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
-
- // Enforce exactly one Owner account. Existing data from older HAPA versions
- // may contain more than one user with role='owner'. OWNER_EMAIL is the
- // source of truth and every other owner is safely demoted to customer.
- const oe=email(process.env.OWNER_EMAIL||'Trader2027@protonmail.com');
- const op=process.env.OWNER_PASSWORD||'';
- const ownerName=process.env.OWNER_NAME||'HAPA Owner';
-
+ const primaryOwnerEmail=email(process.env.PRIMARY_OWNER_EMAIL||'Trader2027@protonmail.com');
+ const moreenEmail='moreentrader@gmail.com';
+ const ownerPassword=process.env.OWNER_PASSWORD||'';
  await q('BEGIN');
  try{
-  await q(`UPDATE users
-           SET role='customer', status=CASE WHEN status='blocked' THEN 'blocked' ELSE 'active' END
-           WHERE role='owner' AND lower(coalesce(email,''))<>lower($1)`,[oe]);
-
-  let existing=await q(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,[oe]);
-  if(existing.rowCount){
-   await q(`UPDATE users
-            SET role='owner', status='active', email_verified=true, phone_verified=true
-            WHERE id=$1`,[existing.rows[0].id]);
+  // Exactly one Owner: Piotr's account. Every other old Owner is demoted.
+  await q(`UPDATE users SET role='customer', status=CASE WHEN status='blocked' THEN 'blocked' ELSE 'active' END, token_version=token_version+1 WHERE role='owner' AND lower(coalesce(email,''))<>lower($1)`,[primaryOwnerEmail]);
+  // Explicitly repair Moreen's existing account and invalidate any old Owner session.
+  await q(`UPDATE users SET role='customer', status='active', token_version=token_version+1 WHERE lower(coalesce(email,''))=lower($1)`,[moreenEmail]);
+  let r=await q(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,[primaryOwnerEmail]);
+  if(r.rowCount){
+   await q(`UPDATE users SET role='owner',status='active',email_verified=true,phone_verified=true WHERE id=$1`,[r.rows[0].id]);
+  }else if(strong(ownerPassword)){
+   let h=await bcrypt.hash(ownerPassword,12);
+   await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',primaryOwnerEmail,h]);
   }else{
-   if(!strong(op))throw new Error('OWNER_PASSWORD must contain at least 10 characters, including a letter and a number');
-   let h=await bcrypt.hash(op,12);
-   await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified)
-            VALUES($1,$2,'owner','active',$3,true,true)`,[ownerName,oe,h]);
+   throw new Error('Primary Owner account missing and OWNER_PASSWORD is not configured');
   }
-
-  // Explicitly protect the known customer account from inheriting owner access.
-  await q(`UPDATE users SET role='customer', status='active'
-           WHERE lower(coalesce(email,''))=lower($1) AND lower($1)<>lower($2)`,
-          ['Moreentrader@gmail.com',oe]);
-
   await q('COMMIT');
- }catch(err){
-  await q('ROLLBACK');
-  throw err;
- }
+ }catch(e){await q('ROLLBACK');throw e}
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{

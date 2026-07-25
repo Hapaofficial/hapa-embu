@@ -19,7 +19,8 @@ WHERE role = 'partner';
 
 UPDATE users
 SET role = 'customer',
-    status = CASE WHEN status = 'blocked' THEN 'blocked' ELSE 'active' END
+    status = 'active',
+    token_version = token_version + 1
 WHERE LOWER(email) = LOWER('Moreentrader@gmail.com');
 
 
