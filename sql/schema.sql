@@ -15,7 +15,9 @@ ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 UPDATE users
 SET role = 'customer',
     status = 'pending'
-WHERE role = 'partner';
+WHERE role = 'partner';UPDATE users
+SET role = 'customer'
+WHERE LOWER(email) = LOWER('Moreentrader@gmail.com');
 
 
 
