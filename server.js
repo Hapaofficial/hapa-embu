@@ -16,48 +16,8 @@ async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.
 
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
-
- // HAPA has one fixed owner account. Do not use OWNER_EMAIL to choose the owner,
- // because a wrong environment value previously promoted the wrong user.
- const ownerEmail='trader2027@protonmail.com';
- const moreenEmail='moreentrader@gmail.com';
- const ownerPassword=process.env.OWNER_PASSWORD||'';
- const ownerName=process.env.OWNER_NAME||'HAPA Owner';
-
- let ownerRow=(await q('SELECT * FROM users WHERE lower(email)=lower($1) LIMIT 1',[ownerEmail])).rows[0];
- if(!ownerRow){
-  if(!strong(ownerPassword))throw new Error('Owner account missing. Set OWNER_PASSWORD in Render to create it.');
-  const passwordHash=await bcrypt.hash(ownerPassword,12);
-  ownerRow=(await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified)
-   VALUES($1,$2,'owner','active',$3,true,true) RETURNING *`,[ownerName,ownerEmail,passwordHash])).rows[0];
- }
-
- // Promote the real owner and demote every other accidental owner.
- await q(`UPDATE users
-          SET role='owner',status='active',email_verified=true
-          WHERE id=$1`,[ownerRow.id]);
- const demoted=await q(`UPDATE users
-                        SET role='customer'
-                        WHERE role='owner' AND id<>$1
-                        RETURNING id,email`,[ownerRow.id]);
-
- // Repair Moreen's account if it was previously created as the HAPA owner account.
- const moreen=await q(`UPDATE users
-                       SET role='customer',
-                           status=CASE WHEN status='blocked' THEN status ELSE 'active' END,
-                           name=CASE WHEN lower(name)='hapa owner' THEN 'Moreen' ELSE name END
-                       WHERE lower(email)=lower($1)
-                       RETURNING id,email,role,status,name`,[moreenEmail]);
-
- const owners=await q(`SELECT id,email,name FROM users WHERE role='owner' ORDER BY created_at`);
- console.log(JSON.stringify({
-  event:'owner-role-enforced',
-  fixedOwner:ownerEmail,
-  ownerCount:owners.rowCount,
-  owners:owners.rows.map(r=>({email:r.email,name:r.name})),
-  demotedOwners:demoted.rows.map(r=>r.email),
-  moreenFixed:moreen.rowCount===1
- }));
+ let oe=email(process.env.OWNER_EMAIL),op=process.env.OWNER_PASSWORD||'';
+ if(oe&&strong(op)){let r=await q("SELECT 1 FROM users WHERE role='owner'");if(!r.rowCount){let h=await bcrypt.hash(op,12);await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',oe,h])}}
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{
@@ -93,6 +53,14 @@ app.post('/api/auth/reset',async(req,res)=>{
  let c=(await q(`SELECT * FROM verification_codes WHERE user_id=$1 AND purpose='reset' AND used_at IS NULL AND expires_at>NOW() ORDER BY expires_at DESC LIMIT 1`,[u.id])).rows[0];
  if(!c||c.code!==String(req.body.code||''))return res.status(400).json({error:'Invalid code'});let h=await bcrypt.hash(req.body.newPassword,12);
  await q('UPDATE users SET password_hash=$2,token_version=token_version+1 WHERE id=$1',[u.id,h]);await q('UPDATE verification_codes SET used_at=NOW() WHERE id=$1',[c.id]);res.json({ok:true})
+});
+app.get('/api/debug/users',async(req,res)=>{
+ const debugKey=process.env.DEBUG_KEY||'';
+ if(!debugKey||String(req.query.key||'')!==debugKey)return res.status(404).json({error:'Not found'});
+ try{
+  const r=await q(`SELECT id,name,email,phone,role,status,email_verified,phone_verified,created_at FROM users ORDER BY created_at ASC`);
+  res.json({count:r.rowCount,users:r.rows});
+ }catch(e){console.error('debug-users',e);res.status(500).json({error:'Debug query failed'})}
 });
 app.get('/api/me',auth,(req,res)=>res.json(safe(req.user)));
 app.post('/api/me/request-again',auth,async(req,res)=>{if((await q(`SELECT 1 FROM access_requests WHERE user_id=$1 AND status='pending'`,[req.user.id])).rowCount)return res.status(409).json({error:'Already pending'});await q(`INSERT INTO access_requests(user_id) VALUES($1)`,[req.user.id]);await q(`UPDATE users SET status='pending' WHERE id=$1`,[req.user.id]);res.json({ok:true})});
