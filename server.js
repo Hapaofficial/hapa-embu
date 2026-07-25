@@ -17,24 +17,47 @@ async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
 
- // Keep exactly one owner account. OWNER_EMAIL should be set in Render.
- // The fallback protects the current HAPA installation if that variable is missing.
- const ownerEmail=email(process.env.OWNER_EMAIL||'Trader2027@protonmail.com');
+ // HAPA has one fixed owner account. Do not use OWNER_EMAIL to choose the owner,
+ // because a wrong environment value previously promoted the wrong user.
+ const ownerEmail='trader2027@protonmail.com';
+ const moreenEmail='moreentrader@gmail.com';
  const ownerPassword=process.env.OWNER_PASSWORD||'';
  const ownerName=process.env.OWNER_NAME||'HAPA Owner';
 
  let ownerRow=(await q('SELECT * FROM users WHERE lower(email)=lower($1) LIMIT 1',[ownerEmail])).rows[0];
  if(!ownerRow){
-  if(!strong(ownerPassword))throw new Error('OWNER account is missing and OWNER_PASSWORD is not configured correctly');
+  if(!strong(ownerPassword))throw new Error('Owner account missing. Set OWNER_PASSWORD in Render to create it.');
   const passwordHash=await bcrypt.hash(ownerPassword,12);
   ownerRow=(await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified)
    VALUES($1,$2,'owner','active',$3,true,true) RETURNING *`,[ownerName,ownerEmail,passwordHash])).rows[0];
  }
 
- // Promote the configured account and demote every other accidental owner.
- await q(`UPDATE users SET role='owner',status='active',email_verified=true WHERE id=$1`,[ownerRow.id]);
- const demoted=await q(`UPDATE users SET role='customer' WHERE role='owner' AND id<>$1 RETURNING id,email`,[ownerRow.id]);
- console.log(`Owner role enforced for ${ownerEmail}; demoted ${demoted.rowCount} duplicate owner account(s)`);
+ // Promote the real owner and demote every other accidental owner.
+ await q(`UPDATE users
+          SET role='owner',status='active',email_verified=true
+          WHERE id=$1`,[ownerRow.id]);
+ const demoted=await q(`UPDATE users
+                        SET role='customer'
+                        WHERE role='owner' AND id<>$1
+                        RETURNING id,email`,[ownerRow.id]);
+
+ // Repair Moreen's account if it was previously created as the HAPA owner account.
+ const moreen=await q(`UPDATE users
+                       SET role='customer',
+                           status=CASE WHEN status='blocked' THEN status ELSE 'active' END,
+                           name=CASE WHEN lower(name)='hapa owner' THEN 'Moreen' ELSE name END
+                       WHERE lower(email)=lower($1)
+                       RETURNING id,email,role,status,name`,[moreenEmail]);
+
+ const owners=await q(`SELECT id,email,name FROM users WHERE role='owner' ORDER BY created_at`);
+ console.log(JSON.stringify({
+  event:'owner-role-enforced',
+  fixedOwner:ownerEmail,
+  ownerCount:owners.rowCount,
+  owners:owners.rows.map(r=>({email:r.email,name:r.name})),
+  demotedOwners:demoted.rows.map(r=>r.email),
+  moreenFixed:moreen.rowCount===1
+ }));
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{
