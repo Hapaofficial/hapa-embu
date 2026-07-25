@@ -15,9 +15,32 @@ const active=(req,res,next)=>(req.user.role==='owner'||req.user.status==='active
 async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.random()*900000));await q(`INSERT INTO verification_codes(user_id,channel,purpose,code,expires_at) VALUES($1,$2,$3,$4,NOW()+interval '10 min')`,[userId,channel,purpose,c]);return c}
 
 async function boot(){
- await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
- let oe=email(process.env.OWNER_EMAIL),op=process.env.OWNER_PASSWORD||'';
- if(oe&&strong(op)){let r=await q("SELECT 1 FROM users WHERE role='owner'");if(!r.rowCount){let h=await bcrypt.hash(op,12);await q(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',oe,h])}}
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  await client.query(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
+
+  const oe=email(process.env.OWNER_EMAIL),op=process.env.OWNER_PASSWORD||'';
+  if(!oe)throw new Error('OWNER_EMAIL is required');
+
+  // Exactly one account may be Owner: the account configured in OWNER_EMAIL.
+  await client.query(`UPDATE users SET role='customer' WHERE role='owner' AND lower(coalesce(email,''))<>lower($1)`,[oe]);
+
+  const existing=await client.query(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) LIMIT 1`,[oe]);
+  if(existing.rowCount){
+   await client.query(`UPDATE users SET role='owner',status='active',email_verified=true WHERE id=$1`,[existing.rows[0].id]);
+  }else{
+   if(!strong(op))throw new Error('OWNER_PASSWORD must contain at least 10 characters, including a letter and a number');
+   const h=await bcrypt.hash(op,12);
+   await client.query(`INSERT INTO users(name,email,role,status,password_hash,email_verified,phone_verified) VALUES($1,$2,'owner','active',$3,true,true)`,[process.env.OWNER_NAME||'HAPA Owner',oe,h]);
+  }
+
+  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_single_owner_uq ON users ((role)) WHERE role='owner'`);
+  await client.query('COMMIT');
+ }catch(e){
+  await client.query('ROLLBACK').catch(()=>{});
+  throw e;
+ }finally{client.release()}
 }
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 app.post('/api/auth/register',async(req,res)=>{

@@ -1,0 +1,19 @@
+HAPA v1.6 role fix
+
+What changed
+- OWNER_EMAIL is now the single source of truth for the Owner account.
+- At every app startup, every other accidental owner is automatically changed to customer.
+- The account matching OWNER_EMAIL is promoted to owner and kept active.
+- A database index prevents more than one owner from existing.
+- Legacy partner/driver/merchant roles are safely migrated to customer roles.
+
+Required Render environment variable
+OWNER_EMAIL=Trader2027@protonmail.com
+
+Deployment
+Upload the full project contents to the GitHub repository, commit to main, then in Render choose Manual Deploy > Deploy latest commit.
+
+Expected result
+- Trader2027@protonmail.com: owner
+- Moreentrader@gmail.com: customer
+- Moreen keeps her current account status and password.
