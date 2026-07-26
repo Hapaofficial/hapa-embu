@@ -1,115 +1,1268 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA v1.6</title>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA — Buy &amp; Sell in Embu</title>
 <style>
-:root{--bg:#0b1020;--p:#17213a;--p2:#10182c;--line:#33405f;--text:#f7f8fc;--muted:#aeb7cf;--a:#ffb12d;--ok:#41d997;--bad:#ff6c76}
+:root{--bg:#0b1020;--p:#17213a;--p2:#10182c;--card:#1b2744;--line:#33405f;--text:#f7f8fc;--muted:#c0c8e0;--a:#ffb12d;--ok:#41d997;--bad:#ff6c76;--wa:#25d366}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#26385f,#0b1020 55%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
-.wrap{max-width:1180px;margin:auto;padding:26px 18px 70px}.card{background:linear-gradient(145deg,#1b2744,#121a2e);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 18px 50px #0005}
-.auth{max-width:520px;margin:5vh auto}.brand{font-size:28px;font-weight:900}.brand span{color:var(--a)}.muted{color:var(--muted)}button,input,select,textarea{font:inherit}
-.btn{border:1px solid var(--line);background:#22304f;color:white;border-radius:11px;padding:11px 15px;font-weight:750;cursor:pointer}.btn.primary{background:var(--a);color:#261900;border:0}.btn.bad{background:#4b202a}.btn.ok{background:#174b38}
-.field{display:grid;gap:6px;margin:12px 0}.field label{font-size:13px;color:var(--muted);font-weight:700}.field input,.field select,.field textarea{background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:12px;width:100%}
-.tabs,.nav{display:flex;flex-wrap:wrap;gap:9px}.hidden{display:none!important}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;background:var(--p2);border:1px solid var(--line);border-radius:12px}.list{display:grid;gap:9px}.notice{padding:12px;border-radius:10px;margin:12px 0;background:#17382d;border:1px solid #2a755b}.notice.bad{background:#3a1c25;border-color:#873747}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.pill{padding:7px 10px;border-radius:999px;border:1px solid var(--line)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{padding:15px;border-radius:13px;background:var(--p2);border:1px solid var(--line)}.stat span{display:block;color:var(--muted);font-size:12px}.stat b{font-size:21px}.photo{width:58px;height:58px;border-radius:50%;object-fit:cover;background:#26324c}.listing img{width:100%;height:150px;object-fit:cover;border-radius:12px;background:#26324c}
-@media(max-width:820px){.grid,.grid3{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.top{align-items:flex-start}}
+.wrap{max-width:1180px;margin:auto;padding:26px 18px 80px}
+.card{background:linear-gradient(145deg,var(--card),#121a2e);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 18px 50px #0005}
+.auth{max-width:520px;margin:5vh auto}
+.brand{font-size:28px;font-weight:900}.brand span{color:var(--a)}
+.muted{color:var(--muted)}
+button,input,select,textarea{font:inherit}
+.btn{border:1px solid var(--line);background:#22304f;color:white;border-radius:11px;padding:11px 15px;font-weight:750;cursor:pointer;transition:background .12s,border-color .12s}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--a);color:#261900;border:0}
+.btn.bad{background:#4b202a;border-color:#6b2535}
+.btn.ok{background:#174b38;border-color:#2a755b}
+.btn.wa{background:#1a3d26;border-color:var(--wa);color:var(--wa)}
+.btn.nav-active{background:var(--a);color:#261900;border-color:transparent}
+.field{display:grid;gap:6px;margin:12px 0}
+.field label{font-size:13px;color:var(--muted);font-weight:700}
+.field input,.field select,.field textarea{background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:12px;width:100%;transition:border-color .15s}
+.field input.err,.field select.err,.field textarea.err{border-color:var(--bad)!important}
+.field-err{display:none;color:var(--bad);font-size:12px;margin-top:3px;font-weight:600}
+.field-err.show{display:block}
+.tabs,.nav{display:flex;flex-wrap:wrap;gap:9px}
+.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;background:var(--p2);border:1px solid var(--line);border-radius:12px}
+.list{display:grid;gap:9px}
+.notice{padding:12px;border-radius:10px;margin:12px 0;background:#17382d;border:1px solid #2a755b}
+.notice.bad{background:#3a1c25;border-color:#873747}
+.notice.warn{background:#332200;border-color:#7a5500}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.pill{padding:7px 10px;border-radius:999px;border:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{padding:15px;border-radius:13px;background:var(--p2);border:1px solid var(--line)}
+.stat span{display:block;color:var(--muted);font-size:12px}.stat b{font-size:21px}
+.photo{width:58px;height:58px;border-radius:50%;object-fit:cover;background:#26324c}
+/* Password requirements */
+.pw-reqs{background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:4px;display:grid;gap:4px}
+.pw-req-item{font-size:12px;display:flex;align-items:center;gap:6px;color:var(--muted);transition:color .15s}
+.pw-req-item.met{color:var(--ok)}
+.pw-req-icon{font-size:14px;width:16px;text-align:center}
+/* Selfie preview */
+.selfie-preview-wrap{margin-top:10px;display:flex;align-items:center;gap:12px}
+.selfie-preview-wrap img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--a)}
+/* HAPA Verified */
+.hapa-verified{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:#0d2b1e;border:1px solid #2a755b;color:var(--ok);font-size:11px;font-weight:700;white-space:nowrap}
+/* Auth prompt overlay */
+.auth-prompt{position:fixed;bottom:0;left:0;right:0;z-index:200;background:linear-gradient(#121a2eee,#0b1020);border-top:1px solid var(--line);padding:20px 24px;display:flex;flex-direction:column;gap:12px;backdrop-filter:blur(12px)}
+.auth-prompt-title{font-size:16px;font-weight:700;margin:0}
+.auth-prompt-btns{display:flex;gap:10px;flex-wrap:wrap}
+/* Pending banner */
+.pending-banner{background:#17382d;border:1px solid #2a755b;border-radius:12px;padding:13px 16px;margin-bottom:14px;font-size:14px}
+/* Guest banner */
+.guest-banner{background:#1a2644;border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:14px;font-size:14px}
+/* Draft banner */
+.draft-banner{background:#1a2d0a;border:1px solid #3a6020;border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:13px}
+/* Owner user detail */
+.ud-sticky{position:sticky;top:0;z-index:10;background:linear-gradient(#0b1020f5,#0b102080);backdrop-filter:blur(10px);padding:10px 0;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.ud-tab{padding:8px 15px;border-radius:9px;cursor:pointer;font-weight:650;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--muted);white-space:nowrap;transition:all .15s}
+.ud-tab.active{background:var(--a);color:#261900;border-color:transparent;font-weight:800}
+.ud-tab:hover:not(.active){border-color:var(--a);color:var(--text)}
+.ud-photo{width:84px;height:84px;border-radius:50%;object-fit:cover;background:var(--p2);flex-shrink:0;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:var(--muted)}
+.ud-listing-card{background:var(--p2);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s}
+.ud-listing-card:hover{border-color:var(--a);transform:translateY(-2px)}
+.ud-listing-card-img{width:100%;height:140px;object-fit:cover;display:block;background:var(--p)}
+.ud-gallery{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.ud-gallery img{height:160px;width:auto;max-width:45%;object-fit:cover;border-radius:10px;cursor:zoom-in;transition:max-width .2s}
+.ud-gallery img.expanded{max-width:100%;cursor:zoom-out}
+.badge-pill{padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700;display:inline-block}
+/* Marketplace PRO */
+.mp-subnav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.mp-tab{padding:9px 16px;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--muted);white-space:nowrap;transition:all .15s}
+.mp-tab.active{background:var(--a);color:#261900;border-color:transparent}
+.mp-tab:hover:not(.active){border-color:var(--a);color:var(--text)}
+.mp-card{background:var(--p2);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .12s;position:relative}
+.mp-card:hover{border-color:var(--a);transform:translateY(-2px)}
+.mp-card-img{width:100%;height:160px;object-fit:cover;display:block;background:var(--p)}
+.mp-no-img{height:110px;display:flex;align-items:center;justify-content:center;background:var(--p);color:var(--muted);font-size:13px}
+.mp-card-body{padding:12px}
+.mp-badge{padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;display:inline-block}
+.mp-price{font-size:18px;font-weight:900;color:var(--a)}
+.mp-fav-btn{position:absolute;top:10px;right:10px;width:44px;height:44px;border-radius:50%;background:#00000088;border:0;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:0;touch-action:manipulation}
+.mp-filters{background:var(--p2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.mp-search-row{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.mp-search-row input{flex:1;background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:11px 14px;font:inherit}
+.mp-sort-select{background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+.mp-pagination{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:18px;flex-wrap:wrap}
+.mp-gallery-main{width:100%;max-height:340px;object-fit:contain;border-radius:12px;background:var(--p);margin-bottom:10px;display:block}
+.mp-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.mp-thumb{width:68px;height:68px;object-fit:cover;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:border-color .15s}
+.mp-thumb.sel{border-color:var(--a)}
+.mp-seller-card{background:var(--p2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;cursor:pointer;transition:border-color .15s}
+.mp-seller-card:hover{border-color:var(--a)}
+.mp-my-card{background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.mp-my-thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--p);display:block}
+.mp-preview-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:flex-start;min-height:90px;padding:4px 0}
+.mp-empty{text-align:center;padding:40px 20px}
+.mp-back-bar{margin-bottom:14px}
+.mp-char-count{font-size:12px;color:var(--muted);text-align:right;margin-top:3px}
+.sold-banner{background:#2d1a00;border:2px solid var(--a);border-radius:14px;padding:20px;margin-bottom:16px;text-align:center}
+.cond-new{background:#1a3a26;color:var(--ok)}
+.cond-used{background:#2d1f00;color:#e8a020}
+/* Inline confirm */
+.inline-confirm{background:#3a1c25;border:1px solid #873747;border-radius:9px;padding:10px 12px;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+/* Value prop */
+.value-prop{display:flex;flex-direction:column;gap:7px;margin:12px 0 16px;padding:14px;background:var(--p2);border:1px solid var(--line);border-radius:12px}
+.value-prop-item{display:flex;align-items:center;gap:8px;font-size:14px}
+.value-prop-icon{font-size:18px;width:26px;text-align:center}
+/* Resend */
+.verify-hint{font-size:13px;color:var(--muted);margin:4px 0 8px}
+@media(max-width:820px){
+ .grid,.grid3{grid-template-columns:1fr}
+ .stats{grid-template-columns:1fr 1fr}
+ .top{align-items:flex-start}
+ .ud-gallery img{height:110px;max-width:100%}
+ .mp-card-img{height:130px}
+ .mp-gallery-main{max-height:220px}
+ .mp-search-row{flex-wrap:wrap}
+ .mp-sort-select{width:100%}
+}
+@media(max-width:520px){
+ .stats{grid-template-columns:1fr 1fr}
+ .mp-subnav{gap:6px}
+ .mp-tab{padding:8px 12px;font-size:12px}
+}
 </style></head><body><div class="wrap">
+
+<!-- ═══════════════════════ AUTH ═══════════════════════ -->
 <section id="authView" class="auth card">
-<div class="brand">HA<span>PA</span></div><p class="muted">Everything local — Embu, Kenya</p>
-<div class="tabs"><button class="btn primary" onclick="authMode('login')">Login</button><button class="btn" onclick="authMode('register')">Create account</button></div><div id="authMsg"></div>
-<form id="loginForm"><div class="field"><label>Email or phone</label><input id="loginId" required></div><div class="field"><label>Password</label><input id="loginPass" type="password" required></div><button class="btn primary" style="width:100%">Login</button><button type="button" class="btn" style="width:100%;margin-top:8px" onclick="authMode('forgot')">Forgot password?</button></form>
-<form id="registerForm" class="hidden"><div class="field"><label>Full name</label><input id="regName" required></div><div class="grid"><div class="field"><label>Phone</label><input id="regPhone" placeholder="+254..."></div><div class="field"><label>Email (optional if phone used)</label><input id="regEmail" type="email"></div></div><div class="field"><label>Password</label><input id="regPass" type="password" required></div><div class="field"><label>Selfie / profile photo</label><input id="regSelfie" type="file" accept="image/*" capture="user" required></div><button class="btn primary" style="width:100%">Create Customer account</button></form>
-<form id="verifyForm" class="hidden"><div class="field"><label>Verification code</label><input id="verifyCode"></div><button class="btn primary" style="width:100%">Verify</button></form>
-<form id="forgotForm" class="hidden"><div class="field"><label>Email or phone</label><input id="forgotId"></div><button class="btn primary" style="width:100%">Send reset code</button><div id="resetFields" class="hidden"><div class="field"><label>Code</label><input id="resetCode"></div><div class="field"><label>New password</label><input id="resetPass" type="password"></div><button type="button" class="btn ok" style="width:100%" onclick="resetPassword()">Reset password</button></div></form>
+<div class="brand">HA<span>PA</span></div>
+<div class="value-prop">
+ <div class="value-prop-item"><span class="value-prop-icon">🛒</span><span>Buy and sell locally in Embu.</span></div>
+ <div class="value-prop-item"><span class="value-prop-icon">✓</span><span>Verified local accounts — every seller is reviewed.</span></div>
+ <div class="value-prop-item"><span class="value-prop-icon">📍</span><span>Marketplace, transport and services in one app.</span></div>
+</div>
+<div style="margin-bottom:12px"><button class="btn" style="width:100%" onclick="enterGuest()">Browse listings without account →</button></div>
+<div class="tabs"><button class="btn primary" onclick="authMode('login')">Login</button><button class="btn" onclick="authMode('register')">Create free account</button></div>
+<div id="authMsg"></div>
+
+<form id="loginForm"><div class="field"><label>Email or phone</label><input id="loginId" required autocomplete="username"></div>
+<div class="field"><label>Password</label><input id="loginPass" type="password" required autocomplete="current-password"></div>
+<button class="btn primary" style="width:100%">Login</button>
+<button type="button" class="btn" style="width:100%;margin-top:8px" onclick="authMode('forgot')">Forgot password?</button></form>
+
+<form id="registerForm" class="hidden">
+<div class="field"><label>Full name</label><input id="regName" required></div>
+<div class="grid">
+ <div class="field"><label>Phone</label><input id="regPhone" type="tel" placeholder="0712 345 678"></div>
+ <div class="field"><label>Email (optional if phone used)</label><input id="regEmail" type="email"></div>
+</div>
+<div class="field"><label>Password</label>
+ <input id="regPass" type="password" required autocomplete="new-password" oninput="updatePwReqs(this.value)">
+ <div class="pw-reqs" id="pwReqs">
+  <div class="pw-req-item" id="pwReqLen"><span class="pw-req-icon">○</span>At least 10 characters</div>
+  <div class="pw-req-item" id="pwReqLetter"><span class="pw-req-icon">○</span>At least one letter</div>
+  <div class="pw-req-item" id="pwReqNum"><span class="pw-req-icon">○</span>At least one number</div>
+ </div>
+</div>
+<div class="field"><label>Your photo or selfie *</label>
+ <input id="regSelfie" type="file" accept="image/*" capture="user" required onchange="updateSelfiePreview(this)">
+ <div class="selfie-preview-wrap hidden" id="selfiePreviewWrap"><img id="selfiePreview" alt="Your selfie"><span style="font-size:13px;color:var(--muted)">Looking good!</span></div>
+ <div style="font-size:12px;color:var(--muted);margin-top:5px">Your photo helps HAPA verify that accounts belong to real people. It will appear on your seller profile.</div>
+</div>
+<button class="btn primary" style="width:100%">Create free account</button></form>
+
+<div id="verifyForm" class="hidden">
+ <div class="verify-hint" id="verifyHint">Enter the 6-digit code we sent you.</div>
+ <div class="field"><label>Verification code</label><input id="verifyCode" type="tel" maxlength="6" placeholder="123456"></div>
+ <button class="btn primary" style="width:100%;margin-bottom:8px" onclick="doVerify()">Verify</button>
+ <button id="resendBtn" class="btn" style="width:100%" onclick="resendCode()">Resend code</button>
+</div>
+
+<form id="forgotForm" class="hidden">
+<div class="field"><label>Email or phone</label><input id="forgotId"></div>
+<button class="btn primary" style="width:100%">Send reset code</button>
+<div id="resetFields" class="hidden">
+ <div class="field"><label>Code</label><input id="resetCode"></div>
+ <div class="field"><label>New password</label><input id="resetPass" type="password" autocomplete="new-password"></div>
+ <button type="button" class="btn ok" style="width:100%" onclick="resetPassword()">Reset password</button>
+</div></form>
 </section>
 
+<!-- ═══════════════════════ APP ════════════════════════ -->
 <section id="appView" class="hidden">
-<div class="top"><div><div class="brand">HA<span>PA</span></div><div class="muted">Customer first. Upgrade later.</div></div><div><span id="badge" class="pill"></span> <button class="btn" onclick="logout()">Logout</button></div></div>
-<div class="nav"><button class="btn primary" onclick="tab('home')">Home</button><button class="btn" onclick="tab('market')">Marketplace</button><button class="btn" onclick="tab('upgrade')">Upgrade account</button><button id="ownerNav" class="btn hidden" onclick="tab('owner')">Owner dashboard</button></div>
+<div class="top">
+ <div><div class="brand">HA<span>PA</span></div><div class="muted" id="appSubtitle" style="font-size:13px">Safer local buying and selling</div></div>
+ <div id="userActions"><span id="badge" class="pill"></span> <button class="btn" onclick="logout()">Logout</button></div>
+ <div id="guestActions" class="hidden" style="display:flex;gap:8px"><button class="btn" onclick="showLoginFromGuest()">Login</button><button class="btn primary" onclick="showRegisterFromGuest()">Register</button></div>
+</div>
 
-<section id="home" class="grid"><div class="card"><h1>Welcome to HAPA</h1><p class="muted">Every account starts as Customer. Owner accepts or rejects access. Rejected users can request again.</p><div class="stats"><div class="stat"><span>Status</span><b id="homeStatus"></b></div><div class="stat"><span>Phone</span><b id="phoneVerified"></b></div><div class="stat"><span>Email</span><b id="emailVerified"></b></div><div class="stat"><span>Version</span><b>1.6</b></div></div><div id="accessBox"></div></div>
-<div class="card"><h3>Additional permissions</h3><div id="capabilities" class="list"></div></div></section>
+<div id="pendingBanner" class="pending-banner hidden">
+ <b>⏳ Account pending approval.</b> The owner reviews new accounts, usually within a few hours.
+ You can <a href="#" onclick="tab('market');return false;" style="color:var(--a)">browse the Marketplace</a> while you wait.
+</div>
+<div id="guestBanner" class="guest-banner hidden">
+ <span>👋 Browsing as guest — use the <b>Login</b> or <b>Register</b> buttons above to contact sellers, save listings, and post your own.</span>
+</div>
 
-<section id="market" class="hidden"><div class="grid"><div class="card"><h2>Sell locally</h2><div class="field"><label>Title</label><input id="mTitle"></div><div class="field"><label>Price (KES)</label><input id="mPrice" type="number"></div><div class="field"><label>Category</label><select id="mCategory"><option>Phones &amp; Electronics</option><option>Vehicles</option><option>Motorcycles</option><option>Home &amp; Furniture</option><option>Appliances</option><option>Tools &amp; Equipment</option><option>Construction Materials</option><option>Agriculture &amp; Farm</option><option>Animals &amp; Poultry</option><option>Fashion</option><option>Property</option><option>Business Equipment</option><option>Other</option></select></div><div class="field"><label>Condition</label><select id="mCondition"><option>Used</option><option>New</option></select></div><div class="field"><label>Location</label><input id="mLocation" value="Embu"></div><div class="field"><label>Description</label><textarea id="mDescription"></textarea></div><div class="field"><label>Photos</label><input id="mImages" type="file" accept="image/*" multiple></div><button class="btn primary" onclick="createListing()">Publish</button></div><div class="card"><h2>Marketplace</h2><div id="marketList" class="list"></div></div></div></section>
+<div class="nav" id="mainNav">
+ <button class="btn" id="navHome" onclick="tab('home')">Home</button>
+ <button class="btn" id="navMarket" onclick="tab('market')">Marketplace</button>
+ <button class="btn" id="navUpgrade" onclick="tab('upgrade')">Professional roles</button>
+ <button class="btn hidden" id="navOwner" onclick="tab('owner')">Owner dashboard</button>
+</div>
 
-<section id="upgrade" class="hidden"><div class="grid3">
-<div class="card"><h2>Driver</h2><div class="field"><label>Licence number</label><input id="dLicence"></div><div class="field"><label>Licence photo</label><input id="dLicenceImg" type="file" accept="image/*"></div><div class="field"><label>Vehicle registration</label><input id="dReg"></div><div class="field"><label>Insurance document</label><input id="dInsurance" type="file" accept="image/*"></div><div class="field"><label>Insurance expiry</label><input id="dExpiry" type="date"></div><div class="field"><label>Vehicle photo</label><input id="dVehicle" type="file" accept="image/*"></div><button class="btn primary" onclick="applyDriver()">Apply as Driver</button></div>
-<div class="card"><h2>Merchant</h2><div class="field"><label>Business name</label><input id="bName"></div><div class="field"><label>Category</label><input id="bCategory" placeholder="Restaurant, Shop, Hardware..."></div><div class="field"><label>KRA / registration details</label><input id="bKra"></div><div class="field"><label>Address/location</label><input id="bAddress"></div><div class="field"><label>Store/business photo</label><input id="bPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyMerchant()">Apply as Merchant</button></div>
-<div class="card"><h2>Professional</h2><div class="field"><label>Profession</label><select id="pProfession"></select></div><div class="field"><label>Skills</label><textarea id="pSkills"></textarea></div><div class="field"><label>Experience</label><input id="pExperience"></div><div class="field"><label>Location</label><input id="pLocation" value="Embu"></div><div class="field"><label>Profile photo</label><input id="pPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyProfessional()">Apply as Professional</button></div>
-</div><div id="upgradeMsg"></div></section>
+<!-- Home -->
+<section id="home" class="hidden">
+<div class="grid">
+<div class="card">
+ <h2 style="margin:0 0 8px">Welcome to HAPA</h2>
+ <p class="muted" style="margin:0 0 16px;font-size:14px">Buy and sell anything in Embu. Every account is personally reviewed before accessing the marketplace.</p>
+ <div class="stats">
+  <div class="stat"><span>Status</span><b id="homeStatus" style="font-size:16px"></b></div>
+  <div class="stat"><span>Phone</span><b id="phoneVerified" style="font-size:14px"></b></div>
+  <div class="stat"><span>Email</span><b id="emailVerified" style="font-size:14px"></b></div>
+  <div class="stat"><span>Member since</span><b id="memberSince" style="font-size:13px"></b></div>
+ </div>
+ <div id="accessBox" style="margin-top:14px"></div>
+</div>
+<div class="card"><h3>Your capabilities</h3><div id="capabilities" class="list"></div></div>
+</div>
+</section>
 
+<!-- ═══════════════════ MARKETPLACE PRO ═══════════════════ -->
+<section id="market" class="hidden">
+<!-- Auth prompt overlay -->
+<div id="authPromptPanel" class="auth-prompt hidden">
+ <p class="auth-prompt-title" id="authPromptMsg">Sign in to continue</p>
+ <div class="auth-prompt-btns">
+  <button class="btn primary" id="authPromptLoginBtn" onclick="showLoginFromGuest()">Login</button>
+  <button class="btn" id="authPromptRegBtn" onclick="showRegisterFromGuest()">Create free account</button>
+  <button class="btn" onclick="hideAuthPrompt()">Cancel</button>
+ </div>
+</div>
+
+<div class="mp-subnav">
+ <button class="mp-tab active" id="mpTab-browse" onclick="mpView('browse')">Browse</button>
+ <button class="mp-tab" id="mpTab-create" onclick="mpView('create')">+ Sell</button>
+ <button class="mp-tab" id="mpTab-mylistings" onclick="mpView('mylistings')">My Listings</button>
+ <button class="mp-tab" id="mpTab-favorites" onclick="mpView('favorites')">♡ Saved</button>
+</div>
+
+<!-- Browse -->
+<div id="mp-browse">
+ <div class="mp-search-row">
+  <input id="mpQ" placeholder="Search in Embu…" oninput="mpDebounceBrowse()">
+  <select id="mpSort" class="mp-sort-select" onchange="mpBrowse(1)">
+   <option value="newest">Newest</option><option value="oldest">Oldest</option>
+   <option value="price_asc">Price ↑</option><option value="price_desc">Price ↓</option>
+   <option value="most_viewed">Most viewed</option>
+  </select>
+  <button class="btn" id="mpFilterBtn" onclick="mpToggleFilters()">⊞ Filters</button>
+ </div>
+ <div id="mpFilters" class="mp-filters hidden">
+  <div class="grid" style="margin-bottom:10px">
+   <div class="field"><label>Category</label><select id="mpCat" onchange="mpBrowse(1)"><option value="">All categories</option></select></div>
+   <div class="field"><label>Condition</label><select id="mpCond" onchange="mpBrowse(1)"><option value="">Any condition</option><option>New</option><option>Used</option></select></div>
+  </div>
+  <div class="grid" style="margin-bottom:10px">
+   <div class="field"><label>Min price (KES)</label><input id="mpMin" type="number" min="0" placeholder="0" oninput="mpDebounceBrowse()"></div>
+   <div class="field"><label>Max price (KES)</label><input id="mpMax" type="number" min="0" placeholder="Any" oninput="mpDebounceBrowse()"></div>
+  </div>
+  <div class="field" style="margin-bottom:12px"><label>Location</label><input id="mpLoc" placeholder="e.g. Embu, Runyenjes, Mwea" oninput="mpDebounceBrowse()"></div>
+  <button class="btn" onclick="mpClearFilters()">Clear all filters</button>
+ </div>
+ <div id="mpResults"></div>
+ <div id="mpPagination" class="mp-pagination"></div>
+</div>
+
+<!-- Listing detail -->
+<div id="mp-detail" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="mpBack()">← Back</button></div>
+ <div id="mpDetailContent"></div>
+</div>
+
+<!-- Create listing -->
+<div id="mp-create" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="mpBack()">← Back</button></div>
+ <div id="draftBanner" class="draft-banner hidden">
+  <span>📝 You have a saved draft.</span>
+  <span style="display:flex;gap:8px"><button class="btn ok" onclick="mpKeepDraft()">Continue draft</button><button class="btn bad" onclick="mpDiscardDraft()">Discard</button></span>
+ </div>
+ <div class="card" id="mpCreateForm">
+  <h2 style="margin:0 0 16px">Post a listing</h2>
+  <div id="mpCreateMsg"></div>
+  <div class="field">
+   <label>Title * <span class="mp-char-count" id="cTitleCount">0 / 100</span></label>
+   <input id="cTitle" placeholder="What are you selling?" oninput="updateCharCount('cTitle','cTitleCount',100);mpFieldClear('cTitle')">
+   <div class="field-err" id="cTitleErr"></div>
+  </div>
+  <div class="grid">
+   <div class="field"><label>Price (KES) *</label>
+    <input id="cPrice" type="text" inputmode="numeric" placeholder="e.g. 15000" oninput="mpFieldClear('cPrice')">
+    <div class="field-err" id="cPriceErr"></div>
+   </div>
+   <div class="field"><label>Category *</label>
+    <select id="cCat" onchange="mpFieldClear('cCat')"><option value="">Choose category</option></select>
+    <div class="field-err" id="cCatErr"></div>
+   </div>
+  </div>
+  <div class="grid">
+   <div class="field"><label>Condition *</label>
+    <select id="cCond" onchange="mpFieldClear('cCond')"><option value="">Choose</option><option>Used</option><option>New</option></select>
+    <div class="field-err" id="cCondErr"></div>
+   </div>
+   <div class="field"><label>Location *</label>
+    <input id="cLoc" value="Embu" list="locationList" oninput="mpFieldClear('cLoc')">
+    <datalist id="locationList"><option>Embu</option><option>Runyenjes</option><option>Siakago</option><option>Mwea</option><option>Ishiara</option><option>Kiritiri</option><option>Kerugoya</option><option>Kagumo</option></datalist>
+    <div class="field-err" id="cLocErr"></div>
+   </div>
+  </div>
+  <div class="field">
+   <label>Description * <span class="mp-char-count" id="cDescCount">0 / 2000</span></label>
+   <textarea id="cDesc" rows="4" placeholder="Describe the item, condition and reason for selling…" oninput="updateCharCount('cDesc','cDescCount',2000);mpFieldClear('cDesc')"></textarea>
+   <div class="field-err" id="cDescErr"></div>
+  </div>
+  <div class="field">
+   <label>Photos * — up to 5 images, max 5 MB each</label>
+   <div class="mp-preview-strip" id="cPreviews"></div>
+   <div class="field-err" id="cImgErr"></div>
+  </div>
+  <div class="grid" style="margin-top:4px">
+   <label class="row" style="cursor:pointer;gap:8px"><input type="checkbox" id="cNeg" style="width:auto"> Price negotiable</label>
+   <label class="row" style="cursor:pointer;gap:8px"><input type="checkbox" id="cPhone" style="width:auto"> Show my phone publicly <span style="font-size:11px;color:var(--muted)">(visible to logged-in buyers)</span></label>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:8px">
+   <span class="muted" style="font-size:12px" id="draftStatus"></span>
+   <button class="btn primary" id="mpPublishBtn" style="min-width:180px" onclick="mpCreate()">Publish listing</button>
+  </div>
+ </div>
+ <!-- Success screen (initially hidden) -->
+ <div class="card hidden" id="mpCreateSuccess" style="text-align:center;padding:40px 20px">
+  <div style="font-size:56px;margin-bottom:16px">🎉</div>
+  <h2 style="margin:0 0 8px">Your listing is live!</h2>
+  <p class="muted" id="mpSuccessMsg" style="margin:0 0 24px"></p>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:300px;margin:0 auto" id="mpSuccessActions"></div>
+ </div>
+</div>
+
+<!-- Edit listing -->
+<div id="mp-edit" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="mpBack()">← Back</button></div>
+ <div class="card">
+  <h2 style="margin:0 0 16px">Edit Listing</h2>
+  <div id="mpEditMsg"></div>
+  <div class="field"><label>Title * <span class="mp-char-count" id="eTitleCount">0 / 100</span></label><input id="eTitle" oninput="updateCharCount('eTitle','eTitleCount',100)"><div class="field-err" id="eTitleErr"></div></div>
+  <div class="grid">
+   <div class="field"><label>Price (KES) *</label><input id="ePrice" type="text" inputmode="numeric"><div class="field-err" id="ePriceErr"></div></div>
+   <div class="field"><label>Category *</label><select id="eCat"></select><div class="field-err" id="eCatErr"></div></div>
+  </div>
+  <div class="grid">
+   <div class="field"><label>Condition *</label><select id="eCond"><option>Used</option><option>New</option></select></div>
+   <div class="field"><label>Location *</label><input id="eLoc" list="locationList"><div class="field-err" id="eLocErr"></div></div>
+  </div>
+  <div class="field"><label>Description * <span class="mp-char-count" id="eDescCount">0 / 2000</span></label><textarea id="eDesc" rows="4" oninput="updateCharCount('eDesc','eDescCount',2000)"></textarea><div class="field-err" id="eDescErr"></div></div>
+  <div class="field"><label>Photos — up to 5 images</label><div class="mp-preview-strip" id="ePreviews"></div><div class="field-err" id="eImgErr"></div></div>
+  <div class="grid" style="margin-top:4px">
+   <label class="row" style="cursor:pointer;gap:8px"><input type="checkbox" id="eNeg" style="width:auto"> Price negotiable</label>
+   <label class="row" style="cursor:pointer;gap:8px"><input type="checkbox" id="ePhone" style="width:auto"> Show my phone publicly</label>
+  </div>
+  <button class="btn primary" style="width:100%;margin-top:16px" onclick="mpSaveEdit()">Save changes</button>
+ </div>
+</div>
+
+<!-- My Listings -->
+<div id="mp-mylistings" class="hidden">
+ <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+  <h3 style="margin:0">My Listings</h3>
+  <button class="btn primary" onclick="mpView('create')">+ New listing</button>
+ </div>
+ <div id="mpMyContent"></div>
+</div>
+
+<!-- Favorites -->
+<div id="mp-favorites" class="hidden">
+ <h3 style="margin:0 0 14px">Saved Listings</h3>
+ <div id="mpFavContent"></div>
+</div>
+
+<!-- Seller profile -->
+<div id="mp-seller" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="mpBack()">← Back</button></div>
+ <div id="mpSellerContent"></div>
+</div>
+</section>
+
+<!-- Professional roles (Upgrade) -->
+<section id="upgrade" class="hidden">
+<div class="card" style="margin-bottom:14px">
+ <h2 style="margin:0 0 6px">Apply for a Professional Role</h2>
+ <p class="muted" style="margin:0;font-size:14px">Choose one role below and submit your details for Owner review. Approved roles unlock professional features.</p>
+</div>
+<div class="grid3">
+<div class="card"><h2>Driver</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks transport listings and delivery requests.</p><div class="field"><label>Licence number</label><input id="dLicence"></div><div class="field"><label>Licence photo</label><input id="dLicenceImg" type="file" accept="image/*"></div><div class="field"><label>Vehicle registration</label><input id="dReg"></div><div class="field"><label>Insurance document</label><input id="dInsurance" type="file" accept="image/*"></div><div class="field"><label>Insurance expiry</label><input id="dExpiry" type="date"></div><div class="field"><label>Vehicle photo</label><input id="dVehicle" type="file" accept="image/*"></div><button class="btn primary" onclick="applyDriver()">Apply as Driver</button></div>
+<div class="card"><h2>Merchant</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks a business listing and merchant badge.</p><div class="field"><label>Business name</label><input id="bName"></div><div class="field"><label>Category</label><input id="bCategory" placeholder="Restaurant, Shop, Hardware…"></div><div class="field"><label>KRA / registration details</label><input id="bKra"></div><div class="field"><label>Address/location</label><input id="bAddress"></div><div class="field"><label>Store/business photo</label><input id="bPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyMerchant()">Apply as Merchant</button></div>
+<div class="card"><h2>Professional</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks a professional services profile.</p><div class="field"><label>Profession</label><select id="pProfession"></select></div><div class="field"><label>Skills</label><textarea id="pSkills"></textarea></div><div class="field"><label>Experience</label><input id="pExperience"></div><div class="field"><label>Location</label><input id="pLocation" value="Embu"></div><div class="field"><label>Profile photo</label><input id="pPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyProfessional()">Apply as Professional</button></div>
+</div>
+<div id="upgradeMsg"></div>
+</section>
+
+<!-- Owner -->
 <section id="owner" class="hidden">
 <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Owner Dashboard</h2><div class="tabs"><button id="oTabStats" class="btn primary" onclick="ownerSubTab('stats')">Stats</button><button id="oTabUsers" class="btn" onclick="ownerSubTab('users')">All Users</button></div></div></div>
-<div id="ownerStatsPanel" style="margin-top:14px"><div class="card"><div id="ownerStats" class="stats"></div></div><div class="grid" style="margin-top:14px"><div class="card"><h3>Customer access requests</h3><div id="accessRequests" class="list"></div></div><div class="card"><h3>Professional upgrades</h3><div id="upgradeRequests" class="list"></div></div></div></div>
-<div id="ownerUsersPanel" class="hidden" style="margin-top:14px"><div class="card"><h3 style="margin:0 0 12px">All Users</h3><div id="usersListEl" class="list"></div></div></div>
-<div id="ownerUserDetail" class="hidden" style="margin-top:14px"><div class="card" style="padding:14px;margin-bottom:10px"><button class="btn" onclick="ownerSubTab('users')">&#8592; All Users</button></div><div id="userDetailInfo"></div><div class="card" style="margin-top:12px"><h3 style="margin:0 0 12px">Listings</h3><div id="userDetailListings" class="list"></div></div></div>
-<div id="ownerListingDetail" class="hidden" style="margin-top:14px"><div class="card" style="padding:14px;margin-bottom:10px"><button class="btn" id="listingBackBtn">&#8592; Back to user</button></div><div class="card" id="listingDetailContent"></div></div>
+
+<div id="ownerStatsPanel" style="margin-top:14px">
+ <div class="card"><div id="ownerStats" class="stats"></div></div>
+ <div class="grid" style="margin-top:14px">
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Customer access requests</h3>
+    <button class="btn" id="accessHistoryBtn" onclick="toggleAccessHistory()" style="font-size:12px;padding:6px 10px">Show history</button>
+   </div>
+   <div id="accessRequests" class="list"></div>
+  </div>
+  <div class="card"><h3>Professional applications</h3><div id="upgradeRequests" class="list"></div></div>
+ </div>
+ <div class="card" style="margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+   <h3 style="margin:0">Listing Reports</h3>
+   <select id="oReportFilter" onchange="loadOwnerReports()" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit">
+    <option value="pending">Pending</option><option value="reviewed">Reviewed</option><option value="dismissed">Dismissed</option><option value="all">All</option>
+   </select>
+  </div>
+  <div id="listingReportsEl" class="list"></div>
+ </div>
+</div>
+
+<div id="ownerUsersPanel" class="hidden" style="margin-top:14px">
+ <div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+   <h3 style="margin:0">All Users</h3>
+   <input id="ownerUserSearch" placeholder="Search name, email or phone…" oninput="filterOwnerUsers(this.value)" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;min-width:220px">
+  </div>
+  <div id="usersListEl" class="list"></div>
+ </div>
+</div>
+
+<div id="ownerUserDetail" class="hidden" style="margin-top:14px">
+ <div class="ud-sticky"><button class="btn" onclick="ownerSubTab('users')">← All Users</button></div>
+ <div class="card" id="udHeaderCard" style="margin-bottom:14px"></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;overflow-x:auto;padding-bottom:4px" id="udTabBar">
+  <button class="ud-tab active" id="udT-overview" onclick="udTab('overview')">Overview</button>
+  <button class="ud-tab" id="udT-listings" onclick="udTab('listings')">Listings</button>
+  <button class="ud-tab" id="udT-driver" onclick="udTab('driver')">Driver</button>
+  <button class="ud-tab" id="udT-merchant" onclick="udTab('merchant')">Merchant</button>
+  <button class="ud-tab" id="udT-professional" onclick="udTab('professional')">Professional</button>
+  <button class="ud-tab" id="udT-activity" onclick="udTab('activity')">Activity</button>
+ </div>
+ <div id="udP-overview" class="card"></div>
+ <div id="udP-listings" class="hidden"></div>
+ <div id="udP-driver" class="card hidden"></div>
+ <div id="udP-merchant" class="card hidden"></div>
+ <div id="udP-professional" class="card hidden"></div>
+ <div id="udP-activity" class="card hidden"></div>
+</div>
+
+<div id="ownerListingDetail" class="hidden" style="margin-top:14px">
+ <div class="ud-sticky"><button class="btn" id="listingBackBtn">← Back to Listings</button></div>
+ <div class="card" id="listingDetailContent"></div>
+</div>
 </section>
 </section></div>
+
 <script>
-let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';const $=x=>document.getElementById(x);
-const PRO=['Carpenter','Mason','Plumber','Electrician','Painter','Tiler','Roofer','Welder','Handyman','Mechanic','Boda Mechanic','Auto Electrician','Tyre Service','Car Wash','Cleaner','Gardener','Pest Control','Moving Help','Appliance Repair','Phone Repair','Computer Repair','CCTV Installer','Internet/Wi-Fi Technician','Solar Technician','Barber','Hairdresser','Beautician','Nail Technician','Makeup Artist','Tailor','Dressmaker','Shoe Repair','Photographer','Videographer','DJ','Decorator','Caterer','Farm Worker','Tractor Service','Irrigation Technician','Poultry Specialist','Livestock Services','Accountant','Bookkeeper','Graphic Designer','Printing','Delivery Service','Other'];$('pProfession').innerHTML=PRO.map(x=>`<option>${x}</option>`).join('');
-function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>$(i).classList.add('hidden'));$((x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm')).classList.remove('hidden')}
-function msg(t,b=false){$('authMsg').innerHTML=`<div class="notice ${b?'bad':''}">${t}</div>`}
-async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d}
-function logout(){localStorage.removeItem('hapa_token');location.reload()}
-async function f64(el){let f=el?.files?.[0];if(!f)return'';if(f.size>2*1024*1024)throw new Error('Photo must be under 2 MB');return await new Promise((a,b)=>{let r=new FileReader();r.onload=()=>a(r.result);r.onerror=b;r.readAsDataURL(f)})}
-async function many(el){let out=[];for(let f of [...(el.files||[])].slice(0,3)){if(f.size<=2*1024*1024)out.push(await new Promise((a,b)=>{let r=new FileReader();r.onload=()=>a(r.result);r.onerror=b;r.readAsDataURL(f)}))}return out}
+// ── Constants ────────────────────────────────────────────────────────────────
+const CATS=['Phones & Electronics','Vehicles','Motorcycles','Home & Furniture','Appliances','Tools & Equipment','Construction Materials','Agriculture & Farm','Animals & Poultry','Fashion','Property','Business Equipment','Other'];
+const PRO=['Carpenter','Mason','Plumber','Electrician','Painter','Tiler','Roofer','Welder','Handyman','Mechanic','Boda Mechanic','Auto Electrician','Tyre Service','Car Wash','Cleaner','Gardener','Pest Control','Moving Help','Appliance Repair','Phone Repair','Computer Repair','CCTV Installer','Internet/Wi-Fi Technician','Solar Technician','Barber','Hairdresser','Beautician','Nail Technician','Makeup Artist','Tailor','Dressmaker','Shoe Repair','Photographer','Videographer','DJ','Decorator','Caterer','Farm Worker','Tractor Service','Irrigation Technician','Poultry Specialist','Livestock Services','Accountant','Bookkeeper','Graphic Designer','Printing','Delivery Service','Other'];
+const STATUS_LABELS={active:'Live',hidden:'Hidden',sold:'Sold',removed:'Removed'};
+const OWNER_STAT_LABELS={users:'Total Users',pendingAccess:'Pending Approvals',pendingUpgrades:'Pending Professional Applications',activeListings:'Active Listings',pendingReports:'Pending Reports'};
+const DRAFT_KEY='hapa_draft_v2';
+const MP_VIEWS=['browse','detail','create','edit','mylistings','favorites','seller'];
+const MP_TABS=['browse','create','mylistings','favorites'];
+// ── Image placeholder ─────────────────────────────────────────────────────────
+const PH_IMG="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%2310182a'/%3E%3Cpath d='M166 116 L228 116 L248 138 L272 138 L272 200 L128 200 L128 138 L152 138 Z' fill='none' stroke='%2344526a' stroke-width='7' stroke-linejoin='round'/%3E%3Ccircle cx='200' cy='165' r='24' fill='none' stroke='%2344526a' stroke-width='7'/%3E%3C/svg%3E";
+function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
+function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s!=='undefined')?s:PH_IMG;}
 
-$('registerForm').onsubmit=async e=>{e.preventDefault();try{let d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:$('regName').value,phone:$('regPhone').value,email:$('regEmail').value,password:$('regPass').value,selfie:await f64($('regSelfie'))})});token=d.token;localStorage.setItem('hapa_token',token);verifyChannel=d.channel;authMode('verify');msg(d.demoCode?`Demo verification code: ${d.demoCode}`:'Verification code sent')}catch(x){msg(x.message,true)}};
-$('verifyForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/auth/verify',{method:'POST',body:JSON.stringify({code:$('verifyCode').value})});await start()}catch(x){msg(x.message,true)}};
-$('loginForm').onsubmit=async e=>{e.preventDefault();try{let d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({identifier:$('loginId').value,password:$('loginPass').value})});token=d.token;localStorage.setItem('hapa_token',token);start()}catch(x){msg(x.message,true)}};
-$('forgotForm').onsubmit=async e=>{e.preventDefault();resetIdentifier=$('forgotId').value;let d=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({identifier:resetIdentifier})});$('resetFields').classList.remove('hidden');msg(d.demoCode?`Demo reset code: ${d.demoCode}`:'Reset code sent')};
-async function resetPassword(){try{await api('/api/auth/reset',{method:'POST',body:JSON.stringify({identifier:resetIdentifier,code:$('resetCode').value,newPassword:$('resetPass').value})});msg('Password changed');authMode('login')}catch(x){msg(x.message,true)}}
-function tab(id){['home','market','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));if(id==='market')loadMarket();if(id==='owner')loadOwner()}
-async function start(){try{me=await api('/api/me');$('ownerNav').classList.add('hidden');$('owner').classList.add('hidden');$('authView').classList.add('hidden');$('appView').classList.remove('hidden');$('badge').textContent=`${me.name} \u00b7 ${me.role}`;$('homeStatus').textContent=me.status;$('phoneVerified').textContent=me.phoneVerified?'Verified':'—';$('emailVerified').textContent=me.emailVerified?'Verified':'—';$('capabilities').innerHTML=['driver','merchant','professional'].map(k=>`<div class="row"><span>${k}</span><b>${me.capabilities?.[k]?'Approved':'Not enabled'}</b></div>`).join('');if(me.role==='owner'){$('ownerNav').classList.remove('hidden');$('accessBox').innerHTML='<div class="notice">Owner has full access.</div>'}else if(me.status==='active')$('accessBox').innerHTML='<div class="notice">Customer access active.</div>';else if(me.status==='rejected')$('accessBox').innerHTML='<div class="notice bad">Request rejected. You may send it again later.</div><button class="btn primary" onclick="requestAgain()">Send request again</button>';else $('accessBox').innerHTML='<div class="notice">Waiting for Owner approval.</div>'}catch{logout()}}
-async function requestAgain(){await api('/api/me/request-again',{method:'POST'});location.reload()}
-async function createListing(){try{await api('/api/marketplace',{method:'POST',body:JSON.stringify({title:$('mTitle').value,price:+$('mPrice').value,category:$('mCategory').value,condition:$('mCondition').value,description:$('mDescription').value,location:$('mLocation').value,images:await many($('mImages'))})});loadMarket()}catch(x){alert(x.message)}}
-async function loadMarket(){try{let a=await api('/api/marketplace');$('marketList').innerHTML=a.map(x=>`<div class="card listing">${x.images?.[0]?`<img src="${x.images[0]}">`:''}<h3>${x.title}</h3><b>KES ${Number(x.price).toLocaleString()}</b><p class="muted">${x.category} \u00b7 ${x.condition} \u00b7 ${x.location}</p><small>Seller: ${x.seller_name}</small></div>`).join('')||'<p class="muted">No listings yet.</p>'}catch(x){$('marketList').innerHTML=`<div class="notice bad">${x.message}</div>`}}
-async function apply(t,d){try{await api('/api/upgrades',{method:'POST',body:JSON.stringify({type:t,details:d})});$('upgradeMsg').innerHTML=`<div class="notice">${t} application sent for Owner approval.</div>`}catch(x){$('upgradeMsg').innerHTML=`<div class="notice bad">${x.message}</div>`}}
-async function applyDriver(){apply('driver',{licenceNumber:$('dLicence').value,licenceImage:await f64($('dLicenceImg')),vehicleRegistration:$('dReg').value,insuranceImage:await f64($('dInsurance')),insuranceExpiry:$('dExpiry').value,vehiclePhoto:await f64($('dVehicle'))})}
-async function applyMerchant(){apply('merchant',{businessName:$('bName').value,businessCategory:$('bCategory').value,kraPin:$('bKra').value,businessAddress:$('bAddress').value,storePhoto:await f64($('bPhoto'))})}
-async function applyProfessional(){apply('professional',{profession:$('pProfession').value,skills:$('pSkills').value,experience:$('pExperience').value,location:$('pLocation').value,profilePhoto:await f64($('pPhoto'))})}
-async function loadOwner(){ownerSubTab('stats')}
-async function reviewAccess(id,status){await api('/api/owner/access/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats()}
-async function reviewUpgrade(id,status){await api('/api/owner/upgrades/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats()}
+// ── State ────────────────────────────────────────────────────────────────────
+let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
+let appMode='auth'; // auth|guest|pending|active|owner
+let pendingListingId=null; // deep link / post-auth redirect
+let mpCurView='browse',mpPrevView='browse',mpEditId=null;
+let mpImages=[],mpCurListingId=null,mpCurListingStatus=null,mpDt=null,mpPage=1;
+let mpFavSet=new Set();
+let draftAutoTimer=null,resendCountdown=0,resendInt=null;
+let ownerAllUsers=[],ownerAccessData=[],ownerShowAllAccess=false;
+let ownerCurrentUserId=null,udCurrentUser=null,udCurrentListings=[],udCurrentUpgrades=[];
 
-/* ── owner helpers ── */
-let ownerCurrentUserId=null;
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function statusBadge(s){const c=s==='active'?'var(--ok)':s==='blocked'?'var(--bad)':s==='rejected'?'#ff9944':'var(--muted)';return`<span style="color:${c};font-weight:700">${esc(s)}</span>`}
-function listingBadge(s){const c=s==='active'?'var(--ok)':s==='removed'?'var(--bad)':'var(--muted)';return`<span style="color:${c};font-weight:700">${esc(s)}</span>`}
-function capText(c){if(!c)return'—';const a=Object.entries(c).filter(([,v])=>v).map(([k])=>k);return a.length?a.join(', '):'—'}
+// ── Init ─────────────────────────────────────────────────────────────────────
+const $=x=>document.getElementById(x);
+// Populate selects
+$('pProfession').innerHTML=PRO.map(x=>`<option>${x}</option>`).join('');
+const catOpts=CATS.map(x=>`<option>${x}</option>`).join('');
+$('cCat').innerHTML=`<option value="">Choose category</option>${catOpts}`;
+$('eCat').innerHTML=catOpts;
+$('mpCat').innerHTML=`<option value="">All categories</option>${catOpts}`;
 
-/* ── sub-tab switching ── */
-function ownerSubTab(tab){$('oTabStats').className='btn'+(tab==='stats'?' primary':'');$('oTabUsers').className='btn'+(tab==='users'?' primary':'');$('ownerStatsPanel').classList.toggle('hidden',tab!=='stats');$('ownerUsersPanel').classList.toggle('hidden',tab!=='users');$('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.add('hidden');if(tab==='stats')loadOwnerStats();if(tab==='users')loadOwnerUsers()}
+// ── App startup ───────────────────────────────────────────────────────────────
+(function init(){
+ const lid=new URLSearchParams(location.search).get('listing');
+ if(lid) pendingListingId=lid;
+ if(token){ start(); return; }
+ if(lid){ enterGuest(); return; } // deep link without token → guest mode
+})();
 
-/* ── stats panel ── */
-async function loadOwnerStats(){try{const d=await api('/api/owner/dashboard');$('ownerStats').innerHTML=Object.entries(d).map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');const a=await api('/api/owner/access');$('accessRequests').innerHTML=a.map(x=>`<div class="row"><span>${x.profile_photo_url?`<img class="photo" src="${esc(x.profile_photo_url)}">`:''}<b>${esc(x.name)}</b><br><small>${esc(x.phone||x.email||'')} \u00b7 ${esc(x.status)}</small></span>${x.status==='pending'?`<span><button class="btn ok" onclick="reviewAccess('${x.id}','approved')">Accept</button> <button class="btn bad" onclick="reviewAccess('${x.id}','rejected')">Reject</button></span>`:''}</div>`).join('')||'<p class="muted">No requests.</p>';const u=await api('/api/owner/upgrades');$('upgradeRequests').innerHTML=u.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> \u00b7 ${esc(x.type)}<br><small>${esc(x.status)}</small></span>${x.status==='pending'?`<span><button class="btn ok" onclick="reviewUpgrade('${x.id}','approved')">Approve</button> <button class="btn bad" onclick="reviewUpgrade('${x.id}','rejected')">Reject</button></span>`:''}</div>`).join('')||'<p class="muted">No applications.</p>'}catch(e){console.error(e)}}
+async function start(){
+ try{
+  me=await api('/api/me');
+  appMode=me.role==='owner'?'owner':me.status==='active'?'active':'pending';
+  $('authView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  $('guestActions').classList.add('hidden');
+  $('userActions').classList.remove('hidden');
+  $('badge').textContent=`${me.name} \u00b7 ${me.role}`;
+  $('pendingBanner').classList.toggle('hidden',appMode!=='pending');
+  $('guestBanner').classList.add('hidden');
+  $('navOwner').classList.toggle('hidden',appMode!=='owner');
+  $('navUpgrade').classList.toggle('hidden',appMode==='owner');
+  // Home tab content
+  $('homeStatus').textContent=me.status;
+  $('homeStatus').style.color=me.status==='active'?'var(--ok)':me.status==='blocked'?'var(--bad)':'var(--a)';
+  $('phoneVerified').textContent=me.phoneVerified?'✓ Verified':'—';
+  $('emailVerified').textContent=me.emailVerified?'✓ Verified':'—';
+  $('memberSince').textContent=me.created_at?new Date(me.created_at).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
+  $('capabilities').innerHTML=['driver','merchant','professional'].map(k=>`<div class="row"><span style="text-transform:capitalize">${k}</span><b style="color:${me.capabilities?.[k]?'var(--ok)':'var(--muted)'}">${me.capabilities?.[k]?'Approved':'Not enabled'}</b></div>`).join('');
+  if(me.role==='owner')$('accessBox').innerHTML='<div class="notice">Owner account — full access.</div>';
+  else if(me.status==='active')$('accessBox').innerHTML='<div class="notice">✓ Account approved. You can browse and sell on the Marketplace.</div>';
+  else if(me.status==='rejected')$('accessBox').innerHTML='<div class="notice bad">Request rejected. You may send it again.<br><button class="btn primary" style="margin-top:8px" onclick="requestAgain()">Send request again</button></div>';
+  else $('accessBox').innerHTML='<div class="notice">Waiting for Owner approval.</div>';
+  // Navigate
+  if(pendingListingId){ const lid=pendingListingId; pendingListingId=null; tab('market'); mpOpenListing(lid); }
+  else tab('market');
+ }catch{ logout(); }
+}
 
-/* ── users list ── */
-async function loadOwnerUsers(){$('usersListEl').innerHTML='<p class="muted">Loading\u2026</p>';try{const users=await api('/api/owner/users');if(!users.length){$('usersListEl').innerHTML='<p class="muted">No users found.</p>';return}$('usersListEl').innerHTML=users.map(u=>`<div class="row" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="openUserDetail('${esc(u.id)}')"><span style="display:flex;align-items:center;gap:10px">${u.profile_photo_url?`<img class="photo" src="${esc(u.profile_photo_url)}" style="width:42px;height:42px;flex-shrink:0">`:'<span style="width:42px;height:42px;border-radius:50%;background:var(--p);display:inline-block;flex-shrink:0"></span>'}<span><b>${esc(u.name)}</b><br><small class="muted">${esc(u.email||u.phone||'—')}</small></span></span><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${statusBadge(u.status)}<small class="muted">${u.listing_count} listing${u.listing_count!==1?'s':''}</small><span class="pill" style="font-size:11px">${esc(u.role)}</span></span></div>`).join('')}catch(e){$('usersListEl').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`}}
+function enterGuest(listingId){
+ appMode='guest';
+ if(listingId) pendingListingId=listingId;
+ $('authView').classList.add('hidden');
+ $('appView').classList.remove('hidden');
+ $('guestActions').classList.remove('hidden');
+ $('userActions').classList.add('hidden');
+ $('pendingBanner').classList.add('hidden');
+ $('guestBanner').classList.remove('hidden');
+ $('navOwner').classList.add('hidden');
+ $('navUpgrade').classList.add('hidden');
+ if(pendingListingId){ const lid=pendingListingId; pendingListingId=null; tab('market'); mpOpenListing(lid); }
+ else tab('market');
+}
 
-/* ── user detail ── */
-async function openUserDetail(userId){ownerCurrentUserId=userId;$('ownerStatsPanel').classList.add('hidden');$('ownerUsersPanel').classList.add('hidden');$('ownerListingDetail').classList.add('hidden');$('ownerUserDetail').classList.remove('hidden');$('oTabStats').className='btn';$('oTabUsers').className='btn';$('userDetailInfo').innerHTML='<p class="muted">Loading\u2026</p>';$('userDetailListings').innerHTML='<p class="muted">Loading\u2026</p>';try{const[u,listings]=await Promise.all([api('/api/owner/users/'+userId),api('/api/owner/users/'+userId+'/listings')]);renderUserDetail(u);renderUserListings(listings,userId)}catch(e){$('userDetailInfo').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`}}
+function showLoginFromGuest(){
+ if(appMode==='guest'||appMode==='auth'){
+  $('appView').classList.add('hidden');
+  $('authView').classList.remove('hidden');
+  authMode('login');
+ }
+}
+function showRegisterFromGuest(){
+ if(appMode==='guest'||appMode==='auth'){
+  $('appView').classList.add('hidden');
+  $('authView').classList.remove('hidden');
+  authMode('register');
+ }
+}
 
-function renderUserDetail(u){
-  const isOwner=u.role==='owner';
-  const photo=u.profile_photo_url?`<img src="${esc(u.profile_photo_url)}" style="width:68px;height:68px;border-radius:50%;object-fit:cover;flex-shrink:0">`:'<span style="width:68px;height:68px;border-radius:50%;background:var(--p);display:inline-block;flex-shrink:0"></span>';
-  const actions=isOwner?'<p class="muted" style="margin-top:12px">Owner account \u2014 no actions available.</p>':`<h3 style="margin:14px 0 8px">Actions</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${u.status!=='active'?`<button class="btn ok" onclick="setUserStatus('${esc(u.id)}','active')">Approve</button>`:''} ${u.status!=='rejected'?`<button class="btn bad" onclick="confirmUserStatus('${esc(u.id)}','rejected')">Reject</button>`:''} ${u.status==='blocked'?`<button class="btn ok" onclick="setUserStatus('${esc(u.id)}','active')">Unblock</button>`:`<button class="btn bad" onclick="confirmUserStatus('${esc(u.id)}','blocked')">Block</button>`}</div>`;
-  $('userDetailInfo').innerHTML=`<div class="card"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">${photo}<div style="flex:1;min-width:180px"><h2 style="margin:0 0 4px">${esc(u.name)}</h2><p class="muted" style="margin:0;font-size:12px;word-break:break-all">${esc(u.id)}</p></div></div><div class="grid" style="margin-top:14px"><div class="list"><div class="row"><span class="muted">Email</span><span>${esc(u.email||'—')}</span></div><div class="row"><span class="muted">Phone</span><span>${esc(u.phone||'—')}</span></div><div class="row"><span class="muted">Role</span><span class="pill" style="font-size:13px">${esc(u.role)}</span></div><div class="row"><span class="muted">Status</span>${statusBadge(u.status)}</div><div class="row"><span class="muted">Email verified</span><span>${u.email_verified?'&#10003;':'—'}</span></div><div class="row"><span class="muted">Phone verified</span><span>${u.phone_verified?'&#10003;':'—'}</span></div><div class="row"><span class="muted">Capabilities</span><span style="font-size:13px">${esc(capText(u.capabilities))}</span></div><div class="row"><span class="muted">Joined</span><span style="font-size:13px">${new Date(u.created_at).toLocaleString()}</span></div></div><div><div class="stats" style="grid-template-columns:1fr 1fr"><div class="stat"><span>Total</span><b>${u.total_listings}</b></div><div class="stat"><span style="color:var(--ok)">Active</span><b>${u.active_listings}</b></div><div class="stat"><span class="muted">Hidden</span><b>${u.hidden_listings}</b></div><div class="stat"><span style="color:var(--bad)">Removed</span><b>${u.removed_listings}</b></div></div>${actions}</div></div></div>`}
+function requireActive(action,listingId){
+ if(appMode==='active'||appMode==='owner') return true;
+ if(listingId) pendingListingId=listingId;
+ if(appMode==='pending'){
+  showAuthPrompt(`Your account is pending approval. You can't ${action} yet — check back once approved.`,true);
+ }else{
+  showAuthPrompt(`Sign in to ${action}.`,false);
+ }
+ return false;
+}
+function showAuthPrompt(msg,isPending){
+ $('authPromptMsg').textContent=msg;
+ const show=!isPending;
+ $('authPromptLoginBtn').classList.toggle('hidden',isPending);
+ $('authPromptRegBtn').classList.toggle('hidden',isPending);
+ $('authPromptPanel').classList.remove('hidden');
+}
+function hideAuthPrompt(){ $('authPromptPanel').classList.add('hidden'); }
 
-function renderUserListings(listings,userId){if(!listings.length){$('userDetailListings').innerHTML='<p class="muted">No listings.</p>';return}$('userDetailListings').innerHTML=listings.map(l=>`<div class="card" style="cursor:pointer;padding:12px" onclick="openListingDetail('${esc(l.id)}','${esc(userId)}')"><div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">${l.main_image?`<img src="${esc(l.main_image)}" style="width:76px;height:66px;object-fit:cover;border-radius:8px;flex-shrink:0">`:'<span style="width:76px;height:66px;border-radius:8px;background:var(--p);display:inline-block;flex-shrink:0"></span>'}<div style="flex:1;min-width:130px"><b>${esc(l.title)}</b><br><span class="muted">KES ${Number(l.price).toLocaleString()}</span><br><small class="muted">${esc(l.category)} \u00b7 ${esc(l.condition)} \u00b7 ${esc(l.location)}</small><br><small class="muted">${new Date(l.created_at).toLocaleDateString()} \u00b7 ${l.image_count} image(s)</small></div><div style="text-align:right;flex-shrink:0">${listingBadge(l.status)}<br><button class="btn" style="font-size:12px;padding:5px 9px;margin-top:6px">View \u2192</button></div></div></div>`).join('')}
+function logout(){localStorage.removeItem('hapa_token');location.href=location.pathname;}
 
-/* ── listing detail ── */
-async function openListingDetail(listingId,userId){const backId=userId||ownerCurrentUserId;$('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.remove('hidden');$('listingDetailContent').innerHTML='<p class="muted">Loading\u2026</p>';$('listingBackBtn').onclick=()=>openUserDetail(backId);try{const l=await api('/api/owner/listings/'+listingId);renderListingDetail(l,backId)}catch(e){$('listingDetailContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`}}
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
+function msg(t,b=false){$('authMsg').innerHTML=`<div class="notice ${b?'bad':''}">${t}</div>`;}
+async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d;}
+async function publicApi(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json'};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d;}
+function mpApiBase(){return(appMode==='active'||appMode==='owner')?'/api':'/api/public';}
+async function f64(el){let f=el?.files?.[0];if(!f)return'';if(f.size>2*1024*1024)throw new Error('Photo must be under 2 MB');return await new Promise((a,b)=>{let r=new FileReader();r.onload=()=>a(r.result);r.onerror=b;r.readAsDataURL(f);});}
 
-function renderListingDetail(l,backId){const imgs=Array.isArray(l.images)?l.images:[];$('listingBackBtn').onclick=()=>openUserDetail(backId||l.seller_id);$('listingDetailContent').innerHTML=`<h2 style="margin-top:0">${esc(l.title)}</h2><p class="muted">Seller: ${esc(l.seller_name)} \u00b7 ${esc(l.seller_email||l.seller_phone||'—')}</p>${imgs.length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">${imgs.map(img=>`<img src="${esc(img)}" style="width:110px;height:84px;object-fit:cover;border-radius:8px">`).join('')}</div>`:''}<div class="list" style="margin:12px 0"><div class="row"><span class="muted">Price</span><span>KES ${Number(l.price).toLocaleString()}</span></div><div class="row"><span class="muted">Category</span><span>${esc(l.category)}</span></div><div class="row"><span class="muted">Condition</span><span>${esc(l.condition)}</span></div><div class="row"><span class="muted">Location</span><span>${esc(l.location)}</span></div><div class="row"><span class="muted">Status</span>${listingBadge(l.status)}</div><div class="row"><span class="muted">Listed</span><span>${new Date(l.created_at).toLocaleString()}</span></div><div class="row"><span class="muted">Images</span><span>${imgs.length}</span></div></div>${l.description?`<p style="white-space:pre-wrap;margin:12px 0">${esc(l.description)}</p>`:''}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">${l.status!=='active'?`<button class="btn ok" onclick="setListingStatus('${esc(l.id)}','active','${esc(l.seller_id)}')">Restore</button>`:''} ${l.status==='active'?`<button class="btn bad" onclick="confirmListingStatus('${esc(l.id)}','hidden','${esc(l.seller_id)}')">Hide</button>`:''} ${l.status!=='removed'?`<button class="btn bad" onclick="confirmListingStatus('${esc(l.id)}','removed','${esc(l.seller_id)}')">Remove</button>`:''}</div>`}
+// ── Auth forms ────────────────────────────────────────────────────────────────
+$('registerForm').onsubmit=async e=>{e.preventDefault();try{
+ const pw=$('regPass').value;
+ if(pw.length<10||!/[A-Za-z]/.test(pw)||!/\d/.test(pw)){msg('Password must be at least 10 characters with at least one letter and one number.',true);return;}
+ let d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:$('regName').value,phone:$('regPhone').value,email:$('regEmail').value,password:pw,selfie:await f64($('regSelfie'))})});
+ token=d.token;localStorage.setItem('hapa_token',token);verifyChannel=d.channel;
+ authMode('verify');
+ $('verifyHint').textContent=`We sent a 6-digit code to your ${d.channel==='phone'?'phone':'email'}. It expires in 10 minutes.`;
+ startResendCountdown();
+ msg(d.demoCode?`Demo code: ${d.demoCode}`:'Verification code sent.');
+}catch(x){msg(x.message,true);}};
 
-/* ── user status actions ── */
-async function setUserStatus(userId,status){try{await api('/api/owner/users/'+userId+'/status',{method:'PATCH',body:JSON.stringify({status})});openUserDetail(userId)}catch(e){alert(e.message)}}
-function confirmUserStatus(userId,status){if(confirm('Are you sure you want to '+status+' this user?'))setUserStatus(userId,status)}
+async function doVerify(){try{
+ await api('/api/auth/verify',{method:'POST',body:JSON.stringify({code:$('verifyCode').value})});
+ await start();
+}catch(x){msg(x.message,true);}}
 
-/* ── listing status actions ── */
-async function setListingStatus(listingId,status,sellerId){try{await api('/api/owner/listings/'+listingId+'/status',{method:'PATCH',body:JSON.stringify({status})});openListingDetail(listingId,sellerId)}catch(e){alert(e.message)}}
-function confirmListingStatus(listingId,status,sellerId){if(confirm('Are you sure you want to '+status+' this listing?'))setListingStatus(listingId,status,sellerId)}
+$('loginForm').onsubmit=async e=>{e.preventDefault();try{
+ let d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({identifier:$('loginId').value,password:$('loginPass').value})});
+ token=d.token;localStorage.setItem('hapa_token',token);start();
+}catch(x){msg(x.message,true);}};
 
-if(token)start();
+$('forgotForm').onsubmit=async e=>{e.preventDefault();resetIdentifier=$('forgotId').value;
+ let d=await api('/api/auth/forgot',{method:'POST',body:JSON.stringify({identifier:resetIdentifier})});
+ $('resetFields').classList.remove('hidden');
+ msg(d.demoCode?`Demo reset code: ${d.demoCode}`:'Reset code sent.');
+};
+
+async function resetPassword(){try{
+ await api('/api/auth/reset',{method:'POST',body:JSON.stringify({identifier:resetIdentifier,code:$('resetCode').value,newPassword:$('resetPass').value})});
+ msg('Password changed. Please log in.');authMode('login');
+}catch(x){msg(x.message,true);}}
+
+// Resend code
+async function resendCode(){
+ if(resendCountdown>0)return;
+ try{const d=await api('/api/auth/resend',{method:'POST'});
+  msg(d.demoCode?`New code sent. Demo: ${d.demoCode}`:'New code sent.');
+  startResendCountdown();
+ }catch(e){msg(e.message,true);}
+}
+function startResendCountdown(){
+ resendCountdown=60;updateResendBtn();
+ if(resendInt)clearInterval(resendInt);
+ resendInt=setInterval(()=>{resendCountdown--;updateResendBtn();if(resendCountdown<=0){clearInterval(resendInt);resendInt=null;}},1000);
+}
+function updateResendBtn(){const b=$('resendBtn');if(!b)return;b.disabled=resendCountdown>0;b.textContent=resendCountdown>0?`Resend code (${resendCountdown}s)`:'Resend code';}
+
+// Password requirements
+function updatePwReqs(v){
+ setPwReq('pwReqLen',v.length>=10);
+ setPwReq('pwReqLetter',/[A-Za-z]/.test(v));
+ setPwReq('pwReqNum',/\d/.test(v));
+}
+function setPwReq(id,ok){const el=$(id);if(!el)return;el.classList.toggle('met',ok);el.querySelector('.pw-req-icon').textContent=ok?'✓':'○';}
+function updateSelfiePreview(input){const f=input.files?.[0];if(!f)return;const url=URL.createObjectURL(f);const img=$('selfiePreview');img.onload=()=>URL.revokeObjectURL(url);img.src=url;$('selfiePreviewWrap').classList.remove('hidden');}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function tab(id){
+ ['home','market','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ ['navHome','navMarket','navUpgrade','navOwner'].forEach(bid=>{
+  const b=$(bid);if(!b)return;
+  const sect=bid.replace('nav','').toLowerCase();
+  b.classList.toggle('nav-active',sect===id);
+  b.classList.toggle('primary',sect===id);
+ });
+ if(id==='market')mpView('browse');
+ if(id==='owner')loadOwner();
+}
+async function requestAgain(){await api('/api/me/request-again',{method:'POST'});location.reload();}
+
+// ── Upgrade applications ──────────────────────────────────────────────────────
+async function apply(t,d){try{await api('/api/upgrades',{method:'POST',body:JSON.stringify({type:t,details:d})});$('upgradeMsg').innerHTML=`<div class="notice">${t} application submitted. The owner will review it shortly.</div>`;}catch(x){$('upgradeMsg').innerHTML=`<div class="notice bad">${x.message}</div>`;}}
+async function applyDriver(){apply('driver',{licenceNumber:$('dLicence').value,licenceImage:await f64($('dLicenceImg')),vehicleRegistration:$('dReg').value,insuranceImage:await f64($('dInsurance')),insuranceExpiry:$('dExpiry').value,vehiclePhoto:await f64($('dVehicle'))});}
+async function applyMerchant(){apply('merchant',{businessName:$('bName').value,businessCategory:$('bCategory').value,kraPin:$('bKra').value,businessAddress:$('bAddress').value,storePhoto:await f64($('bPhoto'))});}
+async function applyProfessional(){apply('professional',{profession:$('pProfession').value,skills:$('pSkills').value,experience:$('pExperience').value,location:$('pLocation').value,profilePhoto:await f64($('pPhoto'))});}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function statusBadge(s){const m={active:'var(--ok)',blocked:'var(--bad)',rejected:'#ff9944'};return`<span style="color:${m[s]||'var(--muted)'};font-weight:700">${esc(s)}</span>`;}
+function listingStatusBadge(s){const m={active:'var(--ok)',removed:'var(--bad)',sold:'var(--a)',hidden:'var(--muted)'};return`<span style="color:${m[s]||'var(--muted)'};font-weight:700">${esc(STATUS_LABELS[s]||s)}</span>`;}
+function badgePill(label,color,bg){return`<span class="badge-pill" style="color:${color};background:${bg||color+'22'}">${esc(label)}</span>`;}
+function fmtDate(d){try{return new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}catch{return '';}}
+function fmtNum(n){return Number(n).toLocaleString();}
+function verifiedBadge(v){return v?`<span class="hapa-verified" title="Identity reviewed by HAPA">✓ HAPA Verified</span>`:'';}
+function condBadge(c){return`<span class="mp-badge ${c==='New'?'cond-new':'cond-used'}">${esc(c)}</span>`;}
+function mpNormalizePhone(p){if(!p)return null;let s=String(p).replace(/[^\d+]/g,'');if(s.startsWith('0'))s='254'+s.slice(1);if(s.startsWith('+'))s=s.slice(1);return s||null;}
+
+function updateCharCount(inputId,counterId,max){
+ const el=$(inputId),cnt=$(counterId);if(!el||!cnt)return;
+ const len=el.value.length;cnt.textContent=`${len} / ${max}`;
+ cnt.style.color=len>max?'var(--bad)':len>max*0.85?'var(--a)':'var(--muted)';
+}
+function mpFieldErr(fieldId,msg){
+ const e=$(`${fieldId}Err`),f=$(fieldId);
+ if(e){e.textContent=msg;e.classList.toggle('show',!!msg);}
+ if(f)f.classList.toggle('err',!!msg);
+}
+function mpFieldClear(fieldId){mpFieldErr(fieldId,'');}
+function mpClearAllErrors(prefix){['Title','Price','Cat','Cond','Loc','Desc','Img'].forEach(n=>mpFieldErr(`${prefix}${n}`.replace('Title','Title').replace('Price','Price'),''));}
+function mpScrollToFirstErr(){const f=document.querySelector('.field-err.show');if(f)f.scrollIntoView({behavior:'smooth',block:'center'});}
+
+// ── Draft autosave ────────────────────────────────────────────────────────────
+function mpSaveDraft(){
+ if(mpCurView!=='create')return;
+ const d={title:($('cTitle')||{}).value||'',price:($('cPrice')||{}).value||'',cat:($('cCat')||{}).value||'',cond:($('cCond')||{}).value||'',loc:($('cLoc')||{}).value||'',desc:($('cDesc')||{}).value||'',neg:($('cNeg')||{}).checked||false,phone:($('cPhone')||{}).checked||false,images:[...mpImages],ts:Date.now()};
+ if(!d.title&&!d.desc&&!d.price&&!d.images.length)return;
+ localStorage.setItem(DRAFT_KEY,JSON.stringify(d));
+ if($('draftStatus'))$('draftStatus').textContent='Draft saved';
+ setTimeout(()=>{if($('draftStatus'))$('draftStatus').textContent='';},2000);
+}
+function mpLoadDraft(){
+ try{const raw=localStorage.getItem(DRAFT_KEY);if(!raw)return false;const d=JSON.parse(raw);if(!d||!d.ts)return false;if(Date.now()-d.ts>7*24*60*60*1000){localStorage.removeItem(DRAFT_KEY);return false;}if(!d.title&&!d.desc&&!d.price&&!d.images?.length)return false;return d;}catch{return false;}
+}
+function mpRestoreDraft(d){
+ if($('cTitle')){$('cTitle').value=d.title||'';updateCharCount('cTitle','cTitleCount',100);}
+ if($('cPrice'))$('cPrice').value=d.price||'';
+ if($('cCat'))$('cCat').value=d.cat||'';
+ if($('cCond'))$('cCond').value=d.cond||'';
+ if($('cLoc'))$('cLoc').value=d.loc||'Embu';
+ if($('cDesc')){$('cDesc').value=d.desc||'';updateCharCount('cDesc','cDescCount',2000);}
+ if($('cNeg'))$('cNeg').checked=d.neg||false;
+ if($('cPhone'))$('cPhone').checked=d.phone||false;
+ mpImages=Array.isArray(d.images)?[...d.images]:[];
+ mpRenderPreviews('cPreviews');
+}
+function mpKeepDraft(){$('draftBanner').classList.add('hidden');if(draftAutoTimer)clearInterval(draftAutoTimer);draftAutoTimer=setInterval(mpSaveDraft,10000);}
+function mpDiscardDraft(){
+ localStorage.removeItem(DRAFT_KEY);$('draftBanner').classList.add('hidden');
+ mpImages=[];mpRenderPreviews('cPreviews');
+ ['cTitle','cDesc'].forEach(id=>{if($(id))$(id).value='';});
+ if($('cPrice'))$('cPrice').value='';if($('cCat'))$('cCat').selectedIndex=0;
+ if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value='Embu';
+ if($('cNeg'))$('cNeg').checked=false;if($('cPhone'))$('cPhone').checked=false;
+ updateCharCount('cTitle','cTitleCount',100);updateCharCount('cDesc','cDescCount',2000);
+ if(draftAutoTimer)clearInterval(draftAutoTimer);draftAutoTimer=setInterval(mpSaveDraft,10000);
+}
+
+// ── Image handling ────────────────────────────────────────────────────────────
+async function mpResizeImage(file){
+ if(!file.type.startsWith('image/'))throw new Error('Not an image: '+file.name);
+ if(file.size>5*1024*1024)throw new Error(file.name+' exceeds 5 MB limit');
+ return new Promise((resolve,reject)=>{
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=()=>{URL.revokeObjectURL(url);const MAX=900,r=Math.min(1,MAX/Math.max(img.width,img.height));const w=Math.round(img.width*r),h=Math.round(img.height*r);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',0.78));};
+  img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Could not load '+file.name));};
+  img.src=url;
+ });
+}
+async function mpHandleFiles(input,previewId){
+ const slots=5-mpImages.length;if(!slots){mpInlineAlert('Maximum 5 images.');input.value='';return;}
+ const files=[...input.files].slice(0,slots);input.value='';
+ for(const f of files){try{mpImages.push(await mpResizeImage(f));}catch(e){mpInlineAlert(e.message);}}
+ mpRenderPreviews(previewId);mpFieldErr('cImg','');
+}
+function mpRenderPreviews(previewId){
+ const strip=$(previewId);if(!strip)return;
+ strip.innerHTML=mpImages.map((url,i)=>`<div style="position:relative;flex-shrink:0"><img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;display:block"><button onclick="mpRemoveImg(${i},'${previewId}')" style="position:absolute;top:-8px;right:-8px;width:44px;height:44px;border-radius:50%;background:var(--bad);border:0;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-weight:900;touch-action:manipulation">×</button></div>`).join('')+
+ (mpImages.length<5?`<label style="width:80px;height:80px;border:2px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:28px;flex-shrink:0"><input type="file" accept="image/*" multiple style="display:none" onchange="mpHandleFiles(this,'${previewId}')">+</label>`:'');
+}
+function mpRemoveImg(idx,previewId){mpImages.splice(idx,1);mpRenderPreviews(previewId);}
+
+// Inline alert replacement
+let alertDiv=null;
+function mpInlineAlert(msg){
+ if(!alertDiv){alertDiv=document.createElement('div');alertDiv.className='notice bad';alertDiv.style.cssText='position:fixed;top:20px;right:20px;z-index:300;max-width:280px';document.body.appendChild(alertDiv);}
+ alertDiv.textContent=msg;alertDiv.style.display='block';
+ setTimeout(()=>{if(alertDiv)alertDiv.style.display='none';},4000);
+}
+
+// ═══════════════════════ MARKETPLACE ═════════════════════════════════════════
+
+// ── View management ───────────────────────────────────────────────────────────
+function mpView(view){
+ // Gate restricted views
+ if(view==='create'&&!requireActive('post a listing'))return;
+ if(view==='mylistings'&&!requireActive('view your listings'))return;
+ if(view==='favorites'&&!requireActive('save listings'))return;
+ hideAuthPrompt();
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!==view));
+ MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab'+(t===view?' active':'');});
+ mpPrevView=mpCurView;mpCurView=view;
+ if(view==='browse')mpBrowse(mpPage);
+ if(view==='mylistings')mpMyListings();
+ if(view==='favorites')mpFavorites();
+ if(view==='create'){
+  $('mpCreateForm').classList.remove('hidden');$('mpCreateSuccess').classList.add('hidden');
+  $('mpCreateMsg').innerHTML='';
+  // Clear errors
+  ['cTitle','cPrice','cCat','cCond','cLoc','cDesc','cImg'].forEach(id=>mpFieldErr(id,''));
+  if($('mpPublishBtn'))$('mpPublishBtn').disabled=false;
+  const draft=mpLoadDraft();
+  if(draft){$('draftBanner').classList.remove('hidden');}
+  else{
+   mpImages=[];mpRenderPreviews('cPreviews');
+   ['cTitle','cDesc'].forEach(id=>{if($(id))$(id).value='';});
+   if($('cPrice'))$('cPrice').value='';if($('cCat'))$('cCat').selectedIndex=0;
+   if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value='Embu';
+   if($('cNeg'))$('cNeg').checked=false;if($('cPhone'))$('cPhone').checked=false;
+   updateCharCount('cTitle','cTitleCount',100);updateCharCount('cDesc','cDescCount',2000);
+   $('draftBanner').classList.add('hidden');
+  }
+  if(draftAutoTimer)clearInterval(draftAutoTimer);
+  draftAutoTimer=setInterval(mpSaveDraft,10000);
+ }
+}
+function mpBack(){
+ const dest=(['detail','seller'].includes(mpCurView))?mpPrevView:mpCurView==='edit'?'mylistings':'browse';
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!==dest));
+ MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab'+(t===dest?' active':'');});
+ mpCurView=dest;hideAuthPrompt();
+}
+
+// ── Browse ────────────────────────────────────────────────────────────────────
+function mpDebounceBrowse(){clearTimeout(mpDt);mpDt=setTimeout(()=>{mpPage=1;mpBrowse(1);},600);}
+function mpToggleFilters(){$('mpFilters').classList.toggle('hidden');mpUpdateFilterBtn();}
+function mpUpdateFilterBtn(){
+ let n=0;
+ if(($('mpCat')||{}).value)n++;if(($('mpCond')||{}).value)n++;
+ if(($('mpLoc')||{}).value)n++;if(($('mpMin')||{}).value)n++;if(($('mpMax')||{}).value)n++;
+ const b=$('mpFilterBtn');if(!b)return;
+ b.textContent=n>0?`⊞ Filters (${n})`:'⊞ Filters';
+ b.style.borderColor=n>0?'var(--a)':'';b.style.color=n>0?'var(--a)':'';
+}
+function mpClearFilters(){
+ ['mpQ','mpMin','mpMax','mpLoc'].forEach(id=>{if($(id))$(id).value='';});
+ if($('mpCat'))$('mpCat').selectedIndex=0;if($('mpCond'))$('mpCond').selectedIndex=0;
+ if($('mpSort'))$('mpSort').selectedIndex=0;
+ mpUpdateFilterBtn();mpPage=1;mpBrowse(1);
+}
+async function mpBrowse(page=1){
+ mpPage=page;
+ const sq=($('mpQ')||{}).value||'',cat=($('mpCat')||{}).value||'',cond=($('mpCond')||{}).value||'';
+ const loc=($('mpLoc')||{}).value||'',mn=$('mpMin')?$('mpMin').value:'',mx=$('mpMax')?$('mpMax').value:'';
+ const sort=($('mpSort')||{}).value||'newest';
+ const ps=new URLSearchParams({page,limit:20,sort});
+ if(sq)ps.set('q',sq);if(cat)ps.set('category',cat);if(cond)ps.set('condition',cond);
+ if(loc)ps.set('location',loc);if(mn)ps.set('min_price',mn);if(mx)ps.set('max_price',mx);
+ $('mpResults').innerHTML='<div class="grid3">'+[1,2,3,4,5,6].map(()=>`<div style="background:var(--p2);border:1px solid var(--line);border-radius:14px;height:240px;animation:none"></div>`).join('')+'</div>';
+ $('mpPagination').innerHTML='';
+ try{
+  const r=await(appMode==='active'||appMode==='owner'?api:publicApi)(`${mpApiBase()}/marketplace?${ps}`);
+  // Populate fav set from response
+  if(r.data) r.data.forEach(l=>{if(l.is_favorited)mpFavSet.add(l.id);else mpFavSet.delete(l.id);});
+  if(!r.data.length){
+   $('mpResults').innerHTML=`<div class="mp-empty"><p style="font-size:36px;margin:0 0 8px">🔍</p><p class="muted">No listings found.</p><button class="btn" onclick="mpClearFilters()">Clear filters</button></div>`;
+   return;
+  }
+  $('mpResults').innerHTML='<div class="grid3">'+r.data.map(l=>mpCard(l)).join('')+'</div>';
+  $('mpResults').innerHTML+=`<p class="muted" style="font-size:13px;margin-top:10px">${r.total} listing${r.total!==1?'s':''} found</p>`;
+  if(r.pages>1){
+   let h='';
+   if(page>1)h+=`<button class="btn" onclick="mpBrowse(${page-1})">← Prev</button>`;
+   h+=`<span class="muted" style="font-size:14px">Page ${page} of ${r.pages}</span>`;
+   if(page<r.pages)h+=`<button class="btn" onclick="mpBrowse(${page+1})">Next →</button>`;
+   $('mpPagination').innerHTML=h;
+  }
+ }catch(e){$('mpResults').innerHTML=`<div class="notice bad">${esc(e.message)} <button class="btn" onclick="mpBrowse(${page})" style="margin-left:8px">Try again</button></div>`;}
+}
+
+// ── Listing card ──────────────────────────────────────────────────────────────
+function mpCard(l){
+ const img=`<img class="mp-card-img" src="${esc(mpSafeImg(l.main_image))}" alt="${esc(l.title)}" onerror="mpImgError(this)">`;
+ const neg=l.negotiable?`<span class="mp-badge" style="background:#1a3a26;color:var(--ok)">Negotiable</span> `:'';
+ const sold=l.status==='sold'?`<span class="mp-badge" style="background:#2d1a00;color:var(--a)">SOLD</span> `:'';
+ const isFav=mpFavSet.has(l.id);
+ const favHtml=appMode==='active'||appMode==='owner'
+  ?`<button class="mp-fav-btn" onclick="event.stopPropagation();mpToggleFav('${esc(l.id)}',${isFav})">${isFav?'❤️':'🤍'}</button>`
+  :`<button class="mp-fav-btn" onclick="event.stopPropagation();requireActive('save listings','${esc(l.id)}')" title="Sign in to save">🤍</button>`;
+ const id=esc(l.id);
+ return `<div class="mp-card" data-id="${id}" onclick="mpOpenListing('${id}')">
+  <div style="position:relative">${img}${favHtml}</div>
+  <div class="mp-card-body">
+   <div style="margin-bottom:5px">${neg}${sold}${condBadge(l.condition)} ${verifiedBadge(l.is_verified)}</div>
+   <b style="display:block;margin-bottom:4px;font-size:15px;line-height:1.3">${esc(l.title)}</b>
+   <div class="mp-price">KES ${fmtNum(l.price)}</div>
+   <div style="font-size:12px;color:var(--muted);margin-top:5px">${esc(l.category)} · ${esc(l.location)}</div>
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px">
+    <span class="muted">${esc(l.seller_name)}</span>
+    <span class="muted">👁 ${l.views_count||0} · ${fmtDate(l.created_at)}</span>
+   </div>
+  </div>
+ </div>`;
+}
+
+// ── Favorite in-place ─────────────────────────────────────────────────────────
+async function mpToggleFav(id,currently){
+ try{
+  if(currently){await api('/api/marketplace/'+id+'/favorite',{method:'DELETE'});mpFavSet.delete(id);}
+  else{await api('/api/marketplace/'+id+'/favorite',{method:'POST'});mpFavSet.add(id);}
+  const nowFav=mpFavSet.has(id);
+  const card=document.querySelector(`.mp-card[data-id="${id}"]`);
+  if(card){
+   const btn=card.querySelector('.mp-fav-btn');
+   if(btn){btn.innerHTML=nowFav?'❤️':'🤍';btn.onclick=(e)=>{e.stopPropagation();mpToggleFav(id,nowFav);};}
+  }
+ }catch(e){mpInlineAlert(e.message);}
+}
+
+// ── Listing detail ────────────────────────────────────────────────────────────
+async function mpOpenListing(id){
+ mpPrevView=mpCurView;
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='detail'));
+ MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ mpCurView='detail';mpCurListingId=id;
+ $('mpDetailContent').innerHTML='<p class="muted" style="padding:24px 0;text-align:center">Loading…</p>';
+ hideAuthPrompt();
+ try{
+  const isAuth=appMode==='active'||appMode==='owner';
+  const l=await(isAuth?api:publicApi)(`${mpApiBase()}/marketplace/${id}`);
+  mpRenderDetail(l);
+ }catch(e){$('mpDetailContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+function mpRenderDetail(l){
+ mpCurListingStatus=l.status;
+ const imgs=Array.isArray(l.images)?l.images:[];
+ const gallery=imgs.length?`<img id="mpMainImg" class="mp-gallery-main" src="${esc(mpSafeImg(imgs[0]))}" alt="${esc(l.title)}" onerror="mpImgError(this)">${imgs.length>1?`<div class="mp-thumbs">${imgs.map((u,i)=>`<img class="mp-thumb${i===0?' sel':''}" src="${esc(mpSafeImg(u))}" onclick="mpSetMain(this,'${esc(mpSafeImg(u))}')" onerror="mpImgError(this)">`).join('')}</div>`:''}`:`<div class="mp-no-img" style="height:180px;border-radius:12px;margin-bottom:14px">No photos</div>`;
+ const isSold=l.status==='sold';
+ const isOwn=me&&l.seller_id===me.id;
+ const isActive=appMode==='active'||appMode==='owner';
+
+ // SOLD banner
+ const soldBanner=isSold?`<div class="sold-banner"><div style="font-size:32px;font-weight:900;color:var(--a)">SOLD</div><p style="margin:4px 0 12px;color:var(--muted);font-size:14px">This item has already been sold.</p><button class="btn" onclick="mpBrowseCategory('${esc(l.category)}')">Browse more in ${esc(l.category)}</button></div>`:'';
+
+ // Contact actions (only active users, not sold, phone visible)
+ let contactBtns='';
+ if(!isSold){
+  if(isActive&&l.seller_phone_visible&&l.seller_phone){
+   const ph=esc(l.seller_phone),title=esc(l.title.replace(/'/g,"\\'"));
+   contactBtns=`<a href="tel:${ph}" class="btn ok" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">📞 Call ${ph}</a><button class="btn wa" onclick="mpWhatsApp('${ph}','${title}')">💬 WhatsApp</button>`;
+  }else if(!isActive&&!isOwn){
+   contactBtns=`<button class="btn" onclick="requireActive('contact this seller','${esc(l.id)}')">📞 Contact seller</button>`;
+  }
+ }
+
+ // Save button
+ const favBtn=isSold?'':isActive
+  ?(l.is_favorited||mpFavSet.has(l.id)?`<button class="btn bad" onclick="mpToggleFavDetail('${esc(l.id)}',true)">❤️ Saved</button>`:`<button class="btn" onclick="mpToggleFavDetail('${esc(l.id)}',false)">🤍 Save</button>`)
+  :`<button class="btn" onclick="requireActive('save listings','${esc(l.id)}')">🤍 Save</button>`;
+
+ const shareBtn=`<button class="btn" onclick="mpShare('${esc(l.id)}','${esc(l.title.replace(/'/g,"\\'"))}')">🔗 Share</button>`;
+ const editBtn=isOwn?`<button class="btn" onclick="mpOpenEdit('${esc(l.id)}')">Edit</button>`:'';
+
+ // Report section (active only, not own, not sold)
+ const reportSection=(!isOwn&&!isSold&&isActive)?`<div style="margin-top:10px"><button class="btn" style="width:100%;font-size:13px" onclick="$('mpReportSection').classList.toggle('hidden')">🚩 Report this listing</button><div id="mpReportSection" class="hidden" style="background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:8px"><h4 style="margin:0 0 10px">Report listing</h4><div class="field"><label>Reason</label><select id="mpReportReason"><option value="">Choose reason…</option><option value="scam">Scam or fraud</option><option value="prohibited_item">Prohibited item</option><option value="wrong_category">Wrong category</option><option value="duplicate">Duplicate listing</option><option value="offensive_content">Offensive content</option><option value="other">Other</option></select></div><div class="field"><label>Details (optional)</label><textarea id="mpReportDetails" rows="2" placeholder="Describe the issue…"></textarea></div><button class="btn bad" onclick="mpSubmitReport('${esc(l.id)}')">Submit report</button><div id="mpReportMsg" style="margin-top:8px"></div></div></div>`:'';
+
+ // Guest/pending sign-in prompt instead of contact
+ const signInPrompt=(!isActive&&!isOwn&&!isSold)?`<div class="notice" style="margin-top:12px;font-size:13px">🔒 <a href="#" onclick="showLoginFromGuest();return false;" style="color:var(--a)">Sign in</a> to contact the seller, save this listing, or report an issue.</div>`:'';
+
+ $('mpDetailContent').innerHTML=`<div class="card">${gallery}${soldBanner}<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px"><h2 style="margin:0;font-size:20px;flex:1">${esc(l.title)}</h2>${verifiedBadge(l.is_verified)}</div><div class="mp-price" style="margin-bottom:10px">KES ${fmtNum(l.price)}</div><div style="margin-bottom:14px">${l.negotiable?`<span class="mp-badge" style="background:#1a3a26;color:var(--ok)">Negotiable</span> `:''}${condBadge(l.condition)}</div><div class="list" style="margin-bottom:16px"><div class="row"><span class="muted">Category</span><span>${esc(l.category)}</span></div><div class="row"><span class="muted">Location</span><span>${esc(l.location)}</span></div><div class="row"><span class="muted">Views</span><span>👁 ${l.views_count||0}</span></div><div class="row"><span class="muted">Listed</span><span>${fmtDate(l.created_at)}</span></div>${l.updated_at?`<div class="row"><span class="muted">Updated</span><span>${fmtDate(l.updated_at)}</span></div>`:''}</div>${l.description?`<div style="background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px"><p style="margin:0;white-space:pre-wrap;line-height:1.6;font-size:14px">${esc(l.description)}</p></div>`:''}<div class="mp-seller-card" onclick="mpOpenSeller('${esc(l.seller_id)}')">${l.seller_photo?`<img src="${esc(l.seller_photo)}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex'">`:''}${!l.seller_photo||true?`<div style="width:48px;height:48px;border-radius:50%;background:var(--p);display:${l.seller_photo?'none':'flex'};align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--muted);flex-shrink:0">${esc((l.seller_name||'?').charAt(0).toUpperCase())}</div>`:''}<div><b>${esc(l.seller_name)}</b>${verifiedBadge(l.is_verified)}<br><span class="muted" style="font-size:13px">${l.seller_listing_count||0} active listing${l.seller_listing_count!==1?'s':''} · Tap to view profile →</span></div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${contactBtns}${favBtn}${shareBtn}${editBtn}</div>${signInPrompt}${reportSection}</div>`;
+}
+
+function mpSetMain(thumb,url){$('mpMainImg').src=url;document.querySelectorAll('.mp-thumb').forEach(t=>t.classList.remove('sel'));thumb.classList.add('sel');}
+
+async function mpToggleFavDetail(id,currently){
+ if(mpCurListingStatus==='sold')return;
+ try{
+  if(currently){await api('/api/marketplace/'+id+'/favorite',{method:'DELETE'});mpFavSet.delete(id);}
+  else{await api('/api/marketplace/'+id+'/favorite',{method:'POST'});mpFavSet.add(id);}
+  const l=await api('/api/marketplace/'+id);mpRenderDetail(l);
+ }catch(e){mpInlineAlert(e.message);}
+}
+
+function mpWhatsApp(phone,title){
+ const n=mpNormalizePhone(phone);if(!n){mpInlineAlert('No valid phone number.');return;}
+ const text=encodeURIComponent(`Hi, I saw your listing '${title}' on HAPA. Is it still available?`);
+ window.open(`https://wa.me/${n}?text=${text}`,'_blank');
+}
+
+function mpShare(id,title){
+ const url=location.protocol+'//'+location.host+'?listing='+id;
+ if(navigator.share){navigator.share({title,url}).catch(()=>{});}
+ else{navigator.clipboard.writeText(url).then(()=>mpInlineAlert('Link copied!')).catch(()=>mpInlineAlert(url));}
+}
+
+function mpBrowseCategory(cat){if($('mpCat'))$('mpCat').value=cat;mpUpdateFilterBtn();mpView('browse');}
+
+async function mpSubmitReport(listingId){
+ const reason=($('mpReportReason')||{}).value||'';
+ const details=($('mpReportDetails')||{}).value||'';
+ if(!reason){$('mpReportMsg').innerHTML='<div class="notice bad">Please choose a reason.</div>';return;}
+ try{await api('/api/marketplace/'+listingId+'/report',{method:'POST',body:JSON.stringify({reason,details})});$('mpReportMsg').innerHTML='<div class="notice">Report submitted. Thank you.</div>';if($('mpReportReason'))$('mpReportReason').value='';if($('mpReportDetails'))$('mpReportDetails').value='';}
+ catch(e){$('mpReportMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+// ── Create listing ────────────────────────────────────────────────────────────
+async function mpCreate(){
+ ['cTitle','cPrice','cCat','cCond','cLoc','cDesc','cImg'].forEach(id=>mpFieldErr(id,''));
+ const title=($('cTitle').value||'').trim(),price=parseFloat(($('cPrice').value||'').replace(/,/g,'')),cat=$('cCat').value,cond=$('cCond').value,loc=($('cLoc').value||'').trim(),desc=($('cDesc').value||'').trim();
+ let hasErr=false;
+ if(!title||title.length<3||title.length>100){mpFieldErr('cTitle','Title must be 3–100 characters');hasErr=true;}
+ if(!price||price<=0){mpFieldErr('cPrice','Price must be a positive number');hasErr=true;}
+ if(!cat){mpFieldErr('cCat','Please select a category');hasErr=true;}
+ if(!cond){mpFieldErr('cCond','Please select a condition');hasErr=true;}
+ if(!loc||loc.length<2){mpFieldErr('cLoc','Please enter a location');hasErr=true;}
+ if(!desc||desc.length<10){mpFieldErr('cDesc','Description must be at least 10 characters');hasErr=true;}
+ if(desc.length>2000){mpFieldErr('cDesc','Description must be under 2000 characters');hasErr=true;}
+ if(!mpImages.length){mpFieldErr('cImg','Please add at least one photo');hasErr=true;}
+ if(hasErr){mpScrollToFirstErr();return;}
+ $('mpCreateMsg').innerHTML='<p class="muted" style="text-align:center;margin:0">Publishing…</p>';
+ $('mpPublishBtn').disabled=true;
+ try{
+  const r=await api('/api/marketplace',{method:'POST',body:JSON.stringify({title,price,category:cat,condition:cond,location:loc,description:desc,negotiable:$('cNeg').checked,seller_phone_visible:$('cPhone').checked,images:mpImages})});
+  localStorage.removeItem(DRAFT_KEY);if(draftAutoTimer)clearInterval(draftAutoTimer);
+  $('mpCreateForm').classList.add('hidden');$('mpCreateSuccess').classList.remove('hidden');
+  $('mpSuccessMsg').textContent=`"${title}" is now visible to buyers in Embu.`;
+  const ph=me?.phone?mpNormalizePhone(me.phone):null;
+  const waShare=ph?`<button class="btn wa" onclick="window.open('https://wa.me/?text='+encodeURIComponent('Check out my listing: '+location.protocol+'//'+location.host+'?listing=${esc(r.id)}'),'_blank')">📲 Share on WhatsApp</button>`:'';
+  $('mpSuccessActions').innerHTML=`<button class="btn primary" onclick="mpOpenListing('${esc(r.id)}');mpPrevView='mylistings'">👁 View listing</button>${waShare}<button class="btn" onclick="mpView('create')">✏️ Post another</button><button class="btn" onclick="mpView('mylistings')">📋 My Listings</button>`;
+ }catch(e){$('mpCreateMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;$('mpPublishBtn').disabled=false;}
+}
+
+// ── Edit listing ──────────────────────────────────────────────────────────────
+async function mpOpenEdit(id){
+ mpEditId=id;mpPrevView=mpCurView;
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='edit'));
+ MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ mpCurView='edit';$('mpEditMsg').innerHTML='<p class="muted" style="font-size:13px">Loading…</p>';
+ try{
+  const l=await api('/api/marketplace/'+id);
+  mpImages=Array.isArray(l.images)?[...l.images]:[];
+  $('eTitle').value=l.title;$('ePrice').value=l.price;$('eCat').value=l.category;
+  $('eCond').value=l.condition;$('eLoc').value=l.location;$('eDesc').value=l.description;
+  $('eNeg').checked=l.negotiable;$('ePhone').checked=l.seller_phone_visible;
+  updateCharCount('eTitle','eTitleCount',100);updateCharCount('eDesc','eDescCount',2000);
+  mpRenderPreviews('ePreviews');$('mpEditMsg').innerHTML='';
+ }catch(e){$('mpEditMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function mpSaveEdit(){
+ if(!mpEditId)return;
+ ['eTitle','ePrice','eCat','eCond','eLoc','eDesc','eImg'].forEach(id=>mpFieldErr(id,''));
+ const title=($('eTitle').value||'').trim(),price=parseFloat(($('ePrice').value||'').replace(/,/g,'')),desc=($('eDesc').value||'').trim(),loc=($('eLoc').value||'').trim();
+ let hasErr=false;
+ if(!title||title.length<3||title.length>100){mpFieldErr('eTitle','Title must be 3–100 characters');hasErr=true;}
+ if(!price||price<=0){mpFieldErr('ePrice','Price must be a positive number');hasErr=true;}
+ if(!$('eCat').value){mpFieldErr('eCat','Category is required');hasErr=true;}
+ if(!desc||desc.length<10||desc.length>2000){mpFieldErr('eDesc','Description must be 10–2000 characters');hasErr=true;}
+ if(!loc||loc.length<2){mpFieldErr('eLoc','Location is required');hasErr=true;}
+ if(!mpImages.length){mpFieldErr('eImg','At least one photo required');hasErr=true;}
+ if(hasErr){mpScrollToFirstErr();return;}
+ $('mpEditMsg').innerHTML='<p class="muted" style="text-align:center;margin:0">Saving…</p>';
+ try{
+  await api('/api/marketplace/'+mpEditId,{method:'PATCH',body:JSON.stringify({title,price,category:$('eCat').value,condition:$('eCond').value,location:loc,description:desc,negotiable:$('eNeg').checked,seller_phone_visible:$('ePhone').checked,images:mpImages})});
+  $('mpEditMsg').innerHTML='<div class="notice">Changes saved!</div>';
+  setTimeout(()=>mpView('mylistings'),900);
+ }catch(e){$('mpEditMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+// ── My Listings ───────────────────────────────────────────────────────────────
+async function mpMyListings(){
+ $('mpMyContent').innerHTML='<p class="muted" style="padding:20px 0;text-align:center">Loading…</p>';
+ try{
+  const r=await api('/api/me/listings');
+  if(!r.data.length){$('mpMyContent').innerHTML='<div class="mp-empty"><p style="font-size:36px;margin:0 0 8px">📦</p><p class="muted">No listings yet.</p><button class="btn primary" onclick="mpView(\'create\')">Post your first listing</button></div>';return;}
+  $('mpMyContent').innerHTML='<div class="list">'+r.data.map(l=>mpMyCard(l)).join('')+'</div>';
+ }catch(e){$('mpMyContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+function mpMyCard(l){
+ const img=`<img class="mp-my-thumb" src="${esc(mpSafeImg(l.main_image))}" onerror="mpImgError(this)">`;
+ const stC={active:'var(--ok)',hidden:'var(--muted)',sold:'var(--a)',removed:'var(--bad)'};
+ const id=esc(l.id);const actions=[];
+ if(l.status!=='removed'){
+  actions.push(`<button class="btn" onclick="mpOpenEdit('${id}')">Edit</button>`);
+  if(l.status==='active'){
+   actions.push(`<button class="btn" onclick="mpChangeStatus('${id}','hidden')">Hide</button>`);
+   actions.push(`<button class="btn ok" onclick="mpChangeStatus('${id}','sold')">Mark sold</button>`);
+  }
+  if(l.status==='hidden'||l.status==='sold'){actions.push(`<button class="btn ok" onclick="mpChangeStatus('${id}','active')">Reactivate</button>`);}
+  actions.push(`<button class="btn bad" onclick="mpConfirmRemove('${id}')">Remove</button>`);
+ }
+ return `<div class="mp-my-card" data-id="${id}">
+  <div onclick="mpOpenListing('${id}')" style="cursor:pointer">${img}</div>
+  <div style="flex:1;min-width:0">
+   <b style="display:block;margin-bottom:4px">${esc(l.title)}</b>
+   <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+    <span class="mp-price" style="font-size:15px">KES ${fmtNum(l.price)}</span>
+    <span class="mp-badge" style="color:${stC[l.status]||'var(--muted)'};background:${stC[l.status]||'var(--muted)'}22">${STATUS_LABELS[l.status]||l.status}</span>
+    <span class="muted" style="font-size:12px">👁 ${l.views_count||0}</span>
+   </div>
+   <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(l.category)} · ${esc(l.location)} · ${fmtDate(l.created_at)}</div>
+   <div class="mp-actions" style="display:flex;gap:8px;flex-wrap:wrap">${actions.join('')}</div>
+  </div>
+ </div>`;
+}
+async function mpChangeStatus(id,status){
+ try{await api('/api/marketplace/'+id+'/status',{method:'PATCH',body:JSON.stringify({status})});mpMyListings();}
+ catch(e){mpInlineAlert(e.message);}
+}
+function mpConfirmRemove(id){
+ const card=document.querySelector(`.mp-my-card[data-id="${id}"]`);if(!card)return;
+ let conf=card.querySelector('.inline-confirm');
+ if(conf){conf.classList.toggle('hidden');return;}
+ conf=document.createElement('div');conf.className='inline-confirm';
+ conf.innerHTML=`<span style="flex:1">Remove this listing? It won't be visible to buyers.</span><button class="btn bad" onclick="mpChangeStatus('${id}','removed')">Yes, remove</button><button class="btn" onclick="this.closest('.inline-confirm').classList.add('hidden')">Cancel</button>`;
+ card.appendChild(conf);
+}
+
+// ── Favorites ─────────────────────────────────────────────────────────────────
+async function mpFavorites(){
+ $('mpFavContent').innerHTML='<p class="muted" style="padding:20px 0;text-align:center">Loading…</p>';
+ try{
+  const r=await api('/api/me/favorites');
+  if(!r.data.length){$('mpFavContent').innerHTML='<div class="mp-empty"><p style="font-size:36px;margin:0 0 8px">🤍</p><p class="muted">No saved listings yet.</p><button class="btn" onclick="mpView(\'browse\')">Browse listings</button></div>';return;}
+  r.data.forEach(l=>mpFavSet.add(l.id));
+  $('mpFavContent').innerHTML='<div class="grid3">'+r.data.map(l=>mpCard({...l,is_favorited:true})).join('')+'</div>';
+ }catch(e){$('mpFavContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+// ── Seller profile ────────────────────────────────────────────────────────────
+async function mpOpenSeller(id){
+ mpPrevView=mpCurView;
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='seller'));
+ MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ mpCurView='seller';$('mpSellerContent').innerHTML='<p class="muted">Loading…</p>';hideAuthPrompt();
+ try{
+  const isAuth=appMode==='active'||appMode==='owner';
+  const[seller,listings]=await Promise.all([(isAuth?api:publicApi)(`${mpApiBase()}/sellers/${id}`),(isAuth?api:publicApi)(`${mpApiBase()}/sellers/${id}/listings`)]);
+  const photo=seller.profile_photo_url?`<img src="${esc(seller.profile_photo_url)}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid var(--line)" onerror="this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex'">`+'':''
+   +`<div style="width:72px;height:72px;border-radius:50%;background:var(--p2);border:3px solid var(--line);display:${seller.profile_photo_url?'none':'flex'};align-items:center;justify-content:center;font-size:28px;font-weight:900;color:var(--muted)">${esc((seller.name||'?').charAt(0).toUpperCase())}</div>`;
+  $('mpSellerContent').innerHTML=`<div class="card" style="margin-bottom:14px"><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">${photo}<div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><h2 style="margin:0">${esc(seller.name)}</h2>${verifiedBadge(seller.is_verified)}</div><div class="muted" style="font-size:13px">${seller.active_listings} active listing${seller.active_listings!==1?'s':''} · Joined ${fmtDate(seller.created_at)}</div></div></div></div><h3 style="margin:0 0 12px">Active Listings</h3>${listings.data.length?'<div class="grid3">'+listings.data.map(l=>mpCard({...l,is_favorited:false})).join('')+'</div>':'<div class="mp-empty"><p class="muted">No active listings from this seller.</p></div>'}`;
+ }catch(e){$('mpSellerContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+// ═══════════════════════ OWNER DASHBOARD ══════════════════════════════════════
+async function loadOwner(){ownerSubTab('stats');}
+async function reviewAccess(id,status){await api('/api/owner/access/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats();}
+async function reviewUpgrade(id,status){await api('/api/owner/upgrades/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats();}
+async function reviewReport(id,status){try{await api('/api/owner/listing-reports/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerReports();}catch(e){mpInlineAlert(e.message);}}
+
+function ownerSubTab(tab){
+ $('oTabStats').className='btn'+(tab==='stats'?' primary':'');
+ $('oTabUsers').className='btn'+(tab==='users'?' primary':'');
+ $('ownerStatsPanel').classList.toggle('hidden',tab!=='stats');
+ $('ownerUsersPanel').classList.toggle('hidden',tab!=='users');
+ $('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.add('hidden');
+ if(tab==='stats')loadOwnerStats();
+ if(tab==='users')loadOwnerUsers();
+}
+
+async function loadOwnerStats(){
+ try{
+  const[d,a,u]=await Promise.all([api('/api/owner/dashboard'),api('/api/owner/access'),api('/api/owner/upgrades')]);
+  ownerAccessData=a;
+  $('ownerStats').innerHTML=Object.entries(d).map(([k,v])=>`<div class="stat"><span style="font-size:11px">${OWNER_STAT_LABELS[k]||k}</span><b>${v}</b></div>`).join('');
+  renderAccessRequests();
+  $('upgradeRequests').innerHTML=u.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> · ${esc(x.type)}<br><small class="muted">${esc(x.status)}</small></span>${x.status==='pending'?`<span style="display:flex;gap:6px"><button class="btn ok" onclick="reviewUpgrade('${x.id}','approved')">Approve</button><button class="btn bad" onclick="reviewUpgrade('${x.id}','rejected')">Reject</button></span>`:''}</div>`).join('')||'<p class="muted">No applications.</p>';
+  loadOwnerReports();
+ }catch(e){console.error(e);}
+}
+
+function renderAccessRequests(){
+ const data=ownerShowAllAccess?ownerAccessData:ownerAccessData.filter(x=>x.status==='pending');
+ $('accessRequests').innerHTML=data.map(x=>`<div class="row"><span style="display:flex;align-items:center;gap:10px">${x.profile_photo_url?`<img class="photo" src="${esc(x.profile_photo_url)}" style="width:42px;height:42px;flex-shrink:0" onerror="mpImgError(this)">`:''}<span><b>${esc(x.name)}</b><br><small class="muted">${esc(x.phone||x.email||'')} · ${esc(x.status)}</small></span></span>${x.status==='pending'?`<span style="display:flex;gap:6px"><button class="btn ok" onclick="reviewAccess('${x.id}','approved')">Accept</button><button class="btn bad" onclick="reviewAccess('${x.id}','rejected')">Reject</button></span>`:''}</div>`).join('')||'<p class="muted">No pending requests.</p>';
+}
+function toggleAccessHistory(){
+ ownerShowAllAccess=!ownerShowAllAccess;
+ $('accessHistoryBtn').textContent=ownerShowAllAccess?'Show pending only':'Show history';
+ renderAccessRequests();
+}
+
+async function loadOwnerReports(){
+ try{
+  const s=($('oReportFilter')||{}).value||'pending';
+  const reports=await api('/api/owner/listing-reports?status='+s);
+  $('listingReportsEl').innerHTML=reports.length?reports.map(r=>`<div class="row" style="flex-wrap:wrap;gap:8px"><span><b>${esc(r.listing_title)}</b><br><small class="muted">${esc(r.reporter_name)} · ${esc(r.reason.replace(/_/g,' '))} · ${esc(r.status)} · ${fmtDate(r.created_at)}</small></span>${r.status==='pending'?`<span style="display:flex;gap:6px"><button class="btn bad" onclick="reviewReport('${r.id}','reviewed')">Mark actioned</button><button class="btn" onclick="reviewReport('${r.id}','dismissed')">Mark invalid</button></span>`:''}</div>`).join(''):'<p class="muted">No reports.</p>';
+ }catch(e){$('listingReportsEl').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+async function loadOwnerUsers(){
+ $('usersListEl').innerHTML='<p class="muted">Loading…</p>';
+ try{
+  ownerAllUsers=await api('/api/owner/users');
+  renderOwnerUserList(($('ownerUserSearch')||{}).value||'');
+ }catch(e){$('usersListEl').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+function filterOwnerUsers(q){renderOwnerUserList(q);}
+function renderOwnerUserList(q){
+ const s=(q||'').toLowerCase().trim();
+ const f=s?ownerAllUsers.filter(u=>(u.name||'').toLowerCase().includes(s)||(u.email||'').toLowerCase().includes(s)||(u.phone||'').includes(s)):ownerAllUsers;
+ if(!f.length){$('usersListEl').innerHTML=`<p class="muted">${s?`No users matching "${esc(q)}".`:'No users found.'}</p>`;return;}
+ $('usersListEl').innerHTML=f.map(u=>`<div class="row" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="openUserDetail('${esc(u.id)}')"><span style="display:flex;align-items:center;gap:10px">${u.profile_photo_url?`<img class="photo" src="${esc(u.profile_photo_url)}" style="width:42px;height:42px;flex-shrink:0" onerror="mpImgError(this)">`:'<span style="width:42px;height:42px;border-radius:50%;background:var(--p);display:inline-block;flex-shrink:0"></span>'}<span><b>${esc(u.name)}</b><br><small class="muted">${esc(u.email||u.phone||'—')}</small></span></span><span style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">${statusBadge(u.status)}<small class="muted">${u.listing_count} listing${u.listing_count!==1?'s':''}</small><span class="pill" style="font-size:11px">${esc(u.role)}</span></span></div>`).join('');
+}
+
+async function openUserDetail(userId){
+ ownerCurrentUserId=userId;
+ ['ownerStatsPanel','ownerUsersPanel','ownerListingDetail'].forEach(id=>$(id).classList.add('hidden'));
+ $('ownerUserDetail').classList.remove('hidden');
+ $('oTabStats').className='btn';$('oTabUsers').className='btn';
+ $('udHeaderCard').innerHTML='<p class="muted">Loading…</p>';
+ ['overview','listings','driver','merchant','professional','activity'].forEach(t=>$('udP-'+t).innerHTML='');
+ udTab('overview',false);
+ try{
+  const[u,listings,upgrades]=await Promise.all([api('/api/owner/users/'+userId),api('/api/owner/users/'+userId+'/listings'),api('/api/owner/users/'+userId+'/upgrades')]);
+  udCurrentUser=u;udCurrentListings=listings;udCurrentUpgrades=upgrades;
+  renderUdHeader(u);
+  $('udT-listings').textContent='Listings'+(listings.length?` (${listings.length})`:'');
+  udTab('overview');
+ }catch(e){$('udHeaderCard').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+function renderUdHeader(u){
+ const isOwner=u.role==='owner';
+ const photoEl=u.profile_photo_url?`<img class="ud-photo" src="${esc(u.profile_photo_url)}" alt="${esc(u.name)}" onerror="mpImgError(this)">`:`<div class="ud-photo">${esc(u.name.charAt(0).toUpperCase())}</div>`;
+ const roleBg=isOwner?'var(--a)':'var(--p)';const roleColor=isOwner?'#261900':'var(--text)';
+ const stColors={active:'var(--ok)',blocked:'var(--bad)',rejected:'#ff9944'};const stC=stColors[u.status]||'var(--muted)';
+ const actions=isOwner?`<p class="muted" style="margin:14px 0 0;font-size:13px">Owner account — no moderation actions.</p>`:
+  `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">${u.status!=='active'?`<button class="btn ok" onclick="setUserStatus('${esc(u.id)}','active')">Approve</button>`:''} ${u.status!=='rejected'?`<button class="btn bad" onclick="confirmUserStatus('${esc(u.id)}','rejected')">Reject</button>`:''} ${u.status==='blocked'?`<button class="btn ok" onclick="setUserStatus('${esc(u.id)}','active')">Unblock</button>`:`<button class="btn bad" onclick="confirmUserStatus('${esc(u.id)}','blocked')">Block</button>`}</div>`;
+ $('udHeaderCard').innerHTML=`<div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap">${photoEl}<div style="flex:1;min-width:200px"><h2 style="margin:0 0 8px;font-size:22px">${esc(u.name)}</h2><div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${badgePill(u.role,roleColor,roleBg)} ${badgePill(u.status,stC)}</div><div style="display:grid;gap:5px;font-size:14px">${u.email?`<span class="muted">✉ <b style="color:var(--text)">${esc(u.email)}</b></span>`:''} ${u.phone?`<span class="muted">📞 <b style="color:var(--text)">${esc(u.phone)}</b></span>`:''} <span class="muted">📅 Joined ${new Date(u.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</span></div>${actions}</div></div>`;
+}
+
+const UD_TABS=['overview','listings','driver','merchant','professional','activity'];
+function udTab(tab,render=true){
+ UD_TABS.forEach(t=>{const btn=$('udT-'+t),panel=$('udP-'+t);if(!btn||!panel)return;btn.className='ud-tab'+(t===tab?' active':'');panel.classList.toggle('hidden',t!==tab);});
+ if(!render)return;
+ if(tab==='overview')renderUdOverview(udCurrentUser);
+ else if(tab==='listings')renderUdListings(udCurrentListings,udCurrentUser?.id);
+ else if(tab==='driver')renderUdUpgradeTab('driver');
+ else if(tab==='merchant')renderUdUpgradeTab('merchant');
+ else if(tab==='professional')renderUdUpgradeTab('professional');
+ else if(tab==='activity')renderUdActivity(udCurrentUser);
+}
+
+function renderUdOverview(u){
+ if(!u){$('udP-overview').innerHTML='';return;}
+ const cap=u.capabilities||{};const ck=v=>v?`<b style="color:var(--ok)">✓</b>`:`<b style="color:var(--muted)">—</b>`;
+ $('udP-overview').innerHTML=`<h3 style="margin:0 0 16px">Overview</h3><div class="stats" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));margin-bottom:18px"><div class="stat"><span>Status</span><b style="font-size:16px;color:${u.status==='active'?'var(--ok)':u.status==='blocked'?'var(--bad)':'var(--muted)'}">${esc(u.status)}</b></div><div class="stat"><span>Role</span><b style="font-size:16px">${esc(u.role)}</b></div><div class="stat"><span>Email verified</span>${ck(u.email_verified)}</div><div class="stat"><span>Phone verified</span>${ck(u.phone_verified)}</div><div class="stat"><span>Total listings</span><b>${u.total_listings}</b></div><div class="stat"><span style="color:var(--ok)">Live</span><b>${u.active_listings}</b></div><div class="stat"><span>Hidden</span><b>${u.hidden_listings}</b></div><div class="stat"><span style="color:var(--a)">Sold</span><b>${u.sold_listings||0}</b></div><div class="stat"><span style="color:var(--bad)">Removed</span><b>${u.removed_listings}</b></div><div class="stat"><span>Driver</span>${ck(cap.driver)}</div><div class="stat"><span>Merchant</span>${ck(cap.merchant)}</div><div class="stat"><span>Professional</span>${ck(cap.professional)}</div></div>`;
+}
+
+function renderUdListings(listings,userId){
+ const p=$('udP-listings');
+ if(!listings||!listings.length){p.innerHTML='<div class="card"><p class="muted">No listings yet.</p></div>';return;}
+ p.innerHTML=`<div class="grid3">${listings.map(l=>`<div class="ud-listing-card" onclick="openListingDetail('${esc(l.id)}','${esc(userId||'')}')"> <img class="ud-listing-card-img" src="${esc(mpSafeImg(l.main_image))}" alt="${esc(l.title)}" onerror="mpImgError(this)">`+`<div style="padding:12px"><b style="display:block;margin-bottom:4px;font-size:15px">${esc(l.title)}</b><span style="font-size:17px;font-weight:800;color:var(--a)">KES ${fmtNum(l.price)}</span><div style="margin-top:6px;font-size:12px" class="muted">${esc(l.category)} · ${esc(l.location)}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px">${listingStatusBadge(l.status)}<small class="muted">${fmtDate(l.created_at)}</small></div></div></div>`).join('')}</div>`;
+}
+
+function renderUdUpgradeTab(type){
+ const p=$('udP-'+type);
+ const apps=(udCurrentUpgrades||[]).filter(a=>a.type===type).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+ if(!apps.length){p.innerHTML='<div style="text-align:center;padding:32px 0"><p class="muted" style="margin:0">No application submitted.</p></div>';return;}
+ const a=apps[0],d=a.details||{};
+ const imgKeys={licenceImage:1,vehiclePhoto:1,insuranceImage:1,storePhoto:1,profilePhoto:1};
+ const images=Object.entries(d).filter(([k,v])=>imgKeys[k]&&v).map(([,v])=>v);
+ const rows=Object.entries(d).filter(([k])=>!imgKeys[k]).map(([k,v])=>`<div class="row"><span class="muted" style="text-transform:capitalize">${esc(k.replace(/([A-Z])/g,' $1').trim())}</span><span style="word-break:break-all">${esc(String(v||'—'))}</span></div>`).join('');
+ const stC=a.status==='approved'?'var(--ok)':a.status==='rejected'?'var(--bad)':'var(--a)';
+ p.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px"><h3 style="margin:0;text-transform:capitalize">${esc(type)} Application</h3><span class="badge-pill" style="color:${stC};background:${stC}22">${esc(a.status)}</span></div>${images.length?`<div class="ud-gallery">${images.map(img=>`<img src="${esc(mpSafeImg(img))}" onclick="this.classList.toggle('expanded')" title="Click to expand" onerror="mpImgError(this)">`).join('')}</div>`:''}<div class="list">${rows||'<p class="muted">No details recorded.</p>'}</div><p class="muted" style="font-size:12px;margin-top:14px">Submitted ${new Date(a.created_at).toLocaleString()}${a.reviewed_at?` · Reviewed ${new Date(a.reviewed_at).toLocaleString()}`:''}</p>${apps.length>1?`<p class="muted" style="font-size:12px">${apps.length-1} earlier application${apps.length>2?'s':''} on record.</p>`:''}`;
+}
+
+function renderUdActivity(u){
+ if(!u){$('udP-activity').innerHTML='';return;}
+ $('udP-activity').innerHTML=`<h3 style="margin:0 0 16px">Activity</h3><div class="list"><div class="row"><span><b>Account registered</b><br><small class="muted">${new Date(u.created_at).toLocaleString()}</small></span><span class="badge-pill" style="color:var(--muted);background:var(--p2)">Account</span></div></div><p class="muted" style="font-size:12px;margin-top:16px">Full activity log will be available in a future release.</p>`;
+}
+
+async function openListingDetail(listingId,userId){
+ const backId=userId||ownerCurrentUserId;
+ $('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.remove('hidden');
+ $('listingDetailContent').innerHTML='<p class="muted">Loading…</p>';
+ $('listingBackBtn').onclick=()=>{$('ownerListingDetail').classList.add('hidden');$('ownerUserDetail').classList.remove('hidden');udTab('listings');};
+ try{const l=await api('/api/owner/listings/'+listingId);renderListingDetail(l,backId);}
+ catch(e){$('listingDetailContent').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+function renderListingDetail(l,backId){
+ const imgs=Array.isArray(l.images)?l.images:[];
+ const seller=`${esc(l.seller_name||'—')} · ${esc(l.seller_email||l.seller_phone||'—')}`;
+ $('listingDetailContent').innerHTML=`${imgs.length?`<div class="ud-gallery">${imgs.map(img=>`<img src="${esc(mpSafeImg(img))}" onclick="this.classList.toggle('expanded')" title="Click to expand" alt="" onerror="mpImgError(this)">`).join('')}</div>`:''}<h2 style="margin:0 0 6px;font-size:20px">${esc(l.title)}</h2><p class="muted" style="margin:0 0 18px;font-size:14px">Seller: ${seller}</p><div class="list" style="margin-bottom:16px"><div class="row"><span class="muted">Price</span><span style="font-size:20px;font-weight:800;color:var(--a)">KES ${fmtNum(l.price)}</span></div><div class="row"><span class="muted">Category</span><span>${esc(l.category)}</span></div><div class="row"><span class="muted">Condition</span><span>${esc(l.condition)}</span></div><div class="row"><span class="muted">Location</span><span>${esc(l.location)}</span></div><div class="row"><span class="muted">Status</span>${listingStatusBadge(l.status)}</div><div class="row"><span class="muted">Views</span><span>${l.views_count||0}</span></div><div class="row"><span class="muted">Listed</span><span>${new Date(l.created_at).toLocaleString()}</span></div>${l.updated_at?`<div class="row"><span class="muted">Updated</span><span>${new Date(l.updated_at).toLocaleString()}</span></div>`:''}<div class="row"><span class="muted">Images</span><span>${imgs.length}</span></div></div>${l.description?`<div style="background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:16px"><p style="margin:0;white-space:pre-wrap;font-size:14px;line-height:1.6">${esc(l.description)}</p></div>`:''}<div style="display:flex;gap:10px;flex-wrap:wrap">${l.status!=='active'?`<button class="btn ok" onclick="setListingStatus('${esc(l.id)}','active','${esc(l.seller_id)}')">✓ Restore</button>`:''} ${l.status==='active'?`<button class="btn bad" onclick="confirmListingStatus('${esc(l.id)}','hidden','${esc(l.seller_id)}')">Hide</button>`:''} ${l.status!=='removed'?`<button class="btn bad" onclick="confirmListingStatus('${esc(l.id)}','removed','${esc(l.seller_id)}')">Remove</button>`:''}</div>`;
+}
+
+async function setUserStatus(userId,status){try{await api('/api/owner/users/'+userId+'/status',{method:'PATCH',body:JSON.stringify({status})});openUserDetail(userId);}catch(e){mpInlineAlert(e.message);}}
+function confirmUserStatus(userId,status){if(confirm('Are you sure you want to '+status+' this user?'))setUserStatus(userId,status);}
+async function setListingStatus(listingId,status,sellerId){try{await api('/api/owner/listings/'+listingId+'/status',{method:'PATCH',body:JSON.stringify({status})});openListingDetail(listingId,sellerId);}catch(e){mpInlineAlert(e.message);}}
+function confirmListingStatus(listingId,status,sellerId){if(confirm('Are you sure you want to '+status+' this listing?'))setListingStatus(listingId,status,sellerId);}
 </script></body></html>

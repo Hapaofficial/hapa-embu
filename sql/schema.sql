@@ -48,6 +48,43 @@ CREATE TABLE IF NOT EXISTS marketplace_listings(
  condition TEXT NOT NULL DEFAULT 'Used', description TEXT DEFAULT '', location TEXT DEFAULT 'Embu',
  images JSONB NOT NULL DEFAULT '[]'::jsonb, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW()
 );
--- Listing soft-delete/visibility status (idempotent)
+
+-- Listing soft-delete/visibility status (idempotent, includes sold)
 ALTER TABLE marketplace_listings DROP CONSTRAINT IF EXISTS listings_status_check;
-ALTER TABLE marketplace_listings ADD CONSTRAINT listings_status_check CHECK(status IN('active','hidden','removed'));
+ALTER TABLE marketplace_listings ADD CONSTRAINT listings_status_check CHECK(status IN('active','hidden','removed','sold'));
+
+-- Marketplace PRO: extend marketplace_listings (all idempotent)
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS views_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS contact_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS negotiable BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE marketplace_listings ADD COLUMN IF NOT EXISTS seller_phone_visible BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_listings_status ON marketplace_listings(status);
+CREATE INDEX IF NOT EXISTS idx_listings_seller ON marketplace_listings(seller_id);
+CREATE INDEX IF NOT EXISTS idx_listings_category ON marketplace_listings(category);
+
+-- Listing favorites
+CREATE TABLE IF NOT EXISTS listing_favorites(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+ listing_id UUID REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(user_id, listing_id)
+);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON listing_favorites(user_id);
+
+-- Listing reports
+CREATE TABLE IF NOT EXISTS listing_reports(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ listing_id UUID REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+ reporter_id UUID REFERENCES users(id) ON DELETE CASCADE,
+ reason TEXT NOT NULL CHECK(reason IN('scam','prohibited_item','wrong_category','duplicate','offensive_content','other')),
+ details TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','reviewed','dismissed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ reviewed_at TIMESTAMPTZ,
+ reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reports_listing ON listing_reports(listing_id);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON listing_reports(status);
