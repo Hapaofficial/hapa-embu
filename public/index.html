@@ -652,14 +652,30 @@ function setPwReq(id,ok){const el=$(id);if(!el)return;el.classList.toggle('met',
 function updateSelfiePreview(input){const f=input.files?.[0];if(!f)return;const url=URL.createObjectURL(f);const img=$('selfiePreview');img.onload=()=>URL.revokeObjectURL(url);img.src=url;$('selfiePreviewWrap').classList.remove('hidden');}
 
 // ── Navigation ────────────────────────────────────────────────────────────────
+function setActiveMainNav(section){
+ const map={home:'navHome',market:'navMarket',upgrade:'navUpgrade',owner:'navOwner'};
+ Object.entries(map).forEach(([sec,btnId])=>{
+  const b=$(btnId);if(!b)return;
+  const on=sec===section;
+  b.classList.toggle('nav-active',on);
+  b.classList.toggle('primary',on);
+  if(on)b.setAttribute('aria-current','page');
+  else b.removeAttribute('aria-current');
+ });
+}
+function setActiveMarketplaceTab(view){
+ const active=MP_TABS.includes(view)?view:'browse';
+ MP_TABS.forEach(t=>{
+  const b=$('mpTab-'+t);if(!b)return;
+  const on=t===active;
+  b.className='mp-tab'+(on?' active':'');
+  if(on)b.setAttribute('aria-current','page');
+  else b.removeAttribute('aria-current');
+ });
+}
 function tab(id){
  ['home','market','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
- ['navHome','navMarket','navUpgrade','navOwner'].forEach(bid=>{
-  const b=$(bid);if(!b)return;
-  const sect=bid.replace('nav','').toLowerCase();
-  b.classList.toggle('nav-active',sect===id);
-  b.classList.toggle('primary',sect===id);
- });
+ setActiveMainNav(id);
  if(id==='market')mpView('browse');
  if(id==='owner')loadOwner();
 }
@@ -774,7 +790,8 @@ function mpView(view){
  if(view==='favorites'&&!requireActive('save listings'))return;
  hideAuthPrompt();
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!==view));
- MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab'+(t===view?' active':'');});
+ if(MP_TABS.includes(view))setActiveMarketplaceTab(view);
+ setActiveMainNav('market');
  mpPrevView=mpCurView;mpCurView=view;
  if(view==='browse')mpBrowse(mpPage);
  if(view==='mylistings')mpMyListings();
@@ -803,7 +820,8 @@ function mpView(view){
 function mpBack(){
  const dest=(['detail','seller'].includes(mpCurView))?mpPrevView:mpCurView==='edit'?'mylistings':'browse';
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!==dest));
- MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab'+(t===dest?' active':'');});
+ setActiveMarketplaceTab(dest);
+ setActiveMainNav('market');
  mpCurView=dest;hideAuthPrompt();
 }
 
@@ -897,7 +915,7 @@ async function mpToggleFav(id,currently){
 async function mpOpenListing(id){
  mpPrevView=mpCurView;
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='detail'));
- MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ setActiveMainNav('market');
  mpCurView='detail';mpCurListingId=id;
  $('mpDetailContent').innerHTML='<p class="muted" style="padding:24px 0;text-align:center">Loading…</p>';
  hideAuthPrompt();
@@ -1011,7 +1029,7 @@ async function mpCreate(){
 async function mpOpenEdit(id){
  mpEditId=id;mpPrevView=mpCurView;
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='edit'));
- MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ setActiveMainNav('market');
  mpCurView='edit';$('mpEditMsg').innerHTML='<p class="muted" style="font-size:13px">Loading…</p>';
  try{
   const l=await api('/api/marketplace/'+id);
@@ -1107,7 +1125,7 @@ async function mpFavorites(){
 async function mpOpenSeller(id){
  mpPrevView=mpCurView;
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='seller'));
- MP_TABS.forEach(t=>{const b=$('mpTab-'+t);if(b)b.className='mp-tab';});
+ setActiveMainNav('market');
  mpCurView='seller';$('mpSellerContent').innerHTML='<p class="muted">Loading…</p>';hideAuthPrompt();
  try{
   const isAuth=appMode==='active'||appMode==='owner';
@@ -1125,6 +1143,7 @@ async function reviewUpgrade(id,status){await api('/api/owner/upgrades/'+id,{met
 async function reviewReport(id,status){try{await api('/api/owner/listing-reports/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerReports();}catch(e){mpInlineAlert(e.message);}}
 
 function ownerSubTab(tab){
+ setActiveMainNav('owner');
  $('oTabStats').className='btn'+(tab==='stats'?' primary':'');
  $('oTabUsers').className='btn'+(tab==='users'?' primary':'');
  $('ownerStatsPanel').classList.toggle('hidden',tab!=='stats');
