@@ -48,3 +48,6 @@ CREATE TABLE IF NOT EXISTS marketplace_listings(
  condition TEXT NOT NULL DEFAULT 'Used', description TEXT DEFAULT '', location TEXT DEFAULT 'Embu',
  images JSONB NOT NULL DEFAULT '[]'::jsonb, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Listing soft-delete/visibility status (idempotent)
+ALTER TABLE marketplace_listings DROP CONSTRAINT IF EXISTS listings_status_check;
+ALTER TABLE marketplace_listings ADD CONSTRAINT listings_status_check CHECK(status IN('active','hidden','removed'));
