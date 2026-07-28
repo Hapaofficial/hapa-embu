@@ -786,5 +786,193 @@ app.patch('/api/owner/listing-reports/:id',auth,owner,async(req,res)=>{
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
+// ── Sprint 2C: Verification & Support requests ───────────────────────────────
+const SR_TYPES=['more_information','additional_document','application_correction','new_qualification_review','general_support'];
+const SR_ROLE_TYPES=['driver','merchant','professional'];
+const SR_DOC_MAX_PER_REQUEST=10;
+const srSafe=r=>({id:r.id,user_id:r.user_id,application_id:r.application_id,role_type:r.role_type,request_type:r.request_type,title:r.title,message:r.message,requested_items:r.requested_items,requested_document_types:r.requested_document_types,status:r.status,due_at:r.due_at,created_at:r.created_at,updated_at:r.updated_at,resolved_at:r.resolved_at,...(r.user_name!==undefined?{user_name:r.user_name,user_email:r.user_email}:{})});
+async function srLoadThread(reqId,viewerId){
+ const msgs=(await q(`SELECT id,sender_id,message,created_at,read_at FROM support_messages WHERE request_id=$1 ORDER BY created_at ASC`,[reqId])).rows;
+ await q(`UPDATE support_messages SET read_at=NOW() WHERE request_id=$1 AND sender_id<>$2 AND read_at IS NULL`,[reqId,viewerId]);
+ const docs=(await q(`SELECT d.${'id,document_type,application_type,mime_type,size_bytes,width,height,status,created_at,updated_at'.split(',').join(',d.')},d.verification_status,srd.uploaded_by FROM support_request_documents srd JOIN private_documents d ON d.id=srd.private_document_id WHERE srd.request_id=$1 AND d.status='active' ORDER BY d.created_at ASC`,[reqId])).rows;
+ return{messages:msgs,documents:docs};
+}
+
+// User: list own requests (+unread count for the in-app badge)
+app.get('/api/me/support-requests',auth,active,async(req,res)=>{
+ try{
+  const rows=(await q(`SELECT * FROM support_requests WHERE user_id=$1 ORDER BY created_at DESC`,[req.user.id])).rows;
+  const open=rows.filter(r=>['open','owner_replied'].includes(r.status)).length;
+  res.json({requests:rows.map(srSafe),open_count:open});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.get('/api/me/support-requests/:id',auth,active,async(req,res)=>{
+ try{
+  const r=(await q(`SELECT * FROM support_requests WHERE id=$1`,[req.params.id])).rows[0];
+  if(!r||r.user_id!==req.user.id)return res.status(r?403:404).json({error:r?'Forbidden':'Not found'});
+  const thread=await srLoadThread(r.id,req.user.id);
+  res.json({request:srSafe(r),...thread});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.post('/api/me/support-requests/:id/messages',auth,active,async(req,res)=>{
+ try{
+  const r=(await q(`SELECT * FROM support_requests WHERE id=$1`,[req.params.id])).rows[0];
+  if(!r||r.user_id!==req.user.id)return res.status(r?403:404).json({error:r?'Forbidden':'Not found'});
+  if(['resolved','cancelled'].includes(r.status))return res.status(409).json({error:'This request is closed'});
+  const msg=String(req.body.message||'').trim();
+  if(!msg||msg.length>3000)return res.status(400).json({error:'Message is required (max 3000 characters)'});
+  const m=(await q(`INSERT INTO support_messages(request_id,sender_id,message) VALUES($1,$2,$3) RETURNING id,sender_id,message,created_at,read_at`,[r.id,req.user.id,msg])).rows[0];
+  await q(`UPDATE support_requests SET status='user_replied',updated_at=NOW() WHERE id=$1`,[r.id]);
+  res.status(201).json(m);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// User: upload a requested document (same secure pipeline: sanitize → R2/local → audited)
+app.post('/api/me/support-requests/:id/documents',auth,active,(req,res)=>{
+ docUpload.single('file')(req,res,async(err)=>{
+  try{
+   if(err)return res.status(400).json({error:err.code==='LIMIT_FILE_SIZE'?'File exceeds the 5 MB limit':'Upload failed'});
+   const r=(await q(`SELECT * FROM support_requests WHERE id=$1`,[req.params.id])).rows[0];
+   if(!r||r.user_id!==req.user.id)return res.status(r?403:404).json({error:r?'Forbidden':'Not found'});
+   if(['resolved','cancelled'].includes(r.status))return res.status(409).json({error:'This request is closed'});
+   if(!docStorage.productionReady())return res.status(503).json({error:'Secure document storage is not configured. Uploads are disabled.'});
+   if(!req.file||!req.file.buffer)return res.status(400).json({error:'No file provided'});
+   const nActive=(await q(`SELECT count(*)::int n FROM support_request_documents srd JOIN private_documents d ON d.id=srd.private_document_id WHERE srd.request_id=$1 AND d.status='active'`,[r.id])).rows[0].n;
+   if(nActive>=SR_DOC_MAX_PER_REQUEST)return res.status(409).json({error:'Maximum number of documents reached for this request'});
+   const reqTypes=Array.isArray(r.requested_document_types)?r.requested_document_types:[];
+   let docType=String(req.body.document_type||'').trim().slice(0,60)||'requestedDocument';
+   if(reqTypes.length&&!reqTypes.includes(docType))docType=reqTypes[0];
+   const img=await sanitizeImage(req.file.buffer);
+   const docId=crypto.randomUUID();
+   const objectKey=`support/${req.user.id}/${r.id}/${docId}.jpg`;
+   await docStorage.putObject(objectKey,img.buffer,img.mimeType);
+   // New qualifications are NEVER auto-verified — they wait for Owner review.
+   const verStatus=r.request_type==='new_qualification_review'?'pending_review':null;
+   // Atomic metadata write: both inserts + status update commit together, or the
+   // stored object is deleted and no metadata rows remain.
+   const client=await pool.connect();
+   let ins;
+   try{
+    await client.query('BEGIN');
+    ins=(await client.query(`INSERT INTO private_documents(id,user_id,support_request_id,application_type,document_type,storage_provider,object_key,mime_type,size_bytes,width,height,sha256,verification_status)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING ${DOC_SAFE_COLS},verification_status`,
+     [docId,req.user.id,r.id,r.role_type,docType,docStorage.MODE,objectKey,img.mimeType,img.buffer.length,img.width,img.height,img.sha256,verStatus])).rows[0];
+    await client.query(`INSERT INTO support_request_documents(request_id,private_document_id,uploaded_by) VALUES($1,$2,$3)`,[r.id,docId,req.user.id]);
+    await client.query(`UPDATE support_requests SET status='user_replied',updated_at=NOW() WHERE id=$1`,[r.id]);
+    await client.query('COMMIT');
+   }catch(e){
+    try{await client.query('ROLLBACK');}catch(_){}
+    try{await docStorage.deleteObject(objectKey);}catch(_){}
+    throw e;
+   }finally{client.release();}
+   await docLog(docId,req.user.id,'upload',req);
+   res.status(201).json(ins);
+  }catch(e){console.error('support doc upload error:',e.message);res.status(500).json({error:'Server error'})}
+ });
+});
+
+// User: mark checklist items done and submit the response
+app.post('/api/me/support-requests/:id/submit-response',auth,active,async(req,res)=>{
+ try{
+  const r=(await q(`SELECT * FROM support_requests WHERE id=$1`,[req.params.id])).rows[0];
+  if(!r||r.user_id!==req.user.id)return res.status(r?403:404).json({error:r?'Forbidden':'Not found'});
+  if(['resolved','cancelled'].includes(r.status))return res.status(409).json({error:'This request is closed'});
+  const done=Array.isArray(req.body.completed_items)?req.body.completed_items.map(Number).filter(Number.isInteger):[];
+  const items=(Array.isArray(r.requested_items)?r.requested_items:[]).map((it,i)=>({label:String(it.label||it),done:done.includes(i)?true:!!it.done}));
+  const msg=String(req.body.message||'').trim().slice(0,3000);
+  if(msg)await q(`INSERT INTO support_messages(request_id,sender_id,message) VALUES($1,$2,$3)`,[r.id,req.user.id,msg]);
+  const u=(await q(`UPDATE support_requests SET requested_items=$2,status='user_replied',updated_at=NOW() WHERE id=$1 RETURNING *`,[r.id,JSON.stringify(items)])).rows[0];
+  res.json(srSafe(u));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Owner: list all requests (+badge count of new user replies)
+app.get('/api/owner/support-requests',auth,owner,async(req,res)=>{
+ try{
+  const rows=(await q(`SELECT s.*,u.name AS user_name,u.email AS user_email FROM support_requests s JOIN users u ON u.id=s.user_id ORDER BY s.updated_at DESC`)).rows;
+  res.json({requests:rows.map(srSafe),user_replied_count:rows.filter(r=>r.status==='user_replied').length});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Owner: create a request for a user (never touches role or capabilities)
+app.post('/api/owner/users/:userId/support-requests',auth,owner,async(req,res)=>{
+ try{
+  const target=(await q(`SELECT id,role FROM users WHERE id=$1`,[req.params.userId])).rows[0];
+  if(!target)return res.status(404).json({error:'User not found'});
+  if(target.id===req.user.id)return res.status(403).json({error:'Cannot open a request for your own account'});
+  const{request_type,role_type,title,message,requested_items,requested_document_types,due_at,application_id}=req.body;
+  if(!SR_TYPES.includes(request_type))return res.status(400).json({error:'Invalid request type'});
+  if(!SR_ROLE_TYPES.includes(role_type))return res.status(400).json({error:'Invalid role type'});
+  const t=String(title||'').trim(),m=String(message||'').trim();
+  if(!t||t.length>200)return res.status(400).json({error:'Title is required (max 200 characters)'});
+  if(!m||m.length>3000)return res.status(400).json({error:'Message is required (max 3000 characters)'});
+  const items=(Array.isArray(requested_items)?requested_items:[]).slice(0,20).map(x=>({label:String(x&&x.label||x).trim().slice(0,200),done:false})).filter(x=>x.label);
+  const docTypes=(Array.isArray(requested_document_types)?requested_document_types:[]).slice(0,10).map(x=>String(x).trim().slice(0,60)).filter(Boolean);
+  let due=null;if(due_at){due=new Date(due_at);if(isNaN(due))return res.status(400).json({error:'Invalid due date'});}
+  let appId=null;
+  if(application_id){
+   const a=(await q(`SELECT id,user_id,status,type FROM upgrade_applications WHERE id=$1`,[application_id])).rows[0];
+   if(!a||a.user_id!==target.id)return res.status(400).json({error:'Application does not belong to this user'});
+   appId=a.id;
+   // Pre-approval correction flow: allowed transition map only (pending → corrections_requested)
+   if(request_type==='application_correction'&&(UG_TRANSITIONS[a.status]||[]).includes('corrections_requested')){
+    await q(`UPDATE upgrade_applications SET status='corrections_requested',review_note=$2,reviewed_at=NOW(),reviewed_by=$3,updated_at=NOW() WHERE id=$1`,[a.id,m,req.user.id]);
+   }
+  }
+  const r=(await q(`INSERT INTO support_requests(user_id,application_id,role_type,request_type,title,message,requested_items,requested_document_types,status,due_at,created_by)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,'open',$9,$10) RETURNING *`,
+   [target.id,appId,role_type,request_type,t,m,JSON.stringify(items),JSON.stringify(docTypes),due,req.user.id])).rows[0];
+  await q(`INSERT INTO support_messages(request_id,sender_id,message) VALUES($1,$2,$3)`,[r.id,req.user.id,m]);
+  res.status(201).json(srSafe(r));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.get('/api/owner/support-requests/:id',auth,owner,async(req,res)=>{
+ try{
+  const r=(await q(`SELECT s.*,u.name AS user_name,u.email AS user_email FROM support_requests s JOIN users u ON u.id=s.user_id WHERE s.id=$1`,[req.params.id])).rows[0];
+  if(!r)return res.status(404).json({error:'Not found'});
+  const thread=await srLoadThread(r.id,req.user.id);
+  res.json({request:srSafe(r),...thread});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.post('/api/owner/support-requests/:id/messages',auth,owner,async(req,res)=>{
+ try{
+  const r=(await q(`SELECT * FROM support_requests WHERE id=$1`,[req.params.id])).rows[0];
+  if(!r)return res.status(404).json({error:'Not found'});
+  if(['resolved','cancelled'].includes(r.status))return res.status(409).json({error:'This request is closed'});
+  const msg=String(req.body.message||'').trim();
+  if(!msg||msg.length>3000)return res.status(400).json({error:'Message is required (max 3000 characters)'});
+  const m=(await q(`INSERT INTO support_messages(request_id,sender_id,message) VALUES($1,$2,$3) RETURNING id,sender_id,message,created_at,read_at`,[r.id,req.user.id,msg])).rows[0];
+  await q(`UPDATE support_requests SET status='owner_replied',updated_at=NOW() WHERE id=$1`,[r.id]);
+  res.status(201).json(m);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.patch('/api/owner/support-requests/:id/status',auth,owner,async(req,res)=>{
+ try{
+  const s=req.body.status;
+  if(!['open','resolved','cancelled'].includes(s))return res.status(400).json({error:'Invalid status'});
+  const r=(await q(`UPDATE support_requests SET status=$2,updated_at=NOW(),resolved_at=CASE WHEN $2='resolved' THEN NOW() ELSE resolved_at END WHERE id=$1 RETURNING *`,[req.params.id,s])).rows[0];
+  if(!r)return res.status(404).json({error:'Not found'});
+  res.json(srSafe(r));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Owner: decide on a pending qualification document (verify/reject; never automatic)
+app.patch('/api/owner/support-requests/:id/documents/:documentId/verification',auth,owner,async(req,res)=>{
+ try{
+  const decision=req.body.decision;
+  if(!['verified','rejected'].includes(decision))return res.status(400).json({error:'Invalid decision'});
+  const d=(await q(`SELECT d.id,d.verification_status FROM private_documents d JOIN support_request_documents srd ON srd.private_document_id=d.id WHERE d.id=$1 AND srd.request_id=$2 AND d.status='active'`,[req.params.documentId,req.params.id])).rows[0];
+  if(!d)return res.status(404).json({error:'Document not found'});
+  if(d.verification_status!=='pending_review')return res.status(409).json({error:'Document is not pending review'});
+  const r=(await q(`UPDATE private_documents SET verification_status=$2,updated_at=NOW() WHERE id=$1 RETURNING id,verification_status`,[d.id,decision])).rows[0];
+  res.json(r);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 boot().then(()=>app.listen(PORT,'0.0.0.0',()=>console.log('HAPA v1.6 running on '+PORT))).catch(e=>{console.error(e);process.exit(1)});

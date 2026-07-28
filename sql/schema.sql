@@ -139,3 +139,49 @@ CREATE TABLE IF NOT EXISTS document_access_log(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_doclog_document ON document_access_log(document_id);
+
+-- Sprint 2C: Verification & Support requests (all idempotent)
+CREATE TABLE IF NOT EXISTS support_requests(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ application_id UUID REFERENCES upgrade_applications(id) ON DELETE SET NULL,
+ professional_profile_id UUID,
+ role_type TEXT NOT NULL CHECK(role_type IN('driver','merchant','professional')),
+ request_type TEXT NOT NULL CHECK(request_type IN('more_information','additional_document','application_correction','new_qualification_review','general_support')),
+ title TEXT NOT NULL,
+ message TEXT NOT NULL,
+ requested_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+ requested_document_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','user_replied','owner_replied','resolved','cancelled')),
+ due_at TIMESTAMPTZ,
+ created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ resolved_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_supreq_user ON support_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_supreq_status ON support_requests(status);
+
+CREATE TABLE IF NOT EXISTS support_messages(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ request_id UUID NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+ sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ message TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_supmsg_request ON support_messages(request_id);
+
+CREATE TABLE IF NOT EXISTS support_request_documents(
+ request_id UUID NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+ private_document_id UUID NOT NULL REFERENCES private_documents(id) ON DELETE CASCADE,
+ uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ PRIMARY KEY(request_id,private_document_id)
+);
+
+-- Support documents live outside applications; new qualifications carry a verification state.
+ALTER TABLE private_documents ALTER COLUMN upgrade_application_id DROP NOT NULL;
+ALTER TABLE private_documents ADD COLUMN IF NOT EXISTS support_request_id UUID REFERENCES support_requests(id) ON DELETE CASCADE;
+ALTER TABLE private_documents ADD COLUMN IF NOT EXISTS verification_status TEXT CHECK(verification_status IN('pending_review','verified','rejected'));
+CREATE INDEX IF NOT EXISTS idx_privdoc_supreq ON private_documents(support_request_id);

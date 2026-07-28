@@ -407,6 +407,11 @@ button,input,select,textarea{font:inherit}
   <p class="muted" style="margin:0;font-size:14px">Apply for a professional role to unlock additional features. The Owner reviews every application before activation.</p>
  </div>
  <div id="ugCards"></div>
+ <div id="vsSection" style="margin-top:18px"></div>
+</div>
+<div id="vs-detail" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="vsBack()">← Back</button><h2 style="margin:0">Verification &amp; Support</h2></div>
+ <div id="vsDetailBody"></div>
 </div>
 <div id="ug-form" class="hidden">
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ugBack()">← Back</button><h2 style="margin:0" id="ugFormTitle"></h2></div>
@@ -732,9 +737,78 @@ async function loadUpgradeSection(){
  $('ug-select').classList.remove('hidden');
  $('ug-form').classList.add('hidden');
  $('ug-status').classList.add('hidden');
+ $('vs-detail').classList.add('hidden');
  $('ugCards').innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
  try{ugCurrentApps=await api('/api/me/upgrades');}catch(e){ugCurrentApps={};}
  ugRenderSelect();
+ vsLoad();
+}
+
+// ── Sprint 2C: Verification & Support (user side) ─────────────────────────────
+let vsRequests=[];
+const VS_STATUS={open:['Open','var(--a)'],user_replied:['Sent to HAPA','var(--muted)'],owner_replied:['HAPA replied','var(--a)'],resolved:['Resolved','var(--ok)'],cancelled:['Cancelled','var(--muted)']};
+const VS_TYPE={more_information:'More information',additional_document:'Document requested',application_correction:'Application correction',new_qualification_review:'Qualification review',general_support:'Support'};
+function vsBadge(){const n=vsRequests.filter(r=>['open','owner_replied'].includes(r.status)).length;const b=$('navUpgrade');if(b)b.innerHTML='Professional roles'+(n?` <span style="background:var(--a);color:#0b1020;border-radius:999px;padding:1px 7px;font-size:11px;font-weight:800">${n}</span>`:'');return n;}
+async function vsLoad(){
+ try{const d=await api('/api/me/support-requests');vsRequests=d.requests||[];}catch(e){vsRequests=[];}
+ const open=vsBadge();
+ const el=$('vsSection');if(!el)return;
+ const banner=open?`<div class="notice warn" role="alert" style="margin:0 0 12px"><b>HAPA needs additional information from you.</b><p style="margin:4px 0 0;font-size:13px">Open the request${open>1?'s':''} below to reply or upload the requested documents.</p></div>`:'';
+ el.innerHTML=`<div class="card">${banner}<h3 style="margin:0 0 4px">Verification &amp; Support ${open?`<span style="background:var(--a);color:#0b1020;border-radius:999px;padding:1px 8px;font-size:12px;vertical-align:middle">${open}</span>`:''}</h3>
+  <p class="muted" style="margin:0 0 12px;font-size:13px">Private messages between you and HAPA about your professional roles. Never shown publicly.</p>
+  ${vsRequests.length?`<div class="list">${vsRequests.map(r=>{const[l,c]=VS_STATUS[r.status]||[r.status,'var(--muted)'];return`<div class="row" style="cursor:pointer" onclick="vsOpen('${r.id}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')vsOpen('${r.id}')">
+   <span style="min-width:0"><b style="font-size:14px">${esc(r.title)}</b><br><small class="muted">${esc(VS_TYPE[r.request_type]||r.request_type)} · ${new Date(r.created_at).toLocaleDateString()}${r.due_at?' · due '+new Date(r.due_at).toLocaleDateString():''}</small></span>
+   <span class="badge-pill" style="color:${c};background:${c}22;flex-shrink:0">${l}</span></div>`;}).join('')}</div>`
+  :'<p class="muted" style="font-size:13px;margin:0">No requests from HAPA at the moment.</p>'}</div>`;
+}
+function vsBack(){$('vs-detail').classList.add('hidden');$('ug-select').classList.remove('hidden');vsLoad();}
+async function vsOpen(id){
+ $('ug-select').classList.add('hidden');$('vs-detail').classList.remove('hidden');
+ const body=$('vsDetailBody');body.innerHTML='<p class="muted">Loading…</p>';
+ let d;try{d=await api('/api/me/support-requests/'+id);}catch(e){body.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;return;}
+ const r=d.request,closed=['resolved','cancelled'].includes(r.status);
+ const[stL,stC]=VS_STATUS[r.status]||[r.status,'var(--muted)'];
+ const items=Array.isArray(r.requested_items)?r.requested_items:[];
+ body.innerHTML=`<div class="card">
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+   <h3 style="margin:0">${esc(r.title)}</h3><span class="badge-pill" style="color:${stC};background:${stC}22">${stL}</span></div>
+  <p class="muted" style="font-size:12px;margin:0 0 12px">${esc(VS_TYPE[r.request_type]||r.request_type)} · Sent ${new Date(r.created_at).toLocaleString()}${r.due_at?` · <b style="color:var(--a)">Due ${new Date(r.due_at).toLocaleDateString()}</b>`:''}</p>
+  <div class="notice" style="margin:0 0 14px"><b>HAPA:</b> ${esc(r.message)}</div>
+  ${items.length?`<p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">REQUESTED ITEMS</p><div class="list" style="margin-bottom:14px">${items.map((it,i)=>`<label class="row" style="cursor:${closed?'default':'pointer'};gap:10px;justify-content:flex-start"><input type="checkbox" id="vsItem-${i}" ${it.done?'checked':''} ${closed?'disabled':''} style="width:20px;height:20px;flex-shrink:0"><span style="font-size:14px">${esc(it.label)}</span></label>`).join('')}</div>`:''}
+  <p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">MESSAGES</p>
+  <div class="list" style="margin-bottom:14px">${(d.messages||[]).map(m=>{const mine=me&&m.sender_id===me.id;return`<div class="row" style="background:${mine?'var(--p2)':'#17382d'}"><span><b style="font-size:12px;color:${mine?'var(--muted)':'var(--ok)'}">${mine?'You':'HAPA'}</b><br><span style="font-size:14px;white-space:pre-wrap">${esc(m.message)}</span><br><small class="muted">${new Date(m.created_at).toLocaleString()}</small></span></div>`;}).join('')||'<p class="muted" style="font-size:13px">No messages yet.</p>'}</div>
+  ${(d.documents||[]).length?`<p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">UPLOADED DOCUMENTS</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${d.documents.map(dd=>`<div style="text-align:center"><img id="vsdoc-${dd.id}" alt="${esc(ugDocLabel(dd.document_type))}" style="width:74px;height:74px;object-fit:cover;border-radius:8px;background:var(--line)"><div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(ugDocLabel(dd.document_type))}${dd.verification_status?`<br><span style="color:${dd.verification_status==='verified'?'var(--ok)':dd.verification_status==='rejected'?'var(--bad)':'var(--a)'}">${dd.verification_status==='pending_review'?'Pending review':dd.verification_status}</span>`:''}</div></div>`).join('')}</div>`:''}
+  ${closed?'<p class="muted" style="font-size:13px;margin:0">This request is closed.</p>':`
+  <div class="field"><label>Your reply</label><textarea id="vsReplyText" rows="3" placeholder="Write your reply to HAPA…"></textarea></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+   <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">🖼 Upload requested document<input type="file" accept="image/*" style="display:none" onchange="vsUpload(this,'${r.id}')"></label>
+   <button class="btn" style="min-height:44px;flex:1;min-width:150px" onclick="vsReply('${r.id}')">Send reply</button>
+   <button class="btn primary" style="min-height:44px;flex:1;min-width:150px" onclick="vsSubmit('${r.id}',${items.length})">Submit response to HAPA</button>
+  </div>
+  <div id="vsMsg" aria-live="polite" style="font-size:13px"></div>`}
+ </div>`;
+ for(const dd of (d.documents||[])){try{const u=await ugFetchDocUrl(dd.id);const img=$('vsdoc-'+dd.id);if(img)img.src=u;}catch(e){}}
+}
+async function vsReply(id){
+ const t=$('vsReplyText'),m=$('vsMsg');const txt=(t&&t.value||'').trim();
+ if(!txt){if(m)m.textContent='Please write a reply first.';return;}
+ try{await api('/api/me/support-requests/'+id+'/messages',{method:'POST',body:JSON.stringify({message:txt})});vsOpen(id);}catch(e){if(m)m.textContent=e.message;}
+}
+async function vsSubmit(id,nItems){
+ const m=$('vsMsg');const done=[];for(let i=0;i<nItems;i++){const c=$('vsItem-'+i);if(c&&c.checked)done.push(i);}
+ const txt=($('vsReplyText')&&$('vsReplyText').value||'').trim();
+ try{await api('/api/me/support-requests/'+id+'/submit-response',{method:'POST',body:JSON.stringify({completed_items:done,message:txt})});vsOpen(id);}catch(e){if(m)m.textContent=e.message;}
+}
+async function vsUpload(input,id){
+ const f=input.files&&input.files[0];input.value='';if(!f)return;
+ const m=$('vsMsg');if(m)m.textContent='Uploading…';
+ try{
+  const fd=new FormData();fd.append('document_type','requestedDocument');fd.append('file',f);
+  const r=await fetch('/api/me/support-requests/'+id+'/documents',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||'Upload failed');
+  vsOpen(id);
+ }catch(e){if(m)m.textContent=e.message;}
 }
 
 function ugRenderSelect(){
@@ -1718,7 +1792,7 @@ function renderUdListings(listings,userId){
 async function renderUdUpgradeTab(type){
  const p=$('udP-'+type);
  const apps=(udCurrentUpgrades||[]).filter(a=>a.type===type).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
- if(!apps.length){p.innerHTML='<div style="text-align:center;padding:32px 0"><p class="muted" style="margin:0">No '+type+' application on record.</p></div>';return;}
+ if(!apps.length){p.innerHTML='<div style="text-align:center;padding:32px 0"><p class="muted" style="margin:0">No '+type+' application on record.</p></div><div id="udSup-'+type+'"></div>';udSupLoad(type,null);return;}
  const a=apps[0];
  // Fetch full app (includes documents) from owner endpoint
  let d={};
@@ -1751,6 +1825,86 @@ async function renderUdUpgradeTab(type){
  `;
  // Load secure previews through the audited endpoint (auth header → blob URL)
  for(const dd of privDocs){try{const u=await ugFetchDocUrl(dd.id);const img=$('udpriv-'+dd.id);if(img)img.src=u;}catch(e){}}
+ p.insertAdjacentHTML('beforeend','<div id="udSup-'+type+'"></div>');
+ udSupLoad(type,a.id);
+}
+
+// ── Sprint 2C: Verification & Support (owner side) ────────────────────────────
+let udSupCache=[];
+async function udSupLoad(type,appId){
+ const el=$('udSup-'+type);if(!el||!udCurrentUser)return;
+ try{const d=await api('/api/owner/support-requests');udSupCache=(d.requests||[]);}catch(e){udSupCache=[];}
+ const list=udSupCache.filter(r=>r.user_id===udCurrentUser.id&&r.role_type===type);
+ const newBadge=list.filter(r=>r.status==='user_replied').length;
+ el.innerHTML=`<div style="border-top:1px solid var(--line);padding-top:14px;margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+   <h4 style="margin:0">Verification &amp; Support ${newBadge?`<span style="background:var(--a);color:#0b1020;border-radius:999px;padding:1px 8px;font-size:12px;vertical-align:middle">${newBadge} new</span>`:''}</h4>
+   <button class="btn" onclick="udSupToggleForm('${type}','${appId||''}')">+ New request</button></div>
+  <div id="udSupForm-${type}" class="hidden"></div>
+  <div id="udSupList-${type}">${list.length?`<div class="list">${list.map(r=>{const[l,c]=VS_STATUS[r.status]||[r.status,'var(--muted)'];return`<div class="row" style="cursor:pointer" onclick="udSupOpen('${r.id}','${type}')"><span style="min-width:0"><b style="font-size:14px">${esc(r.title)}</b><br><small class="muted">${esc(VS_TYPE[r.request_type]||r.request_type)} · ${new Date(r.created_at).toLocaleDateString()}</small></span><span class="badge-pill" style="color:${c};background:${c}22;flex-shrink:0">${l}</span></div>`;}).join('')}</div>`:'<p class="muted" style="font-size:13px;margin:0">No support requests for this role.</p>'}</div>
+  <div id="udSupDetail-${type}"></div></div>`;
+}
+function udSupToggleForm(type,appId){
+ const f=$('udSupForm-'+type);if(!f)return;
+ if(!f.classList.contains('hidden')){f.classList.add('hidden');f.innerHTML='';return;}
+ f.classList.remove('hidden');
+ f.innerHTML=`<div class="card" style="margin-bottom:12px;background:var(--p2)">
+  <div class="field"><label>Request type</label><select id="udSupType-${type}">
+   <option value="more_information">Request more information</option>
+   <option value="additional_document">Request another document</option>
+   <option value="application_correction">Application correction</option>
+   <option value="new_qualification_review">New qualification review</option>
+   <option value="general_support">Send support message</option></select></div>
+  <div class="field"><label>Title</label><input id="udSupTitle-${type}" maxlength="200" placeholder="e.g. Clearer photo of your driving licence"></div>
+  <div class="field"><label>Message</label><textarea id="udSupMsg-${type}" rows="3" maxlength="3000" placeholder="Explain exactly what you need from the user…"></textarea></div>
+  <div class="field"><label>Checklist items (optional, one per line)</label><textarea id="udSupItems-${type}" rows="2" placeholder="Upload new licence photo&#10;Confirm service area"></textarea></div>
+  <div class="field"><label>Requested document types (optional, comma-separated)</label><input id="udSupDocTypes-${type}" placeholder="e.g. licenceFront, certificates"></div>
+  <div class="field"><label>Due date (optional)</label><input id="udSupDue-${type}" type="date"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" style="flex:1;min-width:140px" onclick="udSupSend('${type}','${appId||''}')">Send request</button><button class="btn" onclick="udSupToggleForm('${type}')">Cancel</button></div>
+  <div id="udSupFormMsg-${type}" aria-live="polite" style="font-size:13px;margin-top:6px"></div></div>`;
+}
+async function udSupSend(type,appId){
+ const g=id=>($(id+'-'+type)&&$(id+'-'+type).value||'').trim();
+ const body={request_type:g('udSupType'),role_type:type,title:g('udSupTitle'),message:g('udSupMsg'),
+  requested_items:g('udSupItems').split('\n').map(s=>s.trim()).filter(Boolean),
+  requested_document_types:g('udSupDocTypes').split(',').map(s=>s.trim()).filter(Boolean),
+  due_at:g('udSupDue')||null,application_id:appId||null};
+ const m=$('udSupFormMsg-'+type);
+ try{await api('/api/owner/users/'+udCurrentUser.id+'/support-requests',{method:'POST',body:JSON.stringify(body)});renderUdUpgradeTab(type);}
+ catch(e){if(m)m.textContent=e.message;}
+}
+async function udSupOpen(id,type){
+ const el=$('udSupDetail-'+type);if(!el)return;
+ el.innerHTML='<p class="muted">Loading…</p>';
+ let d;try{d=await api('/api/owner/support-requests/'+id);}catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;return;}
+ const r=d.request,closed=['resolved','cancelled'].includes(r.status);
+ const items=Array.isArray(r.requested_items)?r.requested_items:[];
+ el.innerHTML=`<div class="card" style="margin-top:12px;background:var(--p2)">
+  <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><b>${esc(r.title)}</b><span class="badge-pill">${esc(r.status.replace('_',' '))}</span></div>
+  ${items.length?`<div class="list" style="margin-bottom:10px">${items.map(it=>`<div class="row" style="justify-content:flex-start;gap:8px"><span>${it.done?'✅':'⬜'}</span><span style="font-size:13px">${esc(it.label)}</span></div>`).join('')}</div>`:''}
+  <div class="list" style="margin-bottom:10px">${(d.messages||[]).map(m=>{const own=m.sender_id===me.id;return`<div class="row"><span><b style="font-size:12px;color:${own?'var(--ok)':'var(--a)'}">${own?'You (HAPA)':'User'}</b><br><span style="font-size:14px;white-space:pre-wrap">${esc(m.message)}</span><br><small class="muted">${new Date(m.created_at).toLocaleString()}${m.read_at?' · read':''}</small></span></div>`;}).join('')}</div>
+  ${(d.documents||[]).length?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${d.documents.map(dd=>`<div style="text-align:center"><img id="udsupdoc-${dd.id}" alt="${esc(ugDocLabel(dd.document_type))}" style="width:74px;height:74px;object-fit:cover;border-radius:8px;background:var(--line)"><div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(ugDocLabel(dd.document_type))}</div>
+   ${dd.verification_status==='pending_review'?`<div style="display:flex;gap:4px;margin-top:3px"><button class="btn ok" style="font-size:11px;padding:3px 7px" onclick="udSupVerify('${r.id}','${dd.id}','verified','${type}')">Verify</button><button class="btn bad" style="font-size:11px;padding:3px 7px" onclick="udSupVerify('${r.id}','${dd.id}','rejected','${type}')">Reject</button></div>`:dd.verification_status?`<div style="font-size:10px;color:${dd.verification_status==='verified'?'var(--ok)':'var(--bad)'}">${dd.verification_status}</div>`:''}</div>`).join('')}</div>`:''}
+  ${closed?'':`<div class="field"><label>Reply to user</label><textarea id="udSupReply-${type}" rows="2"></textarea></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+   <button class="btn" onclick="udSupReplySend('${r.id}','${type}')">Send reply</button>
+   <button class="btn ok" onclick="udSupStatus('${r.id}','resolved','${type}')">Resolve</button>
+   <button class="btn bad" onclick="udSupStatus('${r.id}','cancelled','${type}')">Cancel request</button></div>`}
+  <div id="udSupDetailMsg-${type}" aria-live="polite" style="font-size:13px;margin-top:6px"></div></div>`;
+ for(const dd of (d.documents||[])){try{const u=await ugFetchDocUrl(dd.id);const img=$('udsupdoc-'+dd.id);if(img)img.src=u;}catch(e){}}
+}
+async function udSupReplySend(id,type){
+ const t=$('udSupReply-'+type),m=$('udSupDetailMsg-'+type);const txt=(t&&t.value||'').trim();
+ if(!txt){if(m)m.textContent='Write a reply first.';return;}
+ try{await api('/api/owner/support-requests/'+id+'/messages',{method:'POST',body:JSON.stringify({message:txt})});udSupOpen(id,type);}catch(e){if(m)m.textContent=e.message;}
+}
+async function udSupStatus(id,s,type){
+ const m=$('udSupDetailMsg-'+type);
+ try{await api('/api/owner/support-requests/'+id+'/status',{method:'PATCH',body:JSON.stringify({status:s})});renderUdUpgradeTab(type);}catch(e){if(m)m.textContent=e.message;}
+}
+async function udSupVerify(reqId,docId,decision,type){
+ const m=$('udSupDetailMsg-'+type);
+ try{await api('/api/owner/support-requests/'+reqId+'/documents/'+docId+'/verification',{method:'PATCH',body:JSON.stringify({decision})});udSupOpen(reqId,type);}catch(e){if(m)m.textContent=e.message;}
 }
 
 function ugOwnerActions(app,type){
