@@ -9,7 +9,7 @@
     "migrate-legacy-documents": "node scripts/migrate-legacy-documents.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.0.0 <23.0.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",
