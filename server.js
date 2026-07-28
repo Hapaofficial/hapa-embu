@@ -1,6 +1,10 @@
-const express=require('express'),path=require('path'),fs=require('fs'),bcrypt=require('bcryptjs'),jwt=require('jsonwebtoken');
+const express=require('express'),path=require('path'),fs=require('fs'),bcrypt=require('bcryptjs'),jwt=require('jsonwebtoken'),crypto=require('crypto');
 const {Pool}=require('pg');
 const rateLimit=require('express-rate-limit');
+const multer=require('multer');
+const docStorage=require('./lib/documentStorage');
+const fieldCrypto=require('./lib/fieldCrypto');
+const {sanitizeImage,MAX_INPUT_BYTES}=require('./lib/imagePipeline');
 const app=express(),PORT=+process.env.PORT||10000;
 const pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==='production'?{rejectUnauthorized:false}:false});
 const q=(t,p=[])=>pool.query(t,p), secret=process.env.JWT_SECRET||'CHANGE_ME', authMode=process.env.AUTH_MODE||'demo';
@@ -11,10 +15,22 @@ if(process.env.NODE_ENV==='production'){
   console.error('FATAL: JWT_SECRET must be set to a strong secret in production. Exiting.');
   process.exit(1);
  }
+ if(!docStorage.productionReady())console.error('WARNING: secure document storage is not configured (DOCUMENT_STORAGE_MODE=s3 + credentials required). Document uploads will be refused.');
+ if(!fieldCrypto.available())console.error('WARNING: DOCUMENT_ENCRYPTION_KEY is not set. Sensitive-field writes will be refused.');
 }
 
 app.set('trust proxy',1);
 app.use(express.json({limit:'10mb'}));
+// Defense in depth: private-storage-like paths must 404 before static/SPA.
+// (Bytes were never served — this replaces the SPA-HTML fallthrough with an
+// explicit generic 404, covering encoded/normalized traversal attempts.)
+const PRIVATE_PATH_RE=/(^|\/)(var\/private-documents|\.data\/private-upgrade-documents|private-upgrade-documents)(\/|$)/i;
+app.use((req,res,next)=>{
+ let p=req.path;
+ try{p=decodeURIComponent(p);}catch(_){return res.status(404).json({error:'Not found'});}
+ if(PRIVATE_PATH_RE.test(path.posix.normalize(p)))return res.status(404).json({error:'Not found'});
+ next();
+});
 app.use(express.static(path.join(__dirname,'public')));
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
@@ -150,14 +166,273 @@ app.get('/api/me/favorites',auth,active,async(req,res)=>{
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
-// ── Upgrades ──────────────────────────────────────────────────────────────────
-app.post('/api/upgrades',auth,active,async(req,res)=>{
- let t=String(req.body.type||''),d=req.body.details||{};
- if(!['driver','merchant','professional'].includes(t))return res.status(400).json({error:'Invalid type'});
- let need=t==='driver'?['licenceNumber','licenceImage','vehicleRegistration','insuranceImage','insuranceExpiry','vehiclePhoto']:t==='merchant'?['businessName','businessCategory','businessAddress','storePhoto']:['profession','skills','location','profilePhoto'];
- if(need.some(k=>!d[k]))return res.status(400).json({error:'Required information/documents missing'});
- let r=await q(`INSERT INTO upgrade_applications(user_id,type,details) VALUES($1,$2,$3) RETURNING *`,[req.user.id,t,d]);
- res.status(201).json(r.rows[0]);
+// ── Upgrade System (Sprint 2) ─────────────────────────────────────────────────
+const UG_TYPES=['driver','merchant','professional'];
+const UG_STATUSES=['draft','pending','corrections_requested','approved','rejected','suspended'];
+const UG_REQUIRED={driver:['fullName','drivingLicenceNumber','vehicleType','registrationNumber','county'],merchant:['businessName','ownerName','businessCategory','county'],professional:['fullName','professionCategory','skills','county']};
+// Sprint 2B: base64 document contents are no longer accepted in details.
+// Documents go through the secure multipart pipeline only.
+function ugCheckDocs(det,depth=0){
+ if(depth>4)return'Details are nested too deeply.';
+ for(const[k,v]of Object.entries(det||{})){
+  if(typeof v==='string'&&v.startsWith('data:'))return`Embedded file contents are no longer accepted ("${k}"). Upload documents through the secure document uploader.`;
+  else if(Array.isArray(v)){
+   for(const f of v){
+    if(typeof f==='string'&&f.startsWith('data:'))return`Embedded file contents are no longer accepted ("${k}").`;
+    if(f&&typeof f==='object'){const err=ugCheckDocs(f,depth+1);if(err)return err;}
+   }
+  }
+  else if(v&&typeof v==='object'){const err=ugCheckDocs(v,depth+1);if(err)return err;}
+ }
+ return null;
+}
+// Sensitive text fields: stored AES-256-GCM encrypted in sensitive_details,
+// never in the plain details JSONB, never returned by list endpoints.
+const UG_SENSITIVE=['nationalId','drivingLicenceNumber','psvLicenceNumber','insurancePolicyNumber','businessRegNumber','kraPin'];
+function ugSplitSensitive(det){
+ const plain={},sensitive={};
+ for(const[k,v]of Object.entries(det||{})){
+  if(UG_SENSITIVE.includes(k))sensitive[k]=v;else plain[k]=v;
+ }
+ return{plain,sensitive};
+}
+function ugRequireCryptoOrFail(res){
+ if(fieldCrypto.available())return true;
+ res.status(503).json({error:'Secure storage for sensitive details is not configured. Please try again later.'});
+ return false;
+}
+// Consent version for document processing
+const UG_CONSENT_VERSION='v1-2026-07';
+// Allowed document types + max active documents per type
+const UG_DOC_TYPES={
+ driver:{profilePhoto:1,nationalIdFront:1,nationalIdBack:1,licenceFront:1,licenceBack:1,vehicleRegDoc:1,vehiclePhoto:1,insuranceDoc:1,psvDoc:1},
+ merchant:{ownerPhoto:1,nationalId:1,businessRegDoc:1,kraDoc:1,storefrontPhoto:1},
+ professional:{profilePhoto:1,nationalId:1,certificates:3,portfolioPhotos:3}
+};
+const UG_EDITABLE_STATUSES=['draft','corrections_requested','rejected'];
+const docUpload=multer({storage:multer.memoryStorage(),limits:{fileSize:MAX_INPUT_BYTES,files:1}});
+async function docLog(documentId,actorId,action,req){
+ try{await q(`INSERT INTO document_access_log(document_id,actor_id,action,ip_address,user_agent) VALUES($1,$2,$3,$4,$5)`,
+  [documentId,actorId,action,String(req.ip||'').slice(0,64),String(req.headers['user-agent']||'').slice(0,300)]);}catch(e){console.error('doc-log failed',e.message);}
+}
+// Decrypt sensitive fields for authorized detail views only
+function ugMergeSensitive(row){
+ const out={...row};delete out.sensitive_details;
+ try{if(row.sensitive_details)out.details={...(row.details||{}),...fieldCrypto.decryptFields(row.sensitive_details)};}
+ catch(e){console.error('sensitive decrypt failed for application',row.id);}
+ return out;
+}
+// Allowed moderation transitions: from-status → allowed actions
+const UG_TRANSITIONS={pending:['approved','rejected','corrections_requested'],corrections_requested:['approved','rejected'],approved:['suspended'],suspended:['restored','rejected'],draft:[],rejected:[]};
+
+// GET /api/me/upgrades — latest per type, no documents
+app.get('/api/me/upgrades',auth,active,async(req,res)=>{
+ try{
+  const r=await q(`SELECT id,type,status,review_note,submitted_at,reviewed_at,updated_at,created_at FROM upgrade_applications WHERE user_id=$1 ORDER BY created_at DESC`,[req.user.id]);
+  const map={};r.rows.forEach(a=>{if(!map[a.type])map[a.type]=a;});
+  res.json(map);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// GET /api/me/upgrades/:type — full application including documents
+app.get('/api/me/upgrades/:type',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const r=await q(`SELECT * FROM upgrade_applications WHERE user_id=$1 AND type=$2 ORDER BY created_at DESC LIMIT 1`,[req.user.id,t]);
+  if(!r.rowCount)return res.status(404).json({error:'No application found'});
+  res.json(ugMergeSensitive(r.rows[0]));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// POST /api/me/upgrades/:type — save draft
+app.post('/api/me/upgrades/:type',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const det=req.body.details||{};
+  const docErr=ugCheckDocs(det);if(docErr)return res.status(400).json({error:docErr});
+  const{plain,sensitive}=ugSplitSensitive(det);
+  const hasSensitive=Object.keys(sensitive).some(k=>sensitive[k]!==undefined&&String(sensitive[k]??'').trim()!=='');
+  if(hasSensitive&&!ugRequireCryptoOrFail(res))return;
+  const env=hasSensitive?fieldCrypto.encryptFields(sensitive):null;
+  const ex=await q(`SELECT id,status FROM upgrade_applications WHERE user_id=$1 AND type=$2 AND status NOT IN('rejected') ORDER BY created_at DESC LIMIT 1`,[req.user.id,t]);
+  if(ex.rowCount){
+   if(!['draft','corrections_requested'].includes(ex.rows[0].status))return res.status(409).json({error:'Application is already '+ex.rows[0].status});
+   const r=await q(`UPDATE upgrade_applications SET details=$2,sensitive_details=$3,updated_at=NOW() WHERE id=$1 RETURNING id,type,status,submitted_at,review_note,updated_at,created_at`,[ex.rows[0].id,plain,env]);
+   return res.json(r.rows[0]);
+  }
+  const r=await q(`INSERT INTO upgrade_applications(user_id,type,status,details,sensitive_details) VALUES($1,$2,'draft',$3,$4) RETURNING id,type,status,submitted_at,review_note,updated_at,created_at`,[req.user.id,t,plain,env]);
+  res.status(201).json(r.rows[0]);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// POST /api/me/upgrades/:type/submit — submit for review
+app.post('/api/me/upgrades/:type/submit',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const det=req.body.details||{};
+  const miss=UG_REQUIRED[t].filter(k=>!det[k]||String(det[k]).trim()==='');
+  if(miss.length)return res.status(400).json({error:'Required fields missing: '+miss.join(', ')});
+  const docErr=ugCheckDocs(det);if(docErr)return res.status(400).json({error:docErr});
+  if(req.body.consent!==true)return res.status(400).json({error:'You must consent to secure processing of your documents before submitting.'});
+  const{plain,sensitive}=ugSplitSensitive(det);
+  const hasSensitive=Object.keys(sensitive).some(k=>String(sensitive[k]??'').trim()!=='');
+  if(hasSensitive&&!ugRequireCryptoOrFail(res))return;
+  const env=hasSensitive?fieldCrypto.encryptFields(sensitive):null;
+  const ex=await q(`SELECT id,status FROM upgrade_applications WHERE user_id=$1 AND type=$2 ORDER BY created_at DESC LIMIT 1`,[req.user.id,t]);
+  let r;
+  if(ex.rowCount&&['draft','corrections_requested'].includes(ex.rows[0].status)){
+   r=await q(`UPDATE upgrade_applications SET status='pending',details=$2,sensitive_details=$3,submitted_at=NOW(),updated_at=NOW(),review_note=NULL,consent_at=NOW(),consent_version=$4 WHERE id=$1 RETURNING id,type,status,submitted_at`,[ex.rows[0].id,plain,env,UG_CONSENT_VERSION]);
+  }else if(ex.rowCount&&ex.rows[0].status==='pending'){
+   return res.status(409).json({error:'An application is already under review'});
+  }else if(ex.rowCount&&ex.rows[0].status==='approved'){
+   return res.status(409).json({error:'This role is already approved'});
+  }else{
+   r=await q(`INSERT INTO upgrade_applications(user_id,type,status,details,sensitive_details,submitted_at,consent_at,consent_version) VALUES($1,$2,'pending',$3,$4,NOW(),NOW(),$5) RETURNING id,type,status,submitted_at`,[req.user.id,t,plain,env,UG_CONSENT_VERSION]);
+  }
+  res.json(r.rows[0]);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// PATCH /api/me/upgrades/:type — partial update of draft or corrections_requested
+app.patch('/api/me/upgrades/:type',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const det=req.body.details||{};
+  const docErr=ugCheckDocs(det);if(docErr)return res.status(400).json({error:docErr});
+  const{plain,sensitive}=ugSplitSensitive(det);
+  const hasSensitive=Object.keys(sensitive).length>0;
+  if(hasSensitive&&!ugRequireCryptoOrFail(res))return;
+  const ex=await q(`SELECT id,status,details,sensitive_details FROM upgrade_applications WHERE user_id=$1 AND type=$2 AND status IN('draft','corrections_requested') ORDER BY created_at DESC LIMIT 1`,[req.user.id,t]);
+  if(!ex.rowCount)return res.status(404).json({error:'No editable application found'});
+  const merged={...(ex.rows[0].details||{}),...plain};
+  let env=ex.rows[0].sensitive_details;
+  if(hasSensitive){
+   let prev={};try{prev=ex.rows[0].sensitive_details?fieldCrypto.decryptFields(ex.rows[0].sensitive_details):{};}catch(e){}
+   env=fieldCrypto.encryptFields({...prev,...sensitive});
+  }
+  const r=await q(`UPDATE upgrade_applications SET details=$2,sensitive_details=$3,updated_at=NOW() WHERE id=$1 RETURNING id,type,status,updated_at`,[ex.rows[0].id,merged,env]);
+  res.json(r.rows[0]);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// ── Sprint 2B: Secure Private Documents ───────────────────────────────────────
+const DOC_SAFE_COLS='id,document_type,application_type,mime_type,size_bytes,width,height,status,created_at,updated_at';
+
+// POST /api/me/upgrades/:type/documents — multipart upload (field "file" + "document_type")
+app.post('/api/me/upgrades/:type/documents',auth,active,(req,res)=>{
+ docUpload.single('file')(req,res,async(err)=>{
+  try{
+   if(err)return res.status(400).json({error:err.code==='LIMIT_FILE_SIZE'?'File exceeds the 5 MB limit':'Upload failed'});
+   const t=req.params.type;
+   if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+   if(!docStorage.productionReady())return res.status(503).json({error:'Secure document storage is not configured. Uploads are disabled.'});
+   const docType=String(req.body.document_type||'');
+   const maxN=(UG_DOC_TYPES[t]||{})[docType];
+   if(!maxN)return res.status(400).json({error:'Invalid document type'});
+   if(!req.file||!req.file.buffer)return res.status(400).json({error:'No file provided'});
+   // Application must exist in an editable status (or a draft is created)
+   let appRow=(await q(`SELECT id,status FROM upgrade_applications WHERE user_id=$1 AND type=$2 ORDER BY created_at DESC LIMIT 1`,[req.user.id,t])).rows[0];
+   if(appRow&&!UG_EDITABLE_STATUSES.includes(appRow.status))return res.status(409).json({error:'Documents cannot be changed while the application is '+appRow.status});
+   if(!appRow||appRow.status==='rejected'){
+    appRow=(await q(`INSERT INTO upgrade_applications(user_id,type,status,details) VALUES($1,$2,'draft','{}') RETURNING id,status`,[req.user.id,t])).rows[0];
+   }
+   // Sanitize: decode real bytes, reject fakes/animated, strip EXIF, re-encode JPEG
+   const img=await sanitizeImage(req.file.buffer);
+   const docId=crypto.randomUUID();
+   const objectKey=`upgrades/${req.user.id}/${appRow.id}/${docId}.jpg`;
+   await docStorage.putObject(objectKey,img.buffer,img.mimeType);
+   // Atomic replace+insert: row-lock active docs of this type so concurrent
+   // uploads cannot exceed the per-type limit or half-replace documents.
+   const client=await pool.connect();
+   let insRow,replaced=[];
+   try{
+    await client.query('BEGIN');
+    // Serialize concurrent uploads for the same application+type (advisory
+    // xact lock covers concurrent INSERTs, which row locks alone cannot).
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`,[appRow.id+':'+docType]);
+    const prev=(await client.query(`SELECT id FROM private_documents WHERE upgrade_application_id=$1 AND document_type=$2 AND status='active' ORDER BY created_at ASC FOR UPDATE`,[appRow.id,docType])).rows;
+    while(prev.length>=maxN){
+     const p=prev.shift();
+     await client.query(`UPDATE private_documents SET status='replaced',updated_at=NOW(),retention_until=NOW()+INTERVAL '30 days' WHERE id=$1`,[p.id]);
+     replaced.push(p.id);
+    }
+    insRow=(await client.query(`INSERT INTO private_documents(id,user_id,upgrade_application_id,application_type,document_type,storage_provider,object_key,mime_type,size_bytes,width,height,sha256)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING ${DOC_SAFE_COLS}`,
+     [docId,req.user.id,appRow.id,t,docType,docStorage.MODE,objectKey,img.mimeType,img.sizeBytes,img.width,img.height,img.sha256])).rows[0];
+    await client.query('COMMIT');
+   }catch(txErr){
+    try{await client.query('ROLLBACK');}catch(_){}
+    // Metadata failed → remove the just-stored file so no orphan remains
+    try{await docStorage.deleteObject(objectKey);}catch(_){}
+    throw txErr;
+   }finally{client.release();}
+   for(const pid of replaced)await docLog(pid,req.user.id,'replace',req);
+   await docLog(docId,req.user.id,'upload',req);
+   res.status(201).json({...insRow,replaced});
+  }catch(e){
+   if(e.statusCode===400)return res.status(400).json({error:e.message});
+   console.error('doc upload error:',e.message);res.status(500).json({error:'Server error'});
+  }
+ });
+});
+
+// GET /api/me/upgrades/:type/documents — list own active documents (metadata only)
+app.get('/api/me/upgrades/:type/documents',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const appRow=(await q(`SELECT id,status FROM upgrade_applications WHERE user_id=$1 AND type=$2 ORDER BY created_at DESC LIMIT 1`,[req.user.id,t])).rows[0];
+  if(!appRow)return res.json({application:null,documents:[]});
+  const docs=(await q(`SELECT ${DOC_SAFE_COLS} FROM private_documents WHERE upgrade_application_id=$1 AND user_id=$2 AND status='active' ORDER BY created_at ASC`,[appRow.id,req.user.id])).rows;
+  res.json({application:{id:appRow.id,status:appRow.status},documents:docs});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// DELETE /api/me/upgrades/:type/documents/:documentId — soft remove (editable statuses only)
+app.delete('/api/me/upgrades/:type/documents/:documentId',auth,active,async(req,res)=>{
+ try{
+  const t=req.params.type;
+  if(!UG_TYPES.includes(t))return res.status(400).json({error:'Invalid type'});
+  const d=(await q(`SELECT d.id,d.status,a.status AS app_status FROM private_documents d JOIN upgrade_applications a ON a.id=d.upgrade_application_id WHERE d.id=$1 AND d.user_id=$2 AND d.application_type=$3`,[req.params.documentId,req.user.id,t])).rows[0];
+  if(!d||d.status!=='active')return res.status(404).json({error:'Document not found'});
+  if(!UG_EDITABLE_STATUSES.includes(d.app_status))return res.status(409).json({error:'Documents cannot be changed while the application is '+d.app_status});
+  await q(`UPDATE private_documents SET status='removed',removed_at=NOW(),updated_at=NOW(),retention_until=NOW()+INTERVAL '30 days' WHERE id=$1`,[d.id]);
+  await docLog(d.id,req.user.id,'remove',req);
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// GET /api/owner/upgrades/:id/documents — owner review list (metadata only)
+app.get('/api/owner/upgrades/:id/documents',auth,owner,async(req,res)=>{
+ try{
+  const docs=(await q(`SELECT ${DOC_SAFE_COLS} FROM private_documents WHERE upgrade_application_id=$1 AND status='active' ORDER BY created_at ASC`,[req.params.id])).rows;
+  res.json(docs);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// GET /api/private-documents/:documentId — authenticated, audited access
+// Applicant may view own documents; owner may view any (each view is logged).
+app.get('/api/private-documents/:documentId',auth,async(req,res)=>{
+ try{
+  const d=(await q(`SELECT id,user_id,object_key,mime_type,status FROM private_documents WHERE id=$1`,[req.params.documentId])).rows[0];
+  if(!d)return res.status(404).json({error:'Document not found'});
+  const isOwnerRole=req.user.role==='owner',isSelf=d.user_id===req.user.id;
+  if(!isOwnerRole&&!isSelf)return res.status(403).json({error:'Forbidden'});
+  if(d.status!=='active')return res.status(410).json({error:'Document is no longer available'});
+  await docLog(d.id,req.user.id,'view',req);
+  res.setHeader('Cache-Control','private, no-store');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  const access=await docStorage.getObjectAccess(d.object_key,d.mime_type);
+  if(access.kind==='signedUrl')return res.json({url:access.url,expires_in:access.expiresIn});
+  res.setHeader('Content-Type',d.mime_type);
+  res.setHeader('Content-Disposition','inline');
+  access.stream.on('error',()=>{if(!res.headersSent)res.status(404).json({error:'Document file missing'});});
+  access.stream.pipe(res);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
 // ── Public Marketplace (no auth required — safe data only) ────────────────────
@@ -362,13 +637,74 @@ app.patch('/api/owner/access/:id',auth,owner,async(req,res)=>{
  res.json(r.rows[0]);
 });
 
-app.get('/api/owner/upgrades',auth,owner,async(req,res)=>res.json((await q(`SELECT a.*,u.name,u.email,u.phone FROM upgrade_applications a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC`)).rows));
+// GET /api/owner/upgrades — filtered list, pending first, no documents
+app.get('/api/owner/upgrades',auth,owner,async(req,res)=>{
+ try{
+  const{type,status,q:sq}=req.query;
+  const wp=[],w=[];
+  if(UG_TYPES.includes(type)){wp.push(type);w.push(`a.type=$${wp.length}`);}
+  if(UG_STATUSES.includes(status)){wp.push(status);w.push(`a.status=$${wp.length}`);}
+  if(sq){wp.push(`%${sq}%`);const n=wp.length;w.push(`(u.name ILIKE $${n} OR u.email ILIKE $${n} OR u.phone ILIKE $${n})`);}
+  const ws=w.length?'WHERE '+w.join(' AND '):'';
+  const r=await q(`SELECT a.id,a.user_id,a.type,a.status,a.review_note,a.submitted_at,a.reviewed_at,a.updated_at,a.created_at,u.name,u.email,u.phone FROM upgrade_applications a JOIN users u ON u.id=a.user_id ${ws} ORDER BY CASE a.status WHEN 'pending' THEN 0 WHEN 'corrections_requested' THEN 1 ELSE 2 END,COALESCE(a.submitted_at,a.created_at) DESC`,wp);
+  res.json(r.rows);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// GET /api/owner/upgrades/:id — full application with documents
+app.get('/api/owner/upgrades/:id',auth,owner,async(req,res)=>{
+ try{
+  const r=await q(`SELECT a.*,u.name,u.email,u.phone,u.capabilities FROM upgrade_applications a JOIN users u ON u.id=a.user_id WHERE a.id=$1`,[req.params.id]);
+  if(!r.rowCount)return res.status(404).json({error:'Not found'});
+  res.json(ugMergeSensitive(r.rows[0]));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// PATCH /api/owner/upgrades/:id/status — full moderation with note
+app.patch('/api/owner/upgrades/:id/status',auth,owner,async(req,res)=>{
+ try{
+  const{status,note}=req.body;
+  const valid=['approved','rejected','corrections_requested','suspended','restored'];
+  if(!valid.includes(status))return res.status(400).json({error:'Invalid status'});
+  if(['rejected','corrections_requested','suspended'].includes(status)&&!String(note||'').trim())return res.status(400).json({error:'A review note is required'});
+  const cur=await q(`SELECT * FROM upgrade_applications WHERE id=$1`,[req.params.id]);
+  if(!cur.rowCount)return res.status(404).json({error:'Not found'});
+  const a=cur.rows[0];
+  if(a.user_id===req.user.id)return res.status(403).json({error:'Cannot moderate your own application'});
+  if(!(UG_TRANSITIONS[a.status]||[]).includes(status))return res.status(409).json({error:`Cannot ${status.replace('_',' ')} an application that is ${a.status}`});
+  const newSt=status==='restored'?'approved':status;
+  const r=await q(`UPDATE upgrade_applications SET status=$2,review_note=$3,reviewed_at=NOW(),reviewed_by=$4,updated_at=NOW() WHERE id=$1 RETURNING *`,[req.params.id,newSt,String(note||'').trim()||null,req.user.id]);
+  if(status==='approved'||status==='restored'){
+   await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'true',true) WHERE id=$1`,[a.user_id,a.type]);
+  }else if(status==='suspended'){
+   await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'false',true) WHERE id=$1`,[a.user_id,a.type]);
+  }else if(status==='rejected'&&['approved','suspended'].includes(a.status)){
+   await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'false',true) WHERE id=$1`,[a.user_id,a.type]);
+  }
+  res.json({id:r.rows[0].id,type:r.rows[0].type,status:r.rows[0].status,review_note:r.rows[0].review_note,reviewed_at:r.rows[0].reviewed_at});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// PATCH /api/owner/upgrades/:id — backward-compatible
 app.patch('/api/owner/upgrades/:id',auth,owner,async(req,res)=>{
- let s=req.body.status;
- if(!['approved','rejected'].includes(s))return res.status(400).json({error:'Invalid'});
- let r=await q(`UPDATE upgrade_applications SET status=$2,reviewed_at=NOW() WHERE id=$1 RETURNING *`,[req.params.id,s]);
- if(s==='approved')await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'true',true) WHERE id=$1`,[r.rows[0].user_id,r.rows[0].type]);
- res.json(r.rows[0]);
+ try{
+  const status=String(req.body.status||''),note=String(req.body.note||req.body.review_note||'').trim();
+  const valid=['approved','rejected','corrections_requested','suspended','restored'];
+  if(!valid.includes(status))return res.status(400).json({error:'Invalid status'});
+  if(['rejected','corrections_requested','suspended'].includes(status)&&!note)return res.status(400).json({error:'A review note is required'});
+  const cur=await q(`SELECT * FROM upgrade_applications WHERE id=$1`,[req.params.id]);
+  if(!cur.rowCount)return res.status(404).json({error:'Not found'});
+  const a=cur.rows[0];
+  if(a.user_id===req.user.id)return res.status(403).json({error:'Cannot moderate your own application'});
+  if(!(UG_TRANSITIONS[a.status]||[]).includes(status))return res.status(409).json({error:`Cannot ${status.replace('_',' ')} an application that is ${a.status}`});
+  const newSt=status==='restored'?'approved':status;
+  const r=await q(`UPDATE upgrade_applications SET status=$2,review_note=$3,reviewed_at=NOW(),reviewed_by=$4,updated_at=NOW() WHERE id=$1 RETURNING *`,[req.params.id,newSt,note||null,req.user.id]);
+  if(status==='approved'||status==='restored')await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'true',true) WHERE id=$1`,[a.user_id,a.type]);
+  else if(status==='suspended')await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'false',true) WHERE id=$1`,[a.user_id,a.type]);
+  else if(status==='rejected'&&['approved','suspended'].includes(a.status))await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'false',true) WHERE id=$1`,[a.user_id,a.type]);
+  const{sensitive_details,...safeRow}=r.rows[0];
+  res.json(safeRow);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
 app.get('/api/owner/users',auth,owner,async(req,res)=>{
@@ -393,9 +729,10 @@ app.get('/api/owner/users/:id/listings',auth,owner,async(req,res)=>{
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
+// GET /api/owner/users/:id/upgrades — per-user list, no documents
 app.get('/api/owner/users/:id/upgrades',auth,owner,async(req,res)=>{
  try{
-  const r=await q(`SELECT * FROM upgrade_applications WHERE user_id=$1 ORDER BY created_at DESC`,[req.params.id]);
+  const r=await q(`SELECT id,user_id,type,status,review_note,submitted_at,reviewed_at,reviewed_by,updated_at,created_at FROM upgrade_applications WHERE user_id=$1 ORDER BY type,created_at DESC`,[req.params.id]);
   res.json(r.rows);
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });

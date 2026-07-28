@@ -88,3 +88,54 @@ CREATE TABLE IF NOT EXISTS listing_reports(
 );
 CREATE INDEX IF NOT EXISTS idx_reports_listing ON listing_reports(listing_id);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON listing_reports(status);
+
+-- Sprint 2: Upgrade System (all idempotent)
+ALTER TABLE upgrade_applications DROP CONSTRAINT IF EXISTS upgrade_applications_status_check;
+ALTER TABLE upgrade_applications ADD CONSTRAINT upgrade_applications_status_check
+ CHECK(status IN('draft','pending','corrections_requested','approved','rejected','suspended'));
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS review_note TEXT;
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+CREATE INDEX IF NOT EXISTS idx_upgrade_user_type ON upgrade_applications(user_id,type);
+
+-- Sprint 2B: Secure Private Document Storage (all idempotent)
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS sensitive_details TEXT;
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS consent_at TIMESTAMPTZ;
+ALTER TABLE upgrade_applications ADD COLUMN IF NOT EXISTS consent_version TEXT;
+
+CREATE TABLE IF NOT EXISTS private_documents(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ upgrade_application_id UUID NOT NULL REFERENCES upgrade_applications(id) ON DELETE CASCADE,
+ application_type TEXT NOT NULL CHECK(application_type IN('driver','merchant','professional')),
+ document_type TEXT NOT NULL,
+ storage_provider TEXT NOT NULL CHECK(storage_provider IN('local','s3')),
+ object_key TEXT NOT NULL UNIQUE,
+ mime_type TEXT NOT NULL,
+ size_bytes BIGINT NOT NULL,
+ width INTEGER,
+ height INTEGER,
+ sha256 TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','replaced','removed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ removed_at TIMESTAMPTZ,
+ retention_until TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_privdoc_user ON private_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_privdoc_app ON private_documents(upgrade_application_id);
+CREATE INDEX IF NOT EXISTS idx_privdoc_apptype ON private_documents(application_type);
+CREATE INDEX IF NOT EXISTS idx_privdoc_doctype ON private_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_privdoc_status ON private_documents(status);
+
+CREATE TABLE IF NOT EXISTS document_access_log(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ document_id UUID NOT NULL REFERENCES private_documents(id) ON DELETE CASCADE,
+ actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ action TEXT NOT NULL CHECK(action IN('upload','view','replace','remove')),
+ ip_address TEXT,
+ user_agent TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_doclog_document ON document_access_log(document_id);

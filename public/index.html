@@ -125,6 +125,19 @@ button,input,select,textarea{font:inherit}
  .mp-subnav{gap:6px}
  .mp-tab{padding:8px 12px;font-size:12px}
 }
+.ug-doc-del{min-width:44px;min-height:44px;padding:0;font-size:16px;font-weight:900;line-height:1;background:var(--bad);border-color:var(--bad);color:#fff;border-radius:10px;display:flex;align-items:center;justify-content:center;touch-action:manipulation;flex-shrink:0;cursor:pointer}
+.ug-doc-del:focus-visible{outline:3px solid var(--acc,#fbbf24);outline-offset:2px}
+.ug-doc-item{display:inline-flex;align-items:flex-start;gap:6px;max-width:100%}
+.ug-doc-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:1;min-width:150px;cursor:pointer;touch-action:manipulation;text-align:center}
+.ug-consent-wrap{margin-top:20px;width:100%}
+.ug-consent{display:flex;align-items:flex-start;gap:12px;width:100%;box-sizing:border-box;min-height:44px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--p2);cursor:pointer;font-weight:400;touch-action:manipulation}
+.ug-consent input[type=checkbox]{width:22px;height:22px;min-width:22px;min-height:22px;flex-shrink:0;margin:1px 0 0;accent-color:var(--a);cursor:pointer}
+.ug-consent-text{display:block;flex:1;min-width:0}
+.ug-consent-main{display:block;font-size:13px;line-height:1.5}
+.ug-consent-sub{display:block;font-size:12px;line-height:1.45;color:var(--muted);margin-top:6px}
+.ug-consent:focus-within{outline:2px solid var(--a);outline-offset:2px}
+.ug-consent input[type=checkbox]:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+.ug-doc-btn:focus-visible{outline:3px solid var(--acc,#fbbf24);outline-offset:2px}
 </style></head><body><div class="wrap">
 
 <!-- ═══════════════════════ AUTH ═══════════════════════ -->
@@ -388,16 +401,22 @@ button,input,select,textarea{font:inherit}
 
 <!-- Professional roles (Upgrade) -->
 <section id="upgrade" class="hidden">
-<div class="card" style="margin-bottom:14px">
- <h2 style="margin:0 0 6px">Apply for a Professional Role</h2>
- <p class="muted" style="margin:0;font-size:14px">Choose one role below and submit your details for Owner review. Approved roles unlock professional features.</p>
+<div id="ug-select">
+ <div class="card" style="margin-bottom:14px">
+  <h2 style="margin:0 0 4px">Professional Roles</h2>
+  <p class="muted" style="margin:0;font-size:14px">Apply for a professional role to unlock additional features. The Owner reviews every application before activation.</p>
+ </div>
+ <div id="ugCards"></div>
 </div>
-<div class="grid3">
-<div class="card"><h2>Driver</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks transport listings and delivery requests.</p><div class="field"><label>Licence number</label><input id="dLicence"></div><div class="field"><label>Licence photo</label><input id="dLicenceImg" type="file" accept="image/*"></div><div class="field"><label>Vehicle registration</label><input id="dReg"></div><div class="field"><label>Insurance document</label><input id="dInsurance" type="file" accept="image/*"></div><div class="field"><label>Insurance expiry</label><input id="dExpiry" type="date"></div><div class="field"><label>Vehicle photo</label><input id="dVehicle" type="file" accept="image/*"></div><button class="btn primary" onclick="applyDriver()">Apply as Driver</button></div>
-<div class="card"><h2>Merchant</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks a business listing and merchant badge.</p><div class="field"><label>Business name</label><input id="bName"></div><div class="field"><label>Category</label><input id="bCategory" placeholder="Restaurant, Shop, Hardware…"></div><div class="field"><label>KRA / registration details</label><input id="bKra"></div><div class="field"><label>Address/location</label><input id="bAddress"></div><div class="field"><label>Store/business photo</label><input id="bPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyMerchant()">Apply as Merchant</button></div>
-<div class="card"><h2>Professional</h2><p class="muted" style="font-size:13px;margin:0 0 12px">Unlocks a professional services profile.</p><div class="field"><label>Profession</label><select id="pProfession"></select></div><div class="field"><label>Skills</label><textarea id="pSkills"></textarea></div><div class="field"><label>Experience</label><input id="pExperience"></div><div class="field"><label>Location</label><input id="pLocation" value="Embu"></div><div class="field"><label>Profile photo</label><input id="pPhoto" type="file" accept="image/*"></div><button class="btn primary" onclick="applyProfessional()">Apply as Professional</button></div>
+<div id="ug-form" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ugBack()">← Back</button><h2 style="margin:0" id="ugFormTitle"></h2></div>
+ <div id="ugFormBody"></div>
+ <div id="ugFormMsg" style="margin-top:12px"></div>
 </div>
-<div id="upgradeMsg"></div>
+<div id="ug-status" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ugBack()">← Back</button><h2 style="margin:0" id="ugStatusTitle"></h2></div>
+ <div id="ugStatusBody"></div>
+</div>
 </section>
 
 <!-- Owner -->
@@ -414,7 +433,16 @@ button,input,select,textarea{font:inherit}
    </div>
    <div id="accessRequests" class="list"></div>
   </div>
-  <div class="card"><h3>Professional applications</h3><div id="upgradeRequests" class="list"></div></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+     <h3 style="margin:0">Professional applications <span id="ugPendingBadge"></span></h3>
+     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <select id="ugTypeFilter" onchange="renderUpgradeQueue()" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:8px;padding:5px 9px;font:inherit;font-size:12px"><option value="">All types</option><option value="driver">Driver</option><option value="merchant">Merchant</option><option value="professional">Professional</option></select>
+      <select id="ugStatusFilter" onchange="renderUpgradeQueue()" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:8px;padding:5px 9px;font:inherit;font-size:12px"><option value="">All statuses</option><option value="pending">Pending</option><option value="corrections_requested">Corrections</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="suspended">Suspended</option></select>
+     </div>
+    </div>
+    <div id="upgradeRequests" class="list"></div>
+   </div>
  </div>
  <div class="card" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -469,7 +497,7 @@ const CATS=['Phones & Electronics','Vehicles','Motorcycles','Home & Furniture','
 const PRO=['Carpenter','Mason','Plumber','Electrician','Painter','Tiler','Roofer','Welder','Handyman','Mechanic','Boda Mechanic','Auto Electrician','Tyre Service','Car Wash','Cleaner','Gardener','Pest Control','Moving Help','Appliance Repair','Phone Repair','Computer Repair','CCTV Installer','Internet/Wi-Fi Technician','Solar Technician','Barber','Hairdresser','Beautician','Nail Technician','Makeup Artist','Tailor','Dressmaker','Shoe Repair','Photographer','Videographer','DJ','Decorator','Caterer','Farm Worker','Tractor Service','Irrigation Technician','Poultry Specialist','Livestock Services','Accountant','Bookkeeper','Graphic Designer','Printing','Delivery Service','Other'];
 const STATUS_LABELS={active:'Live',hidden:'Hidden',sold:'Sold',removed:'Removed'};
 const OWNER_STAT_LABELS={users:'Total Users',pendingAccess:'Pending Approvals',pendingUpgrades:'Pending Professional Applications',activeListings:'Active Listings',pendingReports:'Pending Reports'};
-const DRAFT_KEY='hapa_draft_v2';
+function DRAFT_KEY(){return 'hapa_draft_v2_'+(me?.id||'anon');}
 const MP_VIEWS=['browse','detail','create','edit','mylistings','favorites','seller'];
 const MP_TABS=['browse','create','mylistings','favorites'];
 // ── Image placeholder ─────────────────────────────────────────────────────────
@@ -482,16 +510,18 @@ let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIde
 let appMode='auth'; // auth|guest|pending|active|owner
 let pendingListingId=null; // deep link / post-auth redirect
 let mpCurView='browse',mpPrevView='browse',mpEditId=null;
-let mpImages=[],mpCurListingId=null,mpCurListingStatus=null,mpDt=null,mpPage=1;
+let mpImages=[],mpCurListingId=null,mpCurListingStatus=null,mpDt=null,mpPage=1,mpCamPending=null,mpCamMsgFor=null;
 let mpFavSet=new Set();
 let draftAutoTimer=null,resendCountdown=0,resendInt=null;
 let ownerAllUsers=[],ownerAccessData=[],ownerShowAllAccess=false;
 let ownerCurrentUserId=null,udCurrentUser=null,udCurrentListings=[],udCurrentUpgrades=[];
+let ugSelectedType=null,ugCurrentApps={},ugFileData={},ugAutoTimer=null,ownerUpgradeData=[];
+function ugDraftKey(t){return 'hapa_ug_v1_'+(me?.id||'anon')+'_'+t;}
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 const $=x=>document.getElementById(x);
 // Populate selects
-$('pProfession').innerHTML=PRO.map(x=>`<option>${x}</option>`).join('');
+// pProfession element removed in Sprint 2 (select is now built dynamically by ugBuildForm)
 const catOpts=CATS.map(x=>`<option>${x}</option>`).join('');
 $('cCat').innerHTML=`<option value="">Choose category</option>${catOpts}`;
 $('eCat').innerHTML=catOpts;
@@ -678,14 +708,395 @@ function tab(id){
  setActiveMainNav(id);
  if(id==='market')mpView('browse');
  if(id==='owner')loadOwner();
+ if(id==='upgrade')loadUpgradeSection();
 }
 async function requestAgain(){await api('/api/me/request-again',{method:'POST'});location.reload();}
 
-// ── Upgrade applications ──────────────────────────────────────────────────────
-async function apply(t,d){try{await api('/api/upgrades',{method:'POST',body:JSON.stringify({type:t,details:d})});$('upgradeMsg').innerHTML=`<div class="notice">${t} application submitted. The owner will review it shortly.</div>`;}catch(x){$('upgradeMsg').innerHTML=`<div class="notice bad">${x.message}</div>`;}}
-async function applyDriver(){apply('driver',{licenceNumber:$('dLicence').value,licenceImage:await f64($('dLicenceImg')),vehicleRegistration:$('dReg').value,insuranceImage:await f64($('dInsurance')),insuranceExpiry:$('dExpiry').value,vehiclePhoto:await f64($('dVehicle'))});}
-async function applyMerchant(){apply('merchant',{businessName:$('bName').value,businessCategory:$('bCategory').value,kraPin:$('bKra').value,businessAddress:$('bAddress').value,storePhoto:await f64($('bPhoto'))});}
-async function applyProfessional(){apply('professional',{profession:$('pProfession').value,skills:$('pSkills').value,experience:$('pExperience').value,location:$('pLocation').value,profilePhoto:await f64($('pPhoto'))});}
+// ── Upgrade System (Sprint 2) ─────────────────────────────────────────────────
+function ugStatusColor(s){return{approved:'var(--ok)',rejected:'var(--bad)',suspended:'var(--bad)',pending:'var(--a)',corrections_requested:'#ff9944',draft:'var(--muted)'}[s]||'var(--muted)';}
+function ugStatusLabel(s){return{draft:'Draft',pending:'Under review',corrections_requested:'Changes required',approved:'Approved',rejected:'Not approved',suspended:'Suspended'}[s]||s;}
+// Reusable human-readable labels for internal document_type values (DB values unchanged)
+function ugDocLabel(t){return{
+ profilePhoto:'Profile photo',ownerPhoto:'Owner photo',
+ nationalId:'National ID',nationalIdFront:'National ID — front',nationalIdBack:'National ID — back',nationalIdPhoto:'National ID',idDocument:'National ID / passport',
+ licenceFront:'Driving licence — front',licenceBack:'Driving licence — back',
+ vehicleRegDoc:'Vehicle registration',vehicleRegistration:'Vehicle registration',vehiclePhoto:'Vehicle photo',
+ insuranceDoc:'Insurance document',insuranceDocument:'Insurance document',psvDoc:'PSV licence',
+ businessRegDoc:'Business registration',kraDoc:'KRA document',storefrontPhoto:'Storefront photo',
+ certificates:'Certificates',portfolioPhotos:'Portfolio photos',portfolioPhoto:'Portfolio photos'
+}[t]||String(t).replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase()).trim();}
+function ugStatusCopy(s){return{draft:'Your application has not been submitted yet.',pending:'Your application is under review. The owner will respond shortly.',corrections_requested:'Changes are required before your application can be approved.',approved:'Approved — this professional role is active on your account.',rejected:'Your application was not approved. You may update your details and apply again.',suspended:'This professional role has been temporarily suspended.'}[s]||s;}
+
+async function loadUpgradeSection(){
+ ugFileData={};ugSelectedType=null;
+ $('ug-select').classList.remove('hidden');
+ $('ug-form').classList.add('hidden');
+ $('ug-status').classList.add('hidden');
+ $('ugCards').innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
+ try{ugCurrentApps=await api('/api/me/upgrades');}catch(e){ugCurrentApps={};}
+ ugRenderSelect();
+}
+
+function ugRenderSelect(){
+ const cfg=[
+  {type:'driver',icon:'🚗',title:'Driver',desc:'Accept rides and transport customers.',enables:'Transport listings, delivery requests.',reqs:'Driving licence · Vehicle docs · Insurance'},
+  {type:'merchant',icon:'🏪',title:'Merchant',desc:'Sell products, food or services through your HAPA shop.',enables:'Business listing, Merchant badge.',reqs:'National ID · Business details · Store photo'},
+  {type:'professional',icon:'⚙️',title:'Professional',desc:'Offer skilled local services and receive bookings.',enables:'Professional profile, Skills showcase.',reqs:'National ID · Skills & experience · Portfolio'}
+ ];
+ $('ugCards').innerHTML=cfg.map(({type,icon,title,desc,enables,reqs})=>{
+  const a=ugCurrentApps[type],s=a?.status,c=s?ugStatusColor(s):'var(--muted)';
+  const badge=`<span class="badge-pill" style="color:${c};background:${c}22;font-size:12px">${s?ugStatusLabel(s):'Not applied'}</span>`;
+  const btn=!s||s==='rejected'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Apply for ${title}</button>`:
+   s==='draft'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Continue application</button>`:
+   s==='corrections_requested'?`<button class="btn" style="width:100%;margin-top:14px;border-color:var(--a);color:var(--a)" onclick="ugSelectType('${type}')">Make corrections</button>`:
+   `<button class="btn" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">View application</button>`;
+  return `<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><span style="font-size:32px;line-height:1">${icon}</span><h3 style="margin:8px 0 4px">${title}</h3><p class="muted" style="margin:0 0 10px;font-size:14px">${desc}</p></div>${badge}</div><div style="font-size:13px;display:grid;gap:4px"><div><span class="muted">Enables: </span>${enables}</div><div><span class="muted">Requires: </span>${reqs}</div></div>${btn}</div>`;
+ }).join('');
+}
+
+async function ugSelectType(type){
+ ugSelectedType=type;
+ const a=ugCurrentApps[type];
+ if(a&&['pending','approved','suspended'].includes(a.status)){await ugShowStatus(type);return;}
+ await ugShowForm(type);
+}
+
+function ugBack(){
+ if(ugAutoTimer){clearInterval(ugAutoTimer);ugAutoTimer=null;}
+ $('ug-form').classList.add('hidden');$('ug-status').classList.add('hidden');
+ $('ug-select').classList.remove('hidden');ugSelectedType=null;
+}
+
+async function ugShowStatus(type){
+ $('ug-select').classList.add('hidden');$('ug-form').classList.add('hidden');$('ug-status').classList.remove('hidden');
+ $('ugStatusTitle').textContent={driver:'Driver Application',merchant:'Merchant Application',professional:'Professional Application'}[type]||type;
+ $('ugStatusBody').innerHTML='<p class="muted">Loading…</p>';
+ try{
+  const app=await api('/api/me/upgrades/'+type);
+  const s=app.status,c=ugStatusColor(s);
+  const dt=d=>new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  $('ugStatusBody').innerHTML=`<div class="card" style="margin-bottom:14px">
+   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+    <h3 style="margin:0">${{driver:'Driver',merchant:'Merchant',professional:'Professional'}[type]} Application</h3>
+    <span class="badge-pill" style="color:${c};background:${c}22;font-size:13px">${ugStatusLabel(s)}</span>
+   </div>
+   <p style="margin:0 0 12px;font-size:14px">${ugStatusCopy(s)}</p>
+   ${app.review_note?`<div class="notice" style="margin-bottom:12px"><b>Owner note:</b> ${esc(app.review_note)}</div>`:''}
+   <div class="list" style="font-size:13px">
+    ${app.submitted_at?`<div class="row"><span class="muted">Submitted</span><span>${dt(app.submitted_at)}</span></div>`:''}
+    ${app.reviewed_at?`<div class="row"><span class="muted">Last reviewed</span><span>${dt(app.reviewed_at)}</span></div>`:''}
+    ${app.updated_at?`<div class="row"><span class="muted">Last updated</span><span>${dt(app.updated_at)}</span></div>`:''}
+   </div>
+   <div id="ugStatusDocs"></div>
+   ${s==='corrections_requested'?`<button class="btn" style="border-color:var(--a);color:var(--a);width:100%;margin-top:14px" onclick="ugShowForm('${type}')">Make corrections &amp; resubmit</button>`:''}
+   ${s==='rejected'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugShowForm('${type}')">Update and apply again</button>`:''}
+  </div>`;
+  // Read-only view of submitted documents (authenticated previews)
+  try{
+   await ugLoadDocs(type);
+   if(ugDocs.length){
+    const box=$('ugStatusDocs');
+    box.innerHTML=`<p class="muted" style="margin:14px 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Submitted documents</p><div style="display:flex;gap:8px;flex-wrap:wrap">${ugDocs.map(d=>`<div style="text-align:center"><img id="ugimg-${d.id}" alt="${esc(ugDocLabel(d.document_type))}" style="max-width:96px;max-height:72px;border-radius:8px;display:block;background:var(--line)"><div class="muted" style="font-size:10px;margin-top:3px">${esc(ugDocLabel(d.document_type))}</div></div>`).join('')}</div>`;
+    for(const d of ugDocs){try{const u=await ugFetchDocUrl(d.id);const img=$('ugimg-'+d.id);if(img)img.src=u;}catch(e){}}
+   }
+  }catch(e){}
+ }catch(e){$('ugStatusBody').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+
+async function ugShowForm(type){
+ $('ug-select').classList.add('hidden');$('ug-status').classList.add('hidden');$('ug-form').classList.remove('hidden');
+ $('ugFormTitle').textContent={driver:'Driver Application',merchant:'Merchant Application',professional:'Professional Application'}[type]||type;
+ $('ugFormMsg').innerHTML='';
+ let existing={},reviewNote='';
+ const cur=ugCurrentApps[type];
+ const curStatus=cur?cur.status:'';
+ if(cur&&['draft','corrections_requested','rejected'].includes(cur.status)){
+  try{const app=await api('/api/me/upgrades/'+type);existing={...(app.details||{})};reviewNote=app.review_note||'';}catch(e){}
+ }
+ try{const loc=JSON.parse(localStorage.getItem(ugDraftKey(type))||'{}');Object.assign(existing,loc);}catch(e){}
+ ugFileData={};ugRevokeBlobUrls();
+ const correctionsPanel=(curStatus==='corrections_requested'&&reviewNote)?`<div class="notice warn" role="alert" aria-live="polite" style="margin:0 0 16px"><h4 style="margin:0 0 6px;font-size:14px">Changes requested by HAPA</h4><p style="margin:0;font-size:13px">${esc(reviewNote)}</p></div>`:'';
+ $('ugFormBody').innerHTML=correctionsPanel+ugBuildForm(type,existing);
+ // Load existing secure documents and render authenticated previews
+ await ugLoadDocs(type);
+ const docF={driver:['profilePhoto','nationalIdFront','nationalIdBack','licenceFront','licenceBack','vehicleRegDoc','vehiclePhoto','insuranceDoc','psvDoc'],merchant:['ownerPhoto','nationalId','businessRegDoc','kraDoc','storefrontPhoto'],professional:['profilePhoto','nationalId','certificates','portfolioPhotos']};
+ (docF[type]||[]).forEach(k=>ugRenderDocPreview(k,true));
+ if(ugAutoTimer)clearInterval(ugAutoTimer);
+ ugAutoTimer=setInterval(()=>ugLocalSave(type),8000);
+}
+
+function ugSec(t){return`<h4 style="margin:20px 0 12px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--line);padding-bottom:6px">${t}</h4>`;}
+function ugFld(id,label,type,val='',req=false,opts={}){
+ const reqMark=req?`<span style="color:var(--a);margin-left:2px">*</span>`:`<span class="muted" style="font-size:10px;margin-left:4px">(optional)</span>`;
+ const fid='ug_'+id;
+ if(type==='file'){
+  // Sprint 2B: documents upload independently through the secure endpoint.
+  // Separate camera & gallery controls; native inputs stay hidden.
+  const multi=UG_DOC_MULTI[id]?' multiple':'';
+  const kd=`onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}"`;
+  return`<div class="field" id="ugdocfield-${id}"><label>${label}${reqMark}</label>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <label role="button" tabindex="0" class="btn ug-doc-btn" aria-label="Take a photo for ${esc(ugDocLabel(id))}" ${kd}><span id="${fid}-camlbl">📷 Take a photo</span><input type="file" id="${fid}-cam" accept="image/*" capture="environment" style="display:none" onclick="ugCamStart('${id}')" onchange="ugUploadFrom(this,'${id}')"></label>
+    <label role="button" tabindex="0" class="btn ug-doc-btn" aria-label="Choose from gallery for ${esc(ugDocLabel(id))}" ${kd}><span id="${fid}-gallbl">🖼 Choose from gallery</span><input type="file" id="${fid}-gal" accept="image/*"${multi} style="display:none" onchange="ugUploadFrom(this,'${id}')"></label>
+   </div>
+   <div id="${fid}-cammsg" class="notice warn" role="status" aria-live="polite" style="display:none;margin:6px 0 0;font-size:13px">Camera access was cancelled or unavailable. You can still choose photos from your gallery.</div>
+   <div id="${fid}-prev" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+   <div id="${fid}-prog" class="muted" style="font-size:12px" aria-live="polite"></div>
+   <div id="${fid}-err" style="color:var(--bad);font-size:12px" aria-live="polite"></div></div>`;
+ }
+ if(type==='select'){
+  const o=(opts.options||[]).map(op=>`<option value="${esc(op)}"${String(val)===op?' selected':''}>${esc(op)}</option>`).join('');
+  return`<div class="field"><label>${label}${reqMark}</label><select id="${fid}"><option value="">— Select —</option>${o}</select></div>`;
+ }
+ if(type==='textarea')return`<div class="field"><label>${label}${reqMark}</label><textarea id="${fid}" rows="${opts.rows||3}" placeholder="${opts.placeholder||''}">${esc(String(val||''))}</textarea></div>`;
+ return`<div class="field"><label>${label}${reqMark}</label><input type="${type}" id="${fid}" value="${esc(String(val||''))}" placeholder="${opts.placeholder||''}"></div>`;
+}
+
+function ugBuildForm(type,d={}){
+ const VT=['Saloon','SUV','Van/Minibus','Truck','Motorcycle','Tuk-tuk','Pickup','Other'];
+ const BC=['Restaurant & Food','Shop & Retail','Hardware','Pharmacy','Salon & Beauty','Electronics','Clothing','Agriculture','Services','Other'];
+ const docNote=`<p class="muted" style="font-size:12px;margin:0 0 12px">Upload clear photos (JPG, PNG or WebP, max 5 MB each). Documents are stored securely and are only visible to you and HAPA during review. <b>* = required for submission.</b></p>`;
+ let h='<div class="card">';
+ if(type==='driver'){
+  h+=ugSec('Personal Information');
+  h+=ugFld('fullName','Full legal name','text',d.fullName,true,{placeholder:'As on your ID'});
+  h+=ugFld('phone','Phone','tel',d.phone,false,{placeholder:'+254…'});
+  h+=ugFld('email','Email','email',d.email,false);
+  h+=ugFld('nationalId','National ID / Passport number','text',d.nationalId,true);
+  h+=ugFld('county','County','text',d.county,true,{placeholder:'e.g. Embu'});
+  h+=ugFld('town','Town','text',d.town,false);
+  h+=ugSec('Driving Details');
+  h+=ugFld('drivingLicenceNumber','Driving licence number','text',d.drivingLicenceNumber,true);
+  h+=ugFld('licenceExpiry','Licence expiry date','date',d.licenceExpiry,false);
+  h+=ugFld('psvLicenceNumber','PSV licence number','text',d.psvLicenceNumber,false,{placeholder:'If applicable'});
+  h+=ugFld('yearsExperience','Years of driving experience','number',d.yearsExperience,false);
+  h+=ugSec('Vehicle Details');
+  h+=ugFld('vehicleType','Vehicle type','select',d.vehicleType,true,{options:VT});
+  h+=ugFld('vehicleMake','Vehicle make','text',d.vehicleMake,false,{placeholder:'e.g. Toyota'});
+  h+=ugFld('vehicleModel','Vehicle model','text',d.vehicleModel,false,{placeholder:'e.g. Probox'});
+  h+=ugFld('vehicleYear','Year of manufacture','number',d.vehicleYear,false);
+  h+=ugFld('registrationNumber','Registration number','text',d.registrationNumber,true,{placeholder:'e.g. KDA 123A'});
+  h+=ugFld('vehicleColour','Vehicle colour','text',d.vehicleColour,false);
+  h+=ugFld('insuranceProvider','Insurance provider','text',d.insuranceProvider,false);
+  h+=ugFld('insuranceExpiry','Insurance expiry date','date',d.insuranceExpiry,false);
+  h+=ugSec('Availability');
+  h+=ugFld('availability','Availability','text',d.availability,false,{placeholder:'e.g. Weekdays 6am–8pm'});
+  h+=ugFld('description','About you','textarea',d.description,false,{placeholder:'Tell customers about yourself and your service…'});
+  h+=ugSec('Documents');h+=docNote;
+  h+=ugFld('profilePhoto','Profile photo','file',d.profilePhoto,true);
+  h+=ugFld('nationalIdFront','National ID / Passport — front','file',d.nationalIdFront,true);
+  h+=ugFld('nationalIdBack','National ID — back','file',d.nationalIdBack,false);
+  h+=ugFld('licenceFront','Driving licence — front','file',d.licenceFront,true);
+  h+=ugFld('licenceBack','Driving licence — back','file',d.licenceBack,false);
+  h+=ugFld('vehicleRegDoc','Vehicle registration document','file',d.vehicleRegDoc,true);
+  h+=ugFld('vehiclePhoto','Vehicle photo','file',d.vehiclePhoto,true);
+  h+=ugFld('insuranceDoc','Insurance document','file',d.insuranceDoc,false);
+  h+=ugFld('psvDoc','PSV document','file',d.psvDoc,false);
+ }else if(type==='merchant'){
+  h+=ugSec('Business Details');
+  h+=ugFld('businessName','Business name','text',d.businessName,true);
+  h+=ugFld('ownerName','Owner / legal name','text',d.ownerName,true);
+  h+=ugFld('businessCategory','Business category','select',d.businessCategory,true,{options:BC});
+  h+=ugFld('businessDescription','Business description','textarea',d.businessDescription,false,{placeholder:'What do you sell or offer?'});
+  h+=ugSec('Location & Hours');
+  h+=ugFld('county','County','text',d.county,true,{placeholder:'e.g. Embu'});
+  h+=ugFld('town','Town','text',d.town,false);
+  h+=ugFld('physicalLocation','Physical address','text',d.physicalLocation,false);
+  h+=ugFld('openingHours','Opening hours','text',d.openingHours,false,{placeholder:'e.g. Mon–Sat 8am–6pm'});
+  h+=ugFld('deliveryAvailable','Delivery available','select',d.deliveryAvailable,false,{options:['Yes','No']});
+  h+=ugSec('Contact');
+  h+=ugFld('phone','Phone','tel',d.phone,false,{placeholder:'+254…'});
+  h+=ugFld('email','Email','email',d.email,false);
+  h+=ugSec('Registration (optional)');
+  h+=ugFld('kraPin','KRA PIN','text',d.kraPin,false);
+  h+=ugFld('businessRegNumber','Business registration number','text',d.businessRegNumber,false);
+  h+=ugSec('Documents');h+=docNote;
+  h+=ugFld('ownerPhoto','Owner profile photo','file',d.ownerPhoto,true);
+  h+=ugFld('nationalId','National ID / Passport','file',d.nationalId,true);
+  h+=ugFld('businessRegDoc','Business registration document','file',d.businessRegDoc,false);
+  h+=ugFld('kraDoc','KRA document','file',d.kraDoc,false);
+  h+=ugFld('storefrontPhoto','Storefront / business photo','file',d.storefrontPhoto,false);
+ }else if(type==='professional'){
+  h+=ugSec('Personal Information');
+  h+=ugFld('fullName','Full name','text',d.fullName,true);
+  h+=ugFld('phone','Phone','tel',d.phone,false,{placeholder:'+254…'});
+  h+=ugFld('email','Email','email',d.email,false);
+  h+=ugFld('professionCategory','Profession / category','select',d.professionCategory,true,{options:PRO});
+  h+=ugFld('yearsExperience','Years of experience','number',d.yearsExperience,false);
+  h+=ugSec('Services');
+  h+=ugFld('skills','Skills','textarea',d.skills,true,{placeholder:'List your main skills…'});
+  h+=ugFld('serviceDescription','Service description','textarea',d.serviceDescription,false,{placeholder:'Describe what you offer…'});
+  h+=ugFld('startingPrice','Starting price / hourly rate (KES)','number',d.startingPrice,false,{placeholder:'e.g. 500'});
+  h+=ugSec('Location & Availability');
+  h+=ugFld('county','County','text',d.county,true,{placeholder:'e.g. Embu'});
+  h+=ugFld('town','Town','text',d.town,false);
+  h+=ugFld('serviceArea','Service area','text',d.serviceArea,false,{placeholder:'Areas you cover'});
+  h+=ugFld('availability','Availability','text',d.availability,false,{placeholder:'e.g. Weekdays, evenings'});
+  h+=ugSec('Documents');h+=docNote;
+  h+=ugFld('profilePhoto','Profile photo','file',d.profilePhoto,true);
+  h+=ugFld('nationalId','National ID / Passport','file',d.nationalId,true);
+  h+=ugFld('certificates','Certificates or licences','file',d.certificates,false);
+  h+=ugFld('portfolioPhotos','Portfolio / work photos','file',d.portfolioPhotos,false);
+ }
+ h+=`<div class="ug-consent-wrap">
+  <label class="ug-consent" for="ugConsent">
+   <input type="checkbox" id="ugConsent" aria-describedby="ugConsentSub">
+   <span class="ug-consent-text">
+    <span class="ug-consent-main">I consent to HAPA securely storing and processing the documents and details I provide for the purpose of reviewing this application.<span style="color:var(--a);margin-left:2px">*</span></span>
+    <span class="ug-consent-sub" id="ugConsentSub">Your documents are private and visible only to you and authorized HAPA reviewers. They are never shown on Marketplace profiles.</span>
+   </span>
+  </label>
+  <div id="ugConsentErr" style="color:var(--bad);font-size:12px;margin-top:4px" aria-live="polite"></div>
+ </div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+  <button class="btn primary" id="ugSubmitBtn" style="flex:1;min-width:180px" onclick="ugSubmit('${type}')">Submit application</button>
+  <button class="btn" id="ugDraftBtn" onclick="ugSaveDraftToServer('${type}')">Save draft</button>
+ </div></div>`;
+ return h;
+}
+
+// ── Sprint 2B: secure document upload/preview (no base64 in details/localStorage)
+let ugDocs=[];// active document metadata for the open application
+const ugBlobUrls=new Set();
+function ugRevokeBlobUrls(){ugBlobUrls.forEach(u=>{try{URL.revokeObjectURL(u);}catch(e){}});ugBlobUrls.clear();}
+async function ugFetchDocUrl(docId){
+ const r=await fetch('/api/private-documents/'+docId,{headers:token?{Authorization:'Bearer '+token}:{}});
+ if(!r.ok)throw new Error('Could not load document');
+ const ct=r.headers.get('content-type')||'';
+ if(ct.includes('application/json')){const d=await r.json();return d.url;}// short-lived signed URL (S3 mode)
+ const u=URL.createObjectURL(await r.blob());ugBlobUrls.add(u);return u;
+}
+async function ugLoadDocs(type){
+ try{const r=await api('/api/me/upgrades/'+type+'/documents');ugDocs=r.documents||[];}catch(e){ugDocs=[];}
+}
+function ugDocsFor(docType){return ugDocs.filter(d=>d.document_type===docType);}
+async function ugRenderDocPreview(docType,editable){
+ const fid='ug_'+docType,prevEl=$(fid+'-prev');if(!prevEl)return;
+ const docs=ugDocsFor(docType);
+ prevEl.innerHTML=docs.map(d=>`<div class="ug-doc-item"><img id="ugimg-${d.id}" alt="${esc(ugDocLabel(docType))}" style="max-width:110px;max-height:80px;border-radius:8px;display:block;background:var(--line)">${editable?`<button class="btn ug-doc-del" onclick="ugDeleteDoc('${d.id}','${docType}')" aria-label="Remove ${esc(ugDocLabel(docType))}">✕</button>`:''}</div>`).join('');
+ // When at capacity, uploading again replaces — reflect that in the button labels
+ if(editable){
+  const max=UG_DOC_MULTI[docType]||1,full=docs.length>=max;
+  const cl=$(fid+'-camlbl'),gl=$(fid+'-gallbl');
+  if(cl)cl.textContent=full?'📷 Replace — take a photo':'📷 Take a photo';
+  if(gl)gl.textContent=full?'🖼 Replace from gallery':'🖼 Choose from gallery';
+ }
+ for(const d of docs){try{const u=await ugFetchDocUrl(d.id);const img=$('ugimg-'+d.id);if(img)img.src=u;}catch(e){}}
+}
+// Per-type limits mirrored from the server (server remains authoritative)
+const UG_DOC_MULTI={certificates:3,portfolioPhotos:3};
+// Camera-cancel detection for document slots (same pattern as Marketplace)
+let ugCamPending=null;
+function ugCamStart(docType){ugCamPending=docType;ugCamMsg(docType,false);}
+function ugCamMsg(docType,show){const el=$('ug_'+docType+'-cammsg');if(el)el.style.display=show?'block':'none';}
+function ugCamCheck(){
+ if(!ugCamPending)return;const d=ugCamPending;
+ setTimeout(()=>{if(ugCamPending===d){ugCamPending=null;ugCamMsg(d,true);}},900);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ugCamCheck();});
+window.addEventListener('focus',ugCamCheck);
+// Shared secure pipeline: camera and gallery both feed the same multipart upload.
+async function ugUploadFrom(input,docType){
+ ugCamPending=null;ugCamMsg(docType,false);
+ const files=Array.from(input.files||[]);input.value='';
+ if(!files.length)return;
+ const max=UG_DOC_MULTI[docType]||1;
+ const errEl=$('ug_'+docType+'-err');
+ for(const f of files){
+  const have=ugDocsFor(docType).length;
+  if(max>1&&have>=max){if(errEl)errEl.textContent='Maximum '+max+' files for this document.';break;}
+  await ugUploadDoc(docType,f);
+ }
+}
+async function ugUploadDoc(docType,f){
+ const type=ugSelectedType,fid='ug_'+docType;
+ const errEl=$(fid+'-err'),progEl=$(fid+'-prog');
+ if(!f)return;
+ if(errEl)errEl.textContent='';
+ if(f.size>5*1024*1024){if(errEl)errEl.textContent='File too large (max 5 MB)';return;}
+ if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type)){if(errEl)errEl.textContent='Photos only (JPG, PNG or WebP)';return;}
+ if(progEl)progEl.textContent='Uploading…';
+ try{
+  const fd=new FormData();fd.append('document_type',docType);fd.append('file',f);
+  const r=await fetch('/api/me/upgrades/'+type+'/documents',{method:'POST',headers:token?{Authorization:'Bearer '+token}:{},body:fd});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||'Upload failed');
+  await ugLoadDocs(type);
+  await ugRenderDocPreview(docType,true);
+  if(progEl)progEl.textContent='Uploaded ✓';
+  setTimeout(()=>{if(progEl&&progEl.textContent==='Uploaded ✓')progEl.textContent='';},2500);
+ }catch(e){if(errEl)errEl.textContent=e.message;if(progEl)progEl.textContent='';}
+}
+async function ugDeleteDoc(docId,docType){
+ const type=ugSelectedType,errEl=$('ug_'+docType+'-err');
+ try{
+  await api('/api/me/upgrades/'+type+'/documents/'+docId,{method:'DELETE'});
+  await ugLoadDocs(type);
+  await ugRenderDocPreview(docType,true);
+ }catch(e){if(errEl)errEl.textContent=e.message;}
+}
+
+function ugCollect(type){
+ const v=id=>{const el=$('ug_'+id);if(!el)return'';return el.value||'';};
+ const d={};
+ const tf={driver:['fullName','phone','email','nationalId','county','town','drivingLicenceNumber','licenceExpiry','psvLicenceNumber','yearsExperience','vehicleType','vehicleMake','vehicleModel','vehicleYear','registrationNumber','vehicleColour','insuranceProvider','insuranceExpiry','availability','description'],merchant:['businessName','ownerName','businessCategory','businessDescription','county','town','physicalLocation','openingHours','deliveryAvailable','phone','email','kraPin','businessRegNumber'],professional:['fullName','phone','email','professionCategory','yearsExperience','skills','serviceDescription','startingPrice','county','town','serviceArea','availability']};
+ (tf[type]||[]).forEach(k=>{d[k]=v(k);});
+ // Documents are uploaded separately through the secure endpoint — never in details
+ return d;
+}
+
+function ugLocalSave(type){
+ try{
+  const d=ugCollect(type);
+  // Never store document contents or URLs in localStorage
+  const SENS=['nationalId','drivingLicenceNumber','psvLicenceNumber','insurancePolicyNumber','businessRegNumber','kraPin'];
+  const clean={};Object.entries(d).forEach(([k,v])=>{if(typeof v==='string'&&v.startsWith('data:'))return;if(SENS.includes(k))return;clean[k]=v;});
+  localStorage.setItem(ugDraftKey(type),JSON.stringify(clean));
+ }catch(e){}
+}
+
+async function ugSaveDraftToServer(type){
+ const btn=$('ugDraftBtn');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+ try{
+  const d=ugCollect(type);
+  await api('/api/me/upgrades/'+type,{method:'POST',body:JSON.stringify({details:d})});
+  ugLocalSave(type);
+  $('ugFormMsg').innerHTML='<div class="notice">Draft saved.</div>';
+  setTimeout(()=>{const el=$('ugFormMsg');if(el&&el.textContent.includes('Draft'))el.innerHTML='';},3000);
+ }catch(e){$('ugFormMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+ if(btn){btn.disabled=false;btn.textContent='Save draft';}
+}
+
+async function ugSubmit(type){
+ const btn=$('ugSubmitBtn');if(btn){btn.disabled=true;btn.textContent='Submitting…';}
+ $('ugFormMsg').innerHTML='';
+ try{
+  const d=ugCollect(type);
+  const req={driver:['fullName','drivingLicenceNumber','vehicleType','registrationNumber','county'],merchant:['businessName','ownerName','businessCategory','county'],professional:['fullName','professionCategory','skills','county']}[type]||[];
+  const miss=req.filter(k=>!d[k]||!String(d[k]).trim());
+  if(miss.length){
+   $('ugFormMsg').innerHTML=`<div class="notice bad">Required fields missing: ${miss.join(', ')}</div>`;
+   $('ugFormMsg').scrollIntoView({behavior:'smooth',block:'center'});
+   if(btn){btn.disabled=false;btn.textContent='Submit application';}return;
+  }
+  const consentEl=$('ugConsent');
+  if(!consentEl||!consentEl.checked){
+   const ce=$('ugConsentErr');if(ce)ce.textContent='Please tick the consent box to submit your application.';
+   consentEl?.scrollIntoView({behavior:'smooth',block:'center'});
+   if(btn){btn.disabled=false;btn.textContent='Submit application';}return;
+  }
+  const ce=$('ugConsentErr');if(ce)ce.textContent='';
+  await api('/api/me/upgrades/'+type+'/submit',{method:'POST',body:JSON.stringify({details:d,consent:true})});
+  localStorage.removeItem(ugDraftKey(type));
+  if(ugAutoTimer){clearInterval(ugAutoTimer);ugAutoTimer=null;}
+  try{ugCurrentApps=await api('/api/me/upgrades');}catch(e){}
+  await ugShowStatus(type);
+ }catch(e){
+  $('ugFormMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;
+  $('ugFormMsg').scrollIntoView({behavior:'smooth',block:'center'});
+  if(btn){btn.disabled=false;btn.textContent='Submit application';}
+ }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -717,12 +1128,12 @@ function mpSaveDraft(){
  if(mpCurView!=='create')return;
  const d={title:($('cTitle')||{}).value||'',price:($('cPrice')||{}).value||'',cat:($('cCat')||{}).value||'',cond:($('cCond')||{}).value||'',loc:($('cLoc')||{}).value||'',desc:($('cDesc')||{}).value||'',neg:($('cNeg')||{}).checked||false,phone:($('cPhone')||{}).checked||false,images:[...mpImages],ts:Date.now()};
  if(!d.title&&!d.desc&&!d.price&&!d.images.length)return;
- localStorage.setItem(DRAFT_KEY,JSON.stringify(d));
+ localStorage.setItem(DRAFT_KEY(),JSON.stringify(d));
  if($('draftStatus'))$('draftStatus').textContent='Draft saved';
  setTimeout(()=>{if($('draftStatus'))$('draftStatus').textContent='';},2000);
 }
 function mpLoadDraft(){
- try{const raw=localStorage.getItem(DRAFT_KEY);if(!raw)return false;const d=JSON.parse(raw);if(!d||!d.ts)return false;if(Date.now()-d.ts>7*24*60*60*1000){localStorage.removeItem(DRAFT_KEY);return false;}if(!d.title&&!d.desc&&!d.price&&!d.images?.length)return false;return d;}catch{return false;}
+ try{const raw=localStorage.getItem(DRAFT_KEY());if(!raw)return false;const d=JSON.parse(raw);if(!d||!d.ts)return false;if(Date.now()-d.ts>7*24*60*60*1000){localStorage.removeItem(DRAFT_KEY());return false;}if(!d.title&&!d.desc&&!d.price&&!d.images?.length)return false;return d;}catch{return false;}
 }
 function mpRestoreDraft(d){
  if($('cTitle')){$('cTitle').value=d.title||'';updateCharCount('cTitle','cTitleCount',100);}
@@ -736,9 +1147,9 @@ function mpRestoreDraft(d){
  mpImages=Array.isArray(d.images)?[...d.images]:[];
  mpRenderPreviews('cPreviews');
 }
-function mpKeepDraft(){$('draftBanner').classList.add('hidden');if(draftAutoTimer)clearInterval(draftAutoTimer);draftAutoTimer=setInterval(mpSaveDraft,10000);}
+function mpKeepDraft(){const d=mpLoadDraft();if(d)mpRestoreDraft(d);$('draftBanner').classList.add('hidden');if(draftAutoTimer)clearInterval(draftAutoTimer);draftAutoTimer=setInterval(mpSaveDraft,10000);}
 function mpDiscardDraft(){
- localStorage.removeItem(DRAFT_KEY);$('draftBanner').classList.add('hidden');
+ localStorage.removeItem(DRAFT_KEY());$('draftBanner').classList.add('hidden');
  mpImages=[];mpRenderPreviews('cPreviews');
  ['cTitle','cDesc'].forEach(id=>{if($(id))$(id).value='';});
  if($('cPrice'))$('cPrice').value='';if($('cCat'))$('cCat').selectedIndex=0;
@@ -759,18 +1170,55 @@ async function mpResizeImage(file){
   img.src=url;
  });
 }
+// Camera-cancel detection: track a pending camera attempt; some mobile browsers
+// don't fire change on cancel, so also check on focus/visibility restoration.
+function mpCamStart(previewId){mpCamPending=previewId;if(mpCamMsgFor){mpCamMsgFor=null;mpCamNotice(previewId);}}
+function mpCamNotice(previewId){const el=$('camMsg-'+previewId);if(el)el.style.display=mpCamMsgFor===previewId?'block':'none';}
+function mpCamShow(previewId){mpCamMsgFor=previewId;mpCamNotice(previewId);}
+function mpCamCheck(){
+ if(!mpCamPending)return;const pid=mpCamPending;
+ // Wait briefly: a successful capture fires change shortly after the page regains focus.
+ setTimeout(()=>{if(mpCamPending===pid){mpCamPending=null;mpCamShow(pid);}},900);
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')mpCamCheck();});
+window.addEventListener('focus',mpCamCheck);
 async function mpHandleFiles(input,previewId){
- const slots=5-mpImages.length;if(!slots){mpInlineAlert('Maximum 5 images.');input.value='';return;}
- const files=[...input.files].slice(0,slots);input.value='';
- for(const f of files){try{mpImages.push(await mpResizeImage(f));}catch(e){mpInlineAlert(e.message);}}
- mpRenderPreviews(previewId);mpFieldErr('cImg','');
+ const errId=previewId==='ePreviews'?'eImg':'cImg';
+ const isCam=input.dataset.cam==='1';
+ if(isCam)mpCamPending=null;
+ const slots=5-mpImages.length;
+ if(!slots){mpFieldErr(errId,'Maximum 5 photos reached.');input.value='';return;}
+ const files=[...input.files];input.value='';
+ if(!files.length){if(isCam)mpCamShow(previewId);return;}
+ mpCamMsgFor=null;
+ if(files.length>slots)mpFieldErr(errId,`Only ${slots} more photo${slots>1?'s':''} allowed — extra files were skipped.`);
+ else mpFieldErr(errId,'');
+ for(const f of files.slice(0,slots)){
+  try{mpImages.push(await mpResizeImage(f));}
+  catch(e){mpFieldErr(errId,e.message);}
+ }
+ mpRenderPreviews(previewId);
 }
 function mpRenderPreviews(previewId){
  const strip=$(previewId);if(!strip)return;
- strip.innerHTML=mpImages.map((url,i)=>`<div style="position:relative;flex-shrink:0"><img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;display:block"><button onclick="mpRemoveImg(${i},'${previewId}')" style="position:absolute;top:-8px;right:-8px;width:44px;height:44px;border-radius:50%;background:var(--bad);border:0;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-weight:900;touch-action:manipulation">×</button></div>`).join('')+
- (mpImages.length<5?`<label style="width:80px;height:80px;border:2px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:28px;flex-shrink:0"><input type="file" accept="image/*" multiple style="display:none" onchange="mpHandleFiles(this,'${previewId}')">+</label>`:'');
+ const full=mpImages.length>=5;
+ const btnStyle=`display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;width:100%;border-radius:10px;font:inherit;font-weight:600;font-size:14px;cursor:${full?'not-allowed':'pointer'};touch-action:manipulation;border:1px solid var(--line);background:var(--p2);color:${full?'var(--muted)':'var(--text)'};opacity:${full?'.55':'1'}`;
+ strip.innerHTML=
+  `<div style="display:flex;flex-direction:column;gap:8px;width:100%">
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <label role="button" aria-label="Take a photo with your camera" aria-disabled="${full}" tabindex="0" style="${btnStyle};flex:1;min-width:150px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">
+     📷 Take a photo<input type="file" accept="image/*" capture="environment" data-cam="1" style="display:none" ${full?'disabled':''} onclick="mpCamStart('${previewId}')" onchange="mpHandleFiles(this,'${previewId}')">
+    </label>
+    <label role="button" aria-label="Choose photos from your gallery" aria-disabled="${full}" tabindex="0" style="${btnStyle};flex:1;min-width:150px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">
+     🖼 Choose from gallery<input type="file" accept="image/*" multiple style="display:none" ${full?'disabled':''} onchange="mpHandleFiles(this,'${previewId}')">
+    </label>
+   </div>
+   <div id="camMsg-${previewId}" class="notice warn" role="status" aria-live="polite" style="display:${mpCamMsgFor===previewId?'block':'none'};margin:0;font-size:13px">Camera access was cancelled or unavailable. You can still choose photos from your gallery.</div>
+   <div class="muted" style="font-size:12px" aria-live="polite">${mpImages.length} of 5 photos${full?' · Maximum 5 photos reached.':''}</div>
+   ${mpImages.length?`<div style="display:flex;gap:12px;flex-wrap:wrap;padding-top:4px">${mpImages.map((url,i)=>`<div style="position:relative;flex-shrink:0"><img src="${url}" alt="Selected photo ${i+1}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;display:block"><button aria-label="Remove photo ${i+1}" onclick="mpRemoveImg(${i},'${previewId}')" style="position:absolute;top:-8px;right:-8px;width:44px;height:44px;border-radius:50%;background:var(--bad);border:0;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-weight:900;touch-action:manipulation">×</button></div>`).join('')}</div>`:''}
+  </div>`;
 }
-function mpRemoveImg(idx,previewId){mpImages.splice(idx,1);mpRenderPreviews(previewId);}
+function mpRemoveImg(idx,previewId){mpImages.splice(idx,1);mpRenderPreviews(previewId);mpFieldErr(previewId==='ePreviews'?'eImg':'cImg','');}
 
 // Inline alert replacement
 let alertDiv=null;
@@ -801,6 +1249,7 @@ function mpView(view){
   $('mpCreateMsg').innerHTML='';
   // Clear errors
   ['cTitle','cPrice','cCat','cCond','cLoc','cDesc','cImg'].forEach(id=>mpFieldErr(id,''));
+  mpCamPending=null;mpCamMsgFor=null;
   if($('mpPublishBtn'))$('mpPublishBtn').disabled=false;
   const draft=mpLoadDraft();
   if(draft){$('draftBanner').classList.remove('hidden');}
@@ -1016,7 +1465,7 @@ async function mpCreate(){
  $('mpPublishBtn').disabled=true;
  try{
   const r=await api('/api/marketplace',{method:'POST',body:JSON.stringify({title,price,category:cat,condition:cond,location:loc,description:desc,negotiable:$('cNeg').checked,seller_phone_visible:$('cPhone').checked,images:mpImages})});
-  localStorage.removeItem(DRAFT_KEY);if(draftAutoTimer)clearInterval(draftAutoTimer);
+  localStorage.removeItem(DRAFT_KEY());if(draftAutoTimer)clearInterval(draftAutoTimer);
   $('mpCreateForm').classList.add('hidden');$('mpCreateSuccess').classList.remove('hidden');
   $('mpSuccessMsg').textContent=`"${title}" is now visible to buyers in Embu.`;
   const ph=me?.phone?mpNormalizePhone(me.phone):null;
@@ -1038,7 +1487,7 @@ async function mpOpenEdit(id){
   $('eCond').value=l.condition;$('eLoc').value=l.location;$('eDesc').value=l.description;
   $('eNeg').checked=l.negotiable;$('ePhone').checked=l.seller_phone_visible;
   updateCharCount('eTitle','eTitleCount',100);updateCharCount('eDesc','eDescCount',2000);
-  mpRenderPreviews('ePreviews');$('mpEditMsg').innerHTML='';
+  mpCamPending=null;mpCamMsgFor=null;mpRenderPreviews('ePreviews');$('mpEditMsg').innerHTML='';
  }catch(e){$('mpEditMsg').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
 }
 async function mpSaveEdit(){
@@ -1139,7 +1588,25 @@ async function mpOpenSeller(id){
 // ═══════════════════════ OWNER DASHBOARD ══════════════════════════════════════
 async function loadOwner(){ownerSubTab('stats');}
 async function reviewAccess(id,status){await api('/api/owner/access/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats();}
-async function reviewUpgrade(id,status){await api('/api/owner/upgrades/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerStats();}
+async function reviewUpgrade(id,status,note){await api('/api/owner/upgrades/'+id+'/status',{method:'PATCH',body:JSON.stringify({status,note})});loadOwnerStats();}
+
+function renderUpgradeQueue(fresh){
+ if(fresh)ownerUpgradeData=fresh;
+ const tf=($('ugTypeFilter')||{}).value||'';
+ const sf=($('ugStatusFilter')||{}).value||'';
+ let list=ownerUpgradeData;
+ if(tf)list=list.filter(x=>x.type===tf);
+ if(sf)list=list.filter(x=>x.status===sf);
+ const pending=ownerUpgradeData.filter(x=>x.status==='pending').length;
+ const badge=$('ugPendingBadge');
+ if(badge)badge.innerHTML=pending?`<span class="badge-pill" style="color:var(--a);background:var(--a)22;font-size:11px">${pending} pending</span>`:'';
+ const icons={driver:'🚗',merchant:'🏪',professional:'⚙️'};
+ const dt=d=>d?new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'—';
+ $('upgradeRequests').innerHTML=list.map(x=>{
+  const c=ugStatusColor(x.status);
+  return`<div class="row" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="openUserDetail('${esc(x.user_id)}')"><span style="flex:1;min-width:0"><b>${esc(x.name)}</b> <span style="font-size:13px">${icons[x.type]||''} ${esc(x.type)}</span><br><small class="muted">${esc(x.email||x.phone||'—')} · ${dt(x.submitted_at||x.created_at)}</small></span><span class="badge-pill" style="color:${c};background:${c}22;font-size:12px">${ugStatusLabel(x.status)}</span></div>`;
+ }).join('')||'<p class="muted">No applications match.</p>';
+}
 async function reviewReport(id,status){try{await api('/api/owner/listing-reports/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerReports();}catch(e){mpInlineAlert(e.message);}}
 
 function ownerSubTab(tab){
@@ -1159,7 +1626,7 @@ async function loadOwnerStats(){
   ownerAccessData=a;
   $('ownerStats').innerHTML=Object.entries(d).map(([k,v])=>`<div class="stat"><span style="font-size:11px">${OWNER_STAT_LABELS[k]||k}</span><b>${v}</b></div>`).join('');
   renderAccessRequests();
-  $('upgradeRequests').innerHTML=u.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> · ${esc(x.type)}<br><small class="muted">${esc(x.status)}</small></span>${x.status==='pending'?`<span style="display:flex;gap:6px"><button class="btn ok" onclick="reviewUpgrade('${x.id}','approved')">Approve</button><button class="btn bad" onclick="reviewUpgrade('${x.id}','rejected')">Reject</button></span>`:''}</div>`).join('')||'<p class="muted">No applications.</p>';
+   renderUpgradeQueue(u);
   loadOwnerReports();
  }catch(e){console.error(e);}
 }
@@ -1248,16 +1715,92 @@ function renderUdListings(listings,userId){
  p.innerHTML=`<div class="grid3">${listings.map(l=>`<div class="ud-listing-card" onclick="openListingDetail('${esc(l.id)}','${esc(userId||'')}')"> <img class="ud-listing-card-img" src="${esc(mpSafeImg(l.main_image))}" alt="${esc(l.title)}" onerror="mpImgError(this)">`+`<div style="padding:12px"><b style="display:block;margin-bottom:4px;font-size:15px">${esc(l.title)}</b><span style="font-size:17px;font-weight:800;color:var(--a)">KES ${fmtNum(l.price)}</span><div style="margin-top:6px;font-size:12px" class="muted">${esc(l.category)} · ${esc(l.location)}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px">${listingStatusBadge(l.status)}<small class="muted">${fmtDate(l.created_at)}</small></div></div></div>`).join('')}</div>`;
 }
 
-function renderUdUpgradeTab(type){
+async function renderUdUpgradeTab(type){
  const p=$('udP-'+type);
  const apps=(udCurrentUpgrades||[]).filter(a=>a.type===type).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
- if(!apps.length){p.innerHTML='<div style="text-align:center;padding:32px 0"><p class="muted" style="margin:0">No application submitted.</p></div>';return;}
- const a=apps[0],d=a.details||{};
- const imgKeys={licenceImage:1,vehiclePhoto:1,insuranceImage:1,storePhoto:1,profilePhoto:1};
- const images=Object.entries(d).filter(([k,v])=>imgKeys[k]&&v).map(([,v])=>v);
- const rows=Object.entries(d).filter(([k])=>!imgKeys[k]).map(([k,v])=>`<div class="row"><span class="muted" style="text-transform:capitalize">${esc(k.replace(/([A-Z])/g,' $1').trim())}</span><span style="word-break:break-all">${esc(String(v||'—'))}</span></div>`).join('');
- const stC=a.status==='approved'?'var(--ok)':a.status==='rejected'?'var(--bad)':'var(--a)';
- p.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px"><h3 style="margin:0;text-transform:capitalize">${esc(type)} Application</h3><span class="badge-pill" style="color:${stC};background:${stC}22">${esc(a.status)}</span></div>${images.length?`<div class="ud-gallery">${images.map(img=>`<img src="${esc(mpSafeImg(img))}" onclick="this.classList.toggle('expanded')" title="Click to expand" onerror="mpImgError(this)">`).join('')}</div>`:''}<div class="list">${rows||'<p class="muted">No details recorded.</p>'}</div><p class="muted" style="font-size:12px;margin-top:14px">Submitted ${new Date(a.created_at).toLocaleString()}${a.reviewed_at?` · Reviewed ${new Date(a.reviewed_at).toLocaleString()}`:''}</p>${apps.length>1?`<p class="muted" style="font-size:12px">${apps.length-1} earlier application${apps.length>2?'s':''} on record.</p>`:''}`;
+ if(!apps.length){p.innerHTML='<div style="text-align:center;padding:32px 0"><p class="muted" style="margin:0">No '+type+' application on record.</p></div>';return;}
+ const a=apps[0];
+ // Fetch full app (includes documents) from owner endpoint
+ let d={};
+ try{const full=await api('/api/owner/upgrades/'+a.id);d=full.details||{};}catch(e){d=a.details||{};}
+ const docK=['profilePhoto','nationalIdFront','nationalIdBack','licenceFront','licenceBack','vehicleRegDoc','vehiclePhoto','insuranceDoc','psvDoc','ownerPhoto','nationalId','businessRegDoc','kraDoc','storefrontPhoto','productPhotos','certificates','portfolioPhotos'];
+ const legacyDocs=Object.entries(d).filter(([k,v])=>docK.includes(k)&&v&&String(v).startsWith('data:'));
+ const fields=Object.entries(d).filter(([k,v])=>!docK.includes(k)&&v!==null&&v!==undefined&&String(v).trim()!==''&&!(typeof v==='string'&&v.startsWith('data:')));
+ // Secure private documents (metadata; previews load through the audited endpoint)
+ let privDocs=[];try{privDocs=await api('/api/owner/upgrades/'+a.id+'/documents');}catch(e){}
+ const stC=ugStatusColor(a.status),stL=ugStatusLabel(a.status);
+ const dt=ts=>ts?new Date(ts).toLocaleString():'—';
+ const isOwner=udCurrentUser&&udCurrentUser.role==='owner';
+ p.innerHTML=`
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+   <h3 style="margin:0;text-transform:capitalize">${esc(type)} Application</h3>
+   <span class="badge-pill" style="color:${stC};background:${stC}22">${stL}</span>
+  </div>
+  ${a.review_note?`<div class="notice" style="margin-bottom:14px"><b>Owner note:</b> ${esc(a.review_note)}</div>`:''}
+  <div class="list" style="margin-bottom:14px;font-size:13px">
+   <div class="row"><span class="muted">Status</span><span>${stL}</span></div>
+   <div class="row"><span class="muted">Submitted</span><span>${dt(a.submitted_at)}</span></div>
+   <div class="row"><span class="muted">Reviewed</span><span>${dt(a.reviewed_at)}</span></div>
+   <div class="row"><span class="muted">Updated</span><span>${dt(a.updated_at||a.created_at)}</span></div>
+  </div>
+  ${fields.length?`<div class="list" style="margin-bottom:14px">${fields.map(([k,v])=>`<div class="row"><span class="muted" style="font-size:12px;text-transform:capitalize">${esc(k.replace(/([A-Z])/g,' $1').trim())}</span><span style="word-break:break-all;font-size:13px">${esc(String(v))}</span></div>`).join('')}</div>`:''}
+  ${privDocs.length?`<div style="margin-bottom:14px"><p class="muted" style="margin:0 0 10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Documents</p><div class="ud-gallery">${privDocs.map(dd=>`<div><img id="udpriv-${dd.id}" alt="${esc(ugDocLabel(dd.document_type))}" onclick="this.classList.toggle('expanded')" title="${esc(ugDocLabel(dd.document_type))}" style="background:var(--line)"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:3px">${esc(ugDocLabel(dd.document_type))}</div></div>`).join('')}</div></div>`:''}
+  ${legacyDocs.length?`<div style="margin-bottom:14px"><p class="muted" style="margin:0 0 10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Legacy documents</p><div class="ud-gallery">${legacyDocs.map(([k,v])=>`<div><img src="${esc(mpSafeImg(v))}" onclick="this.classList.toggle('expanded')" title="${esc(k.replace(/([A-Z])/g,' $1').trim())}" onerror="mpImgError(this)"><div style="font-size:10px;color:var(--muted);text-align:center;margin-top:3px">${esc(k.replace(/([A-Z])/g,' $1').trim())}</div></div>`).join('')}</div></div>`:''}
+  ${apps.length>1?`<p class="muted" style="font-size:12px;margin-bottom:14px">${apps.length-1} earlier application${apps.length>2?'s':''} on record.</p>`:''}
+  ${!isOwner?`<div id="ugActionPanel-${type}" style="border-top:1px solid var(--line);padding-top:14px">${ugOwnerActions(a,type)}</div>`:'<p class="muted" style="font-size:12px">Owner account — moderation not available for own account.</p>'}
+ `;
+ // Load secure previews through the audited endpoint (auth header → blob URL)
+ for(const dd of privDocs){try{const u=await ugFetchDocUrl(dd.id);const img=$('udpriv-'+dd.id);if(img)img.src=u;}catch(e){}}
+}
+
+function ugOwnerActions(app,type){
+ const s=app.status,id=app.id;
+ return`<div id="ugBtns-${type}" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+  ${s==='pending'||s==='corrections_requested'?`<button class="btn ok" onclick="ugDoAction('${id}','approved','${type}')">✓ Approve</button>`:''}
+  ${s==='approved'?`<button class="btn bad" onclick="ugPromptAction('${id}','suspended','${type}')">Suspend</button>`:''}
+  ${s==='suspended'?`<button class="btn ok" onclick="ugDoAction('${id}','restored','${type}')">Restore</button>`:''}
+  ${s==='pending'||s==='corrections_requested'||s==='suspended'?`<button class="btn bad" onclick="ugPromptAction('${id}','rejected','${type}')">Reject</button>`:''}
+  ${s==='pending'?`<button class="btn" onclick="ugPromptAction('${id}','corrections_requested','${type}')">Request corrections</button>`:''}
+  ${s==='draft'?`<span class="muted" style="font-size:12px;align-self:center">Draft — not yet submitted; no moderation actions available.</span>`:''}
+ </div>
+ <div id="ugNotePanel-${type}" class="hidden">
+  <div class="field"><label>Review note <span style="color:var(--a)">*</span></label><textarea id="ugNote-${type}" rows="3" placeholder="Explain what needs to change or why…"></textarea></div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+   <button class="btn primary" id="ugNoteConfirm-${type}">Confirm</button>
+   <button class="btn" onclick="ugCancelAction('${type}')">Cancel</button>
+  </div>
+ </div>`;
+}
+
+function ugPromptAction(appId,status,type){
+ $('ugBtns-'+type).classList.add('hidden');
+ $('ugNotePanel-'+type).classList.remove('hidden');
+ const labels={rejected:'Confirm Rejection',corrections_requested:'Request Corrections',suspended:'Confirm Suspension'};
+ const btn=$('ugNoteConfirm-'+type);
+ btn.textContent=labels[status]||'Confirm';
+ btn.onclick=()=>ugDoAction(appId,status,type);
+}
+
+function ugCancelAction(type){
+ $('ugBtns-'+type).classList.remove('hidden');
+ $('ugNotePanel-'+type).classList.add('hidden');
+}
+
+async function ugDoAction(appId,status,type){
+ const noteEl=$('ugNote-'+type),note=noteEl?noteEl.value.trim():'';
+ const needNote=['rejected','corrections_requested','suspended'];
+ if(needNote.includes(status)&&!note){if(noteEl)noteEl.focus();mpInlineAlert('Please enter a review note.');return;}
+ const btn=$('ugNoteConfirm-'+type);if(btn){btn.disabled=true;btn.textContent='Saving…';}
+ try{
+  await api('/api/owner/upgrades/'+appId+'/status',{method:'PATCH',body:JSON.stringify({status,note})});
+  const[u,listings,upgrades]=await Promise.all([api('/api/owner/users/'+ownerCurrentUserId),api('/api/owner/users/'+ownerCurrentUserId+'/listings'),api('/api/owner/users/'+ownerCurrentUserId+'/upgrades')]);
+  udCurrentUser=u;udCurrentListings=listings;udCurrentUpgrades=upgrades;
+  renderUdHeader(u);
+  udTab(type);
+ }catch(e){
+  mpInlineAlert(e.message||'Failed to save action.');
+  if(btn){btn.disabled=false;btn.textContent='Confirm';}
+ }
 }
 
 function renderUdActivity(u){
