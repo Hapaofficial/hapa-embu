@@ -786,5 +786,255 @@ app.patch('/api/owner/listing-reports/:id',auth,owner,async(req,res)=>{
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
+// ── Public Professional profiles (Sprint 3A) ────────────────────────────────
+// The verified application (upgrade_applications + private_documents) and this
+// public profile are completely separate entities. This block never reads or
+// writes private documents, and public media uses lib/publicMediaStorage.js —
+// a separate storage abstraction that refuses the private-document buckets.
+const pubMedia=require('./lib/publicMediaStorage');
+const PP_EDITABLE=['display_name','headline','service_description','skills','county','town','service_area','availability','starting_price','pricing_unit','phone_visible','whatsapp_visible'];
+const PP_LOCKED=['legal_name','full_name','fullName','id_number','nationalId','passport','application_status','review_note','moderation_note','capabilities','role','verified_category','profession_category','professionCategory','status','user_id','hidden_by','hidden_at'];
+const PP_MAX_PORTFOLIO=12;
+const PP_LOCK_MSG='Contact HAPA support to request a change to your verified profession category.';
+
+// Eligibility: role customer, active (enforced by auth+active), capability true,
+// AND an approved professional application.
+const ppCap=(req,res,next)=>(req.user.capabilities||{}).professional===true?next():res.status(403).json({error:'Professional capability required'});
+async function ppApprovedApp(userId){
+ return (await q(`SELECT id,details FROM upgrade_applications WHERE user_id=$1 AND type='professional' AND status='approved' ORDER BY created_at DESC LIMIT 1`,[userId])).rows[0]||null;
+}
+const ppSafe=p=>({id:p.id,status:p.status,verified_category:p.verified_category,display_name:p.display_name,headline:p.headline,service_description:p.service_description,skills:p.skills,county:p.county,town:p.town,service_area:p.service_area,availability:p.availability,starting_price:p.starting_price,pricing_unit:p.pricing_unit,phone_visible:p.phone_visible,whatsapp_visible:p.whatsapp_visible,profile_photo_id:p.profile_photo_id,moderation_note:p.status==='owner_hidden'?p.moderation_note:null,created_at:p.created_at,updated_at:p.updated_at,published_at:p.published_at,paused_at:p.paused_at});
+const ppImgSafe=i=>({id:i.id,url:'/api/public/professional-media/'+i.id,width:i.width,height:i.height,sort_order:i.sort_order});
+async function ppImages(profileId){
+ const r=await q(`SELECT id,width,height,sort_order,kind FROM professional_portfolio_images WHERE professional_profile_id=$1 AND status='active' ORDER BY sort_order ASC,created_at ASC`,[profileId]);
+ return{portfolio:r.rows.filter(x=>x.kind==='portfolio').map(ppImgSafe),profilePhoto:r.rows.filter(x=>x.kind==='profile_photo').map(ppImgSafe)[0]||null};
+}
+async function ppMine(userId){return(await q(`SELECT * FROM professional_profiles WHERE user_id=$1`,[userId])).rows[0]||null;}
+async function ppPayload(p){const im=await ppImages(p.id);return{profile:ppSafe(p),profile_photo:im.profilePhoto,portfolio:im.portfolio};}
+
+app.get('/api/me/professional-profile',auth,active,ppCap,async(req,res)=>{
+ try{const p=await ppMine(req.user.id);if(!p)return res.json({profile:null});res.json(await ppPayload(p));}
+ catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Create draft, prefilled from the approved application (which stays untouched)
+app.post('/api/me/professional-profile',auth,active,ppCap,async(req,res)=>{
+ try{
+  if(req.user.role!=='customer')return res.status(403).json({error:'Only customer accounts can hold a professional profile'});
+  if(await ppMine(req.user.id))return res.status(409).json({error:'Profile already exists'});
+  const a=await ppApprovedApp(req.user.id);
+  if(!a)return res.status(403).json({error:'An approved Professional application is required'});
+  const d=a.details||{};
+  const skills=String(d.skills||'').split(',').map(s=>s.trim()).filter(Boolean).slice(0,20);
+  const p=(await q(`INSERT INTO professional_profiles(user_id,application_id,verified_category,display_name,service_description,skills,starting_price,availability,county,town,service_area)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+   [req.user.id,a.id,String(d.professionCategory||'').slice(0,80),String(req.user.name||'').slice(0,80),String(d.serviceDescription||'').slice(0,2000),JSON.stringify(skills),
+    d.startingPrice&&isFinite(+d.startingPrice)?+d.startingPrice:null,String(d.availability||'').slice(0,120),String(d.county||'').slice(0,80),String(d.town||'').slice(0,80),String(d.serviceArea||'').slice(0,200)])).rows[0];
+  res.status(201).json(await ppPayload(p));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.patch('/api/me/professional-profile',auth,active,ppCap,async(req,res)=>{
+ try{
+  const p=await ppMine(req.user.id);
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  const body=req.body||{};
+  const lockedHit=Object.keys(body).find(k=>PP_LOCKED.includes(k));
+  if(lockedHit)return res.status(400).json({error:`Field "${lockedHit}" is verified and cannot be edited here. ${PP_LOCK_MSG}`});
+  const sets=[],vals=[p.id];
+  for(const k of PP_EDITABLE){
+   if(!(k in body))continue;
+   let v=body[k];
+   if(k==='skills'){if(!Array.isArray(v))return res.status(400).json({error:'skills must be an array'});v=JSON.stringify(v.map(s=>String(s).trim().slice(0,60)).filter(Boolean).slice(0,20));}
+   else if(k==='starting_price'){if(v===null||v==='')v=null;else{v=+v;if(!isFinite(v)||v<0||v>10000000)return res.status(400).json({error:'Invalid starting price'});}}
+   else if(k==='phone_visible'||k==='whatsapp_visible')v=v===true;
+   else{v=String(v==null?'':v).trim().slice(0,k==='service_description'?2000:200);}
+   vals.push(v);sets.push(`${k}=$${vals.length}`);
+  }
+  if(!sets.length)return res.status(400).json({error:'No editable fields provided'});
+  const r=(await q(`UPDATE professional_profiles SET ${sets.join(',')},updated_at=NOW() WHERE id=$1 RETURNING *`,vals)).rows[0];
+  res.json(await ppPayload(r));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Status transitions. Owner-hidden profiles cannot be self-restored.
+async function ppTransition(req,res,from,to){
+ try{
+  const p=await ppMine(req.user.id);
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  if(p.status==='owner_hidden')return res.status(403).json({error:'This profile was hidden by HAPA moderation. Contact HAPA support.'});
+  if(!from.includes(p.status))return res.status(409).json({error:`Profile is ${p.status}`});
+  if(to==='active'){
+   if(!(await ppApprovedApp(req.user.id)))return res.status(403).json({error:'An approved Professional application is required to publish'});
+   if(!(String(p.headline).trim()||String(p.service_description).trim()))return res.status(400).json({error:'Add a headline or service description before publishing'});
+  }
+  const r=(await q(`UPDATE professional_profiles SET status=$2,updated_at=NOW(),
+    published_at=CASE WHEN $2='active' AND published_at IS NULL THEN NOW() ELSE published_at END,
+    paused_at=CASE WHEN $2='paused' THEN NOW() ELSE paused_at END
+    WHERE id=$1 RETURNING *`,[p.id,to])).rows[0];
+  res.json(await ppPayload(r));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+}
+app.post('/api/me/professional-profile/publish',auth,active,ppCap,(req,res)=>ppTransition(req,res,['draft','paused'],'active'));
+app.post('/api/me/professional-profile/pause',auth,active,ppCap,(req,res)=>ppTransition(req,res,['active'],'paused'));
+app.post('/api/me/professional-profile/reactivate',auth,active,ppCap,(req,res)=>ppTransition(req,res,['paused'],'active'));
+
+// Shared upload handler: multipart → byte-validated → sharp sanitize (auto-orient,
+// EXIF/GPS stripped, resized, sha256) → public-media storage, PII-free object key.
+async function ppStoreImage(req,kind,profile){
+ const img=await sanitizeImage(req.file.buffer); // rejects SVG/malformed, JPEG/PNG/WebP(+HEIC) only
+ const imageId=crypto.randomUUID();
+ const storageKey=`professional/${profile.id}/${kind}/${imageId}.jpg`;
+ await pubMedia.putObject(storageKey,img.buffer,img.mimeType);
+ try{
+  return(await q(`INSERT INTO professional_portfolio_images(id,professional_profile_id,kind,storage_provider,storage_key,mime_type,size_bytes,width,height,sha256,sort_order)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+   [imageId,profile.id,kind,pubMedia.MODE,storageKey,img.mimeType,img.sizeBytes,img.width,img.height,img.sha256,
+    kind==='portfolio'?+(await q(`SELECT COALESCE(MAX(sort_order),-1)+1 n FROM professional_portfolio_images WHERE professional_profile_id=$1 AND kind='portfolio' AND status='active'`,[profile.id])).rows[0].n:0])).rows[0];
+ }catch(e){try{await pubMedia.deleteObject(storageKey);}catch(_){}throw e;}
+}
+function ppUploadRoute(handler){
+ return(req,res)=>docUpload.single('file')(req,res,async(err)=>{
+  try{
+   if(err)return res.status(400).json({error:err.code==='LIMIT_FILE_SIZE'?'File exceeds the 5 MB limit':'Upload failed'});
+   if(!pubMedia.productionReady())return res.status(503).json({error:'Public media storage is not configured. Uploads are disabled.'});
+   if(!req.file||!req.file.buffer)return res.status(400).json({error:'No file provided'});
+   const p=await ppMine(req.user.id);
+   if(!p)return res.status(404).json({error:'Profile not found'});
+   await handler(req,res,p);
+  }catch(e){
+   if(e.statusCode===400)return res.status(400).json({error:e.message});
+   console.error('public media upload error:',e.message);res.status(500).json({error:'Server error'});
+  }
+ });
+}
+
+// Profile photo (max 1): uploading replaces the previous one (soft-removed).
+app.post('/api/me/professional-profile/profile-photo',auth,active,ppCap,ppUploadRoute(async(req,res,p)=>{
+ const row=await ppStoreImage(req,'profile_photo',p);
+ await q(`UPDATE professional_portfolio_images SET status='removed',removed_at=NOW() WHERE professional_profile_id=$1 AND kind='profile_photo' AND status='active' AND id<>$2`,[p.id,row.id]);
+ await q(`UPDATE professional_profiles SET profile_photo_id=$2,updated_at=NOW() WHERE id=$1`,[p.id,row.id]);
+ res.status(201).json(ppImgSafe(row));
+}));
+app.delete('/api/me/professional-profile/profile-photo',auth,active,ppCap,async(req,res)=>{
+ try{
+  const p=await ppMine(req.user.id);
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  await q(`UPDATE professional_portfolio_images SET status='removed',removed_at=NOW() WHERE professional_profile_id=$1 AND kind='profile_photo' AND status='active'`,[p.id]);
+  await q(`UPDATE professional_profiles SET profile_photo_id=NULL,updated_at=NOW() WHERE id=$1`,[p.id]);
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// Portfolio (max 12 active)
+app.post('/api/me/professional-profile/portfolio',auth,active,ppCap,ppUploadRoute(async(req,res,p)=>{
+ const n=+(await q(`SELECT count(*)::int n FROM professional_portfolio_images WHERE professional_profile_id=$1 AND kind='portfolio' AND status='active'`,[p.id])).rows[0].n;
+ if(n>=PP_MAX_PORTFOLIO)return res.status(409).json({error:`Maximum ${PP_MAX_PORTFOLIO} portfolio photos`});
+ res.status(201).json(ppImgSafe(await ppStoreImage(req,'portfolio',p)));
+}));
+app.patch('/api/me/professional-profile/portfolio/order',auth,active,ppCap,async(req,res)=>{
+ try{
+  const ids=req.body.ids;
+  if(!Array.isArray(ids)||!ids.length)return res.status(400).json({error:'ids array required'});
+  const p=await ppMine(req.user.id);
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  for(let i=0;i<ids.length;i++)await q(`UPDATE professional_portfolio_images SET sort_order=$3 WHERE id=$1 AND professional_profile_id=$2 AND kind='portfolio' AND status='active'`,[ids[i],p.id,i]);
+  res.json({portfolio:(await ppImages(p.id)).portfolio});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+app.delete('/api/me/professional-profile/portfolio/:imageId',auth,active,ppCap,async(req,res)=>{
+ try{
+  const p=await ppMine(req.user.id);
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  const r=await q(`UPDATE professional_portfolio_images SET status='removed',removed_at=NOW() WHERE id=$1 AND professional_profile_id=$2 AND kind='portfolio' AND status='active' RETURNING id`,[req.params.imageId,p.id]);
+  if(!r.rows.length)return res.status(404).json({error:'Photo not found'});
+  res.json({ok:true});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// ── Public API — only status='active' profiles of active capability holders ──
+const PP_PUBLIC_WHERE=`p.status='active' AND u.status='active' AND (u.capabilities->>'professional')='true'`;
+function ppPublicView(p,images){
+ return{id:p.id,display_name:p.display_name,hapa_verified:true,is_verified:p.is_verified===true,
+  verified_category:p.verified_category,headline:p.headline,service_description:p.service_description,
+  skills:p.skills,county:p.county,town:p.town,service_area:p.service_area,availability:p.availability,
+  starting_price:p.starting_price,pricing_unit:p.pricing_unit,
+  phone:p.phone_visible&&p.phone?p.phone:null,whatsapp:p.whatsapp_visible&&p.phone?p.phone:null,
+  profile_photo:images.profilePhoto,portfolio:images.portfolio,member_since:p.created_at};
+}
+app.get('/api/public/professionals',async(req,res)=>{
+ try{
+  const vals=[];let where=PP_PUBLIC_WHERE;
+  if(req.query.category){vals.push(String(req.query.category));where+=` AND p.verified_category ILIKE $${vals.length}`;}
+  if(req.query.county){vals.push(String(req.query.county));where+=` AND p.county ILIKE $${vals.length}`;}
+  if(req.query.q){vals.push('%'+String(req.query.q).slice(0,80)+'%');where+=` AND (p.display_name ILIKE $${vals.length} OR p.headline ILIKE $${vals.length} OR p.verified_category ILIKE $${vals.length} OR p.skills::text ILIKE $${vals.length} OR p.town ILIKE $${vals.length})`;}
+  const rows=(await q(`SELECT p.*,u.phone,${isVerifiedExpr()} AS is_verified FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE ${where} ORDER BY p.published_at DESC NULLS LAST LIMIT 50`,vals)).rows;
+  res.json(await Promise.all(rows.map(async p=>ppPublicView(p,await ppImages(p.id)))));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+app.get('/api/public/professionals/:id',async(req,res)=>{
+ try{
+  const p=(await q(`SELECT p.*,u.phone,u.status AS user_status,${isVerifiedExpr()} AS is_verified FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE (p.id::text=$1 OR p.user_id::text=$1) AND ${PP_PUBLIC_WHERE}`,[req.params.id])).rows[0];
+  if(!p)return res.status(404).json({error:'Professional not found'});
+  res.json(ppPublicView(p,await ppImages(p.id)));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+// Public media bytes — only while the owning profile is publicly visible
+app.get('/api/public/professional-media/:imageId',async(req,res)=>{
+ try{
+  const im=(await q(`SELECT i.storage_key,i.mime_type,i.sha256 FROM professional_portfolio_images i JOIN professional_profiles p ON p.id=i.professional_profile_id JOIN users u ON u.id=p.user_id WHERE i.id=$1 AND i.status='active' AND ${PP_PUBLIC_WHERE}`,[req.params.imageId])).rows[0];
+  if(!im)return res.status(404).json({error:'Image not found'});
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Cache-Control','public, max-age=300');
+  const etag='"'+im.sha256.slice(0,32)+'"';
+  res.setHeader('ETag',etag);
+  if(req.headers['if-none-match']===etag)return res.status(304).end();
+  const access=await pubMedia.getObjectAccess(im.storage_key,im.mime_type);
+  if(access.kind==='signedUrl')return res.redirect(302,access.url);
+  res.setHeader('Content-Type',im.mime_type);
+  access.stream.on('error',()=>{if(!res.headersSent)res.status(404).json({error:'Image file missing'});});
+  access.stream.pipe(res);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+// ── Owner moderation — hides only the public profile; never touches role,
+// capabilities or the verified application. ─────────────────────────────────
+app.get('/api/owner/professional-profiles',auth,owner,async(req,res)=>{
+ try{
+  const rows=(await q(`SELECT p.*,u.name AS account_name,u.email,u.status AS user_status FROM professional_profiles p JOIN users u ON u.id=p.user_id ORDER BY p.updated_at DESC LIMIT 200`)).rows;
+  res.json(rows.map(p=>({...ppSafe(p),moderation_note:p.moderation_note,account_name:p.account_name,email:p.email,user_status:p.user_status,user_id:p.user_id})));
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+app.get('/api/owner/professional-profiles/:id',auth,owner,async(req,res)=>{
+ try{
+  const p=(await q(`SELECT p.*,u.name AS account_name,u.email,u.status AS user_status FROM professional_profiles p JOIN users u ON u.id=p.user_id WHERE p.id=$1`,[req.params.id])).rows[0];
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  const im=await ppImages(p.id);
+  res.json({...ppSafe(p),moderation_note:p.moderation_note,account_name:p.account_name,email:p.email,user_status:p.user_status,user_id:p.user_id,profile_photo:im.profilePhoto,portfolio:im.portfolio});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+app.patch('/api/owner/professional-profiles/:id/status',auth,owner,async(req,res)=>{
+ try{
+  const{status,moderation_note}=req.body||{};
+  if(!['owner_hidden','active'].includes(status))return res.status(400).json({error:'status must be owner_hidden or active'});
+  const p=(await q(`SELECT * FROM professional_profiles WHERE id=$1`,[req.params.id])).rows[0];
+  if(!p)return res.status(404).json({error:'Profile not found'});
+  if(status==='owner_hidden'&&p.status==='owner_hidden')return res.status(409).json({error:'Already hidden'});
+  if(status==='active'&&p.status!=='owner_hidden')return res.status(409).json({error:'Profile is not hidden'});
+  // Restore returns the profile to the status it had BEFORE hiding (draft/paused/
+  // active) — owner moderation must never publish a previously non-public profile.
+  const restoreTo=['draft','active','paused'].includes(p.status_before_hidden)?p.status_before_hidden:'paused';
+  const newStatus=status==='owner_hidden'?'owner_hidden':restoreTo;
+  const r=(await q(`UPDATE professional_profiles SET status=$2,moderation_note=$3,updated_at=NOW(),
+    status_before_hidden=CASE WHEN $2='owner_hidden' THEN $5 ELSE NULL END,
+    hidden_at=CASE WHEN $2='owner_hidden' THEN NOW() ELSE NULL END,
+    hidden_by=CASE WHEN $2='owner_hidden' THEN $4::uuid ELSE NULL END
+    WHERE id=$1 RETURNING *`,[p.id,newStatus,moderation_note?String(moderation_note).slice(0,500):null,req.user.id,p.status])).rows[0];
+  res.json({...ppSafe(r),moderation_note:r.moderation_note});
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
+app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
+
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 boot().then(()=>app.listen(PORT,'0.0.0.0',()=>console.log('HAPA v1.6 running on '+PORT))).catch(e=>{console.error(e);process.exit(1)});

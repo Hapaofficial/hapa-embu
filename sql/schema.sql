@@ -139,3 +139,56 @@ CREATE TABLE IF NOT EXISTS document_access_log(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_doclog_document ON document_access_log(document_id);
+
+-- Public Professional profiles — Sprint 3A (all idempotent).
+-- Completely separate from the verified application (upgrade_applications) and
+-- from private_documents. Public marketing data only; no identity data.
+CREATE TABLE IF NOT EXISTS professional_profiles(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+ application_id UUID REFERENCES upgrade_applications(id) ON DELETE SET NULL,
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','active','paused','owner_hidden')),
+ verified_category TEXT NOT NULL DEFAULT '',
+ display_name TEXT NOT NULL DEFAULT '',
+ headline TEXT NOT NULL DEFAULT '',
+ service_description TEXT NOT NULL DEFAULT '',
+ skills JSONB NOT NULL DEFAULT '[]',
+ county TEXT NOT NULL DEFAULT '',
+ town TEXT NOT NULL DEFAULT '',
+ service_area TEXT NOT NULL DEFAULT '',
+ availability TEXT NOT NULL DEFAULT '',
+ starting_price NUMERIC,
+ pricing_unit TEXT NOT NULL DEFAULT '',
+ phone_visible BOOLEAN NOT NULL DEFAULT false,
+ whatsapp_visible BOOLEAN NOT NULL DEFAULT false,
+ profile_photo_id UUID,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ published_at TIMESTAMPTZ,
+ paused_at TIMESTAMPTZ,
+ hidden_at TIMESTAMPTZ,
+ hidden_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ moderation_note TEXT,
+ status_before_hidden TEXT
+);
+ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS status_before_hidden TEXT;
+CREATE INDEX IF NOT EXISTS idx_proprofile_status ON professional_profiles(status);
+
+-- Public media (profile photo + portfolio). Soft deletion only (status='removed').
+CREATE TABLE IF NOT EXISTS professional_portfolio_images(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ professional_profile_id UUID NOT NULL REFERENCES professional_profiles(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL DEFAULT 'portfolio' CHECK(kind IN('portfolio','profile_photo')),
+ storage_provider TEXT NOT NULL,
+ storage_key TEXT NOT NULL UNIQUE,
+ mime_type TEXT NOT NULL,
+ size_bytes BIGINT NOT NULL,
+ width INTEGER,
+ height INTEGER,
+ sha256 TEXT NOT NULL,
+ sort_order INTEGER NOT NULL DEFAULT 0,
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','removed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ removed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_portfolioimg_profile ON professional_portfolio_images(professional_profile_id,status);

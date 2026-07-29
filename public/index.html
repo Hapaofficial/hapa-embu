@@ -20,6 +20,7 @@ button,input,select,textarea{font:inherit}
 .field input,.field select,.field textarea{background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:12px;width:100%;transition:border-color .15s}
 .field input.err,.field select.err,.field textarea.err{border-color:var(--bad)!important}
 .field-err{display:none;color:var(--bad);font-size:12px;margin-top:3px;font-weight:600}
+.ppErr{color:var(--bad);font-size:12px;margin-top:3px;font-weight:600;min-height:14px}
 .field-err.show{display:block}
 .tabs,.nav{display:flex;flex-wrap:wrap;gap:9px}
 .hidden{display:none!important}
@@ -417,6 +418,14 @@ button,input,select,textarea{font:inherit}
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ugBack()">← Back</button><h2 style="margin:0" id="ugStatusTitle"></h2></div>
  <div id="ugStatusBody"></div>
 </div>
+<div id="pp-edit" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ppBack()">← Back</button><h2 style="margin:0">Professional Profile</h2></div>
+ <div id="ppEditBody"></div>
+</div>
+<div id="pp-public" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ppBack()">← Back</button><h2 style="margin:0">Public Profile</h2></div>
+ <div id="ppPublicBody"></div>
+</div>
 </section>
 
 <!-- Owner -->
@@ -443,6 +452,13 @@ button,input,select,textarea{font:inherit}
     </div>
     <div id="upgradeRequests" class="list"></div>
    </div>
+ </div>
+ <div class="card" style="margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+   <h3 style="margin:0">Public professional profiles</h3>
+   <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerProProfiles()">Refresh</button>
+  </div>
+  <div id="ownerProProfiles" class="list"></div>
  </div>
  <div class="card" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -732,9 +748,228 @@ async function loadUpgradeSection(){
  $('ug-select').classList.remove('hidden');
  $('ug-form').classList.add('hidden');
  $('ug-status').classList.add('hidden');
+ $('pp-edit').classList.add('hidden');
+ $('pp-public').classList.add('hidden');
  $('ugCards').innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
  try{ugCurrentApps=await api('/api/me/upgrades');}catch(e){ugCurrentApps={};}
  ugRenderSelect();
+ ppRefreshCardState();
+}
+
+// ── Public Professional profile (Sprint 3A) — separate from the verified application ──
+let ppProfile=null,ppPortfolio=[],ppProfilePhoto=null;
+async function ppFetch(){try{const d=await api('/api/me/professional-profile');ppProfile=d.profile;ppPortfolio=d.portfolio||[];ppProfilePhoto=d.profile_photo||null;}catch(e){ppProfile=null;ppPortfolio=[];ppProfilePhoto=null;}}
+async function ppRefreshCardState(){
+ if(!(me&&me.capabilities&&me.capabilities.professional===true))return;
+ await ppFetch();
+ const b=$('ppPauseBtn');
+ if(b){b.textContent=!ppProfile||ppProfile.status==='draft'?'Publish profile':ppProfile.status==='paused'?'Reactivate profile':ppProfile.status==='owner_hidden'?'Hidden by HAPA':'Pause profile';b.disabled=ppProfile&&ppProfile.status==='owner_hidden';}
+}
+function ppBack(){$('pp-edit').classList.add('hidden');$('pp-public').classList.add('hidden');$('ug-select').classList.remove('hidden');ppRefreshCardState();}
+async function ppToggleActive(){
+ await ppFetch();
+ try{
+  if(!ppProfile){await ppOpen();return;}
+  if(ppProfile.status==='active')await api('/api/me/professional-profile/pause',{method:'POST'});
+  else if(ppProfile.status==='paused')await api('/api/me/professional-profile/reactivate',{method:'POST'});
+  else await api('/api/me/professional-profile/publish',{method:'POST'});
+ }catch(e){alert(e.message);}
+ ppRefreshCardState();
+}
+function ppCompleteness(p){
+ const checks=[!!p.display_name,!!String(p.headline).trim(),!!String(p.service_description).trim(),(p.skills||[]).length>0,!!p.county||!!p.town,!!String(p.availability).trim(),p.starting_price!=null,!!ppProfilePhoto,ppPortfolio.length>0];
+ return Math.round(checks.filter(Boolean).length/checks.length*100);
+}
+async function ppOpen(){
+ $('ug-select').classList.add('hidden');$('pp-public').classList.add('hidden');$('pp-edit').classList.remove('hidden');
+ const body=$('ppEditBody');body.innerHTML='<p class="muted">Loading…</p>';
+ await ppFetch();
+ if(!ppProfile){
+  try{const d=await api('/api/me/professional-profile',{method:'POST'});ppProfile=d.profile;ppPortfolio=d.portfolio||[];ppProfilePhoto=d.profile_photo||null;}
+  catch(e){body.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;return;}
+ }
+ const p=ppProfile;
+ const pct=ppCompleteness(p);
+ const stC=p.status==='active'?'var(--ok)':p.status==='paused'?'var(--a)':p.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+ const stL=p.status==='active'?'Live — visible to the public':p.status==='paused'?'Paused — hidden from the public':p.status==='owner_hidden'?'Hidden by HAPA moderation':'Draft — not public yet';
+ body.innerHTML=`<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+   <span class="badge-pill" style="color:${stC};background:${stC}22">${stL}</span>
+   <div style="display:flex;gap:8px">
+    ${p.status==='owner_hidden'?'':p.status==='active'?`<button class="btn" style="min-height:44px" onclick="ppStatusAction('pause')">Pause</button>`:p.status==='paused'?`<button class="btn ok" style="min-height:44px" onclick="ppStatusAction('reactivate')">Reactivate</button>`:`<button class="btn ok" style="min-height:44px" onclick="ppStatusAction('publish')">Publish profile</button>`}
+    <button class="btn" style="min-height:44px" onclick="ppViewPublic()">Preview</button></div></div>
+  ${p.status==='owner_hidden'?`<div class="notice bad" style="margin-bottom:12px"><b>Your public profile was hidden by HAPA.</b>${p.moderation_note?`<p style="margin:4px 0 0;font-size:13px">Note: ${esc(p.moderation_note)}</p>`:''}<p style="margin:4px 0 0;font-size:13px">Contact HAPA support for details. Your Professional role is not affected.</p></div>`:''}
+  <div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span class="muted">Profile completeness</span><b id="ppPctLabel">${pct}%</b></div>
+   <div style="height:8px;border-radius:4px;background:var(--line);overflow:hidden"><div id="ppPctBar" style="height:100%;width:${pct}%;border-radius:4px;background:${pct>=80?'var(--ok)':'var(--a)'};transition:width .3s"></div></div></div>
+  <div class="notice" style="margin-bottom:14px;font-size:13px">
+   <b>Verified profession (locked):</b> ${esc(p.verified_category||'Professional')}<br>
+   <span class="muted">Contact HAPA support to request a change to your verified profession category. Your legal name, ID documents and application status cannot be edited here.</span></div>
+
+  <h4 style="margin:0 0 8px">Public identity</h4>
+  <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+   <div style="position:relative">${ppProfilePhoto?`<img src="${esc(ppProfilePhoto.url)}" alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">⚙️</div>`}</div>
+   <div style="display:grid;gap:6px">
+    <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-height:44px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${ppProfilePhoto?'Replace photo':'Add profile photo'}<input type="file" accept="image/*" style="display:none" onchange="ppUploadProfilePhoto(this)"></label>
+    ${ppProfilePhoto?`<button class="btn bad" style="min-height:44px" onclick="ppRemoveProfilePhoto()">Remove photo</button>`:''}</div></div>
+  <div class="field"><label for="ppName">Public display name</label><input id="ppName" maxlength="80" value="${esc(p.display_name||'')}" oninput="ppLive()"><div class="ppErr" id="ppNameErr"></div></div>
+  <div class="field"><label for="ppHeadline">Headline</label><input id="ppHeadline" maxlength="120" value="${esc(p.headline||'')}" placeholder="e.g. Reliable electrician in Embu town" oninput="ppLive()"><div class="ppErr" id="ppHeadlineErr"></div></div>
+
+  <h4 style="margin:14px 0 8px">Services</h4>
+  <div class="field"><label for="ppDesc">Service description</label><textarea id="ppDesc" rows="4" maxlength="2000" placeholder="Describe the services you offer…" oninput="ppLive()">${esc(p.service_description||'')}</textarea></div>
+  <div class="field"><label for="ppSkills">Skills (comma-separated)</label><input id="ppSkills" value="${esc((p.skills||[]).join(', '))}" placeholder="wiring, repairs, installations" oninput="ppLive()"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+   <div class="field"><label for="ppPrice">Starting price (KES)</label><input id="ppPrice" type="number" min="0" inputmode="numeric" value="${p.starting_price??''}" oninput="ppLive()"><div class="ppErr" id="ppPriceErr"></div></div>
+   <div class="field"><label for="ppUnit">Pricing unit</label><select id="ppUnit" onchange="ppLive()">${['','per job','per hour','per day','per item','per visit'].map(u=>`<option value="${u}"${p.pricing_unit===u?' selected':''}>${u||'—'}</option>`).join('')}</select></div>
+   <div class="field"><label for="ppAvail">Availability</label><input id="ppAvail" maxlength="120" value="${esc(p.availability||'')}" placeholder="Mon–Sat, 8am–6pm" oninput="ppLive()"></div>
+   <div class="field"><label for="ppCounty">County</label><input id="ppCounty" maxlength="80" value="${esc(p.county||'')}" oninput="ppLive()"></div>
+   <div class="field"><label for="ppTown">Town</label><input id="ppTown" maxlength="80" value="${esc(p.town||'')}" oninput="ppLive()"></div>
+   <div class="field"><label for="ppArea">Service area</label><input id="ppArea" maxlength="200" value="${esc(p.service_area||'')}" placeholder="Embu town + 20km" oninput="ppLive()"></div></div>
+
+  <h4 style="margin:14px 0 8px">Contact visibility</h4>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:6px;min-height:44px"><input type="checkbox" id="ppPhoneVis" ${p.phone_visible?'checked':''} style="width:22px;height:22px" onchange="ppLive()"><span>Show my phone number publicly (Call button)</span></label>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:14px;min-height:44px"><input type="checkbox" id="ppWaVis" ${p.whatsapp_visible?'checked':''} style="width:22px;height:22px" onchange="ppLive()"><span>Show WhatsApp button publicly</span></label>
+  <button class="btn primary" style="width:100%;min-height:48px" onclick="ppSave()">${p.status==='draft'?'Save draft':'Save changes'}</button>
+  <div id="ppMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+
+  <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+   <h4 style="margin:0 0 4px">Portfolio photos <span class="muted" style="font-weight:400;font-size:12px">(<span id="ppPortCount">${ppPortfolio.length}</span>/12 · public)</span></h4>
+   <p class="muted" style="font-size:12px;margin:0 0 10px">These photos appear on your public profile. Location data is removed automatically. Do not upload ID documents here.</p>
+   <div id="ppPhotoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:10px"></div>
+   <div id="ppUploadProg" class="hidden" style="margin-bottom:8px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div id="ppUploadBar" style="height:100%;width:0;background:var(--a);transition:width .2s"></div></div><span class="muted" style="font-size:12px" id="ppUploadLabel">Uploading…</span></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-height:44px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 Take a photo<input type="file" accept="image/*" capture="environment" style="display:none" onchange="ppUploadPortfolio(this)"></label>
+    <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-height:44px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">🖼 Choose from gallery<input type="file" accept="image/*" multiple style="display:none" onchange="ppUploadPortfolio(this)"></label></div>
+   <div id="ppPhotoMsg" aria-live="polite" style="font-size:13px;margin-top:6px"></div></div>
+
+  <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+   <h4 style="margin:0 0 8px">Live preview</h4>
+   <div id="ppLivePreview"></div></div>
+ </div>`;
+ ppRenderPhotos();ppLive();
+}
+function ppValidate(){
+ let ok=true;
+ const name=$('ppName').value.trim();
+ $('ppNameErr').textContent=name?'':'Display name is required';if(!name)ok=false;
+ $('ppHeadlineErr').textContent=$('ppHeadline').value.length>120?'Max 120 characters':'';
+ const pr=$('ppPrice').value;
+ const bad=pr!==''&&(!isFinite(+pr)||+pr<0);
+ $('ppPriceErr').textContent=bad?'Enter a valid price':'';if(bad)ok=false;
+ return ok;
+}
+function ppFormData(){
+ return{display_name:$('ppName').value,headline:$('ppHeadline').value,service_description:$('ppDesc').value,
+  skills:$('ppSkills').value.split(',').map(s=>s.trim()).filter(Boolean),
+  starting_price:$('ppPrice').value===''?null:$('ppPrice').value,pricing_unit:$('ppUnit').value,
+  availability:$('ppAvail').value,county:$('ppCounty').value,town:$('ppTown').value,service_area:$('ppArea').value,
+  phone_visible:$('ppPhoneVis').checked,whatsapp_visible:$('ppWaVis').checked};
+}
+function ppLive(){
+ if(!$('ppLivePreview'))return;
+ ppValidate();
+ const f=ppFormData();
+ const merged={...ppProfile,...f,skills:f.skills,starting_price:f.starting_price===null?null:+f.starting_price};
+ const pct=ppCompleteness(merged);
+ if($('ppPctLabel'))$('ppPctLabel').textContent=pct+'%';
+ if($('ppPctBar')){$('ppPctBar').style.width=pct+'%';$('ppPctBar').style.background=pct>=80?'var(--ok)':'var(--a)';}
+ $('ppLivePreview').innerHTML=ppPublicCard({display_name:f.display_name,verified_category:ppProfile.verified_category,headline:f.headline,service_description:f.service_description,skills:f.skills,county:f.county,town:f.town,service_area:f.service_area,availability:f.availability,starting_price:f.starting_price===null?null:+f.starting_price,pricing_unit:f.pricing_unit,phone:f.phone_visible&&me.phone?me.phone:null,whatsapp:f.whatsapp_visible&&me.phone?me.phone:null,profile_photo:ppProfilePhoto,portfolio:ppPortfolio},true);
+}
+function ppRenderPhotos(){
+ const g=$('ppPhotoGrid');if(!g)return;
+ if($('ppPortCount'))$('ppPortCount').textContent=ppPortfolio.length;
+ g.innerHTML=ppPortfolio.map((ph,i)=>`<div style="position:relative">
+  <img src="${esc(ph.url)}" alt="Portfolio photo ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">
+  <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
+   <button class="btn" style="min-width:44px;min-height:44px;padding:2px" ${i===0?'disabled':''} aria-label="Move left" onclick="ppMove(${i},-1)">←</button>
+   <button class="btn" style="min-width:44px;min-height:44px;padding:2px" ${i===ppPortfolio.length-1?'disabled':''} aria-label="Move right" onclick="ppMove(${i},1)">→</button>
+   <button class="btn bad" style="min-width:44px;min-height:44px;padding:2px" aria-label="Remove photo" onclick="ppRemovePhoto('${ph.id}')">✕</button></div></div>`).join('')||'<p class="muted" style="font-size:13px;grid-column:1/-1;margin:0">No photos yet.</p>';
+}
+async function ppSave(){
+ const m=$('ppMsg');
+ if(!ppValidate()){m.textContent='Fix the highlighted fields first.';m.style.color='var(--bad)';return;}
+ m.textContent='Saving…';m.style.color='';
+ try{const d=await api('/api/me/professional-profile',{method:'PATCH',body:JSON.stringify(ppFormData())});ppProfile=d.profile;ppPortfolio=d.portfolio||ppPortfolio;ppProfilePhoto=d.profile_photo||ppProfilePhoto;m.textContent='✓ Saved.';m.style.color='var(--ok)';ppLive();}
+ catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function ppStatusAction(action){
+ try{await api('/api/me/professional-profile/'+action,{method:'POST'});await ppOpen();}
+ catch(e){const m=$('ppMsg');if(m){m.textContent=e.message;m.style.color='var(--bad)';}}
+}
+async function ppUploadFile(url,file,onprog){
+ return new Promise((resolve,reject)=>{
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST',url);
+  xhr.setRequestHeader('Authorization','Bearer '+token);
+  xhr.upload.onprogress=e=>{if(e.lengthComputable&&onprog)onprog(Math.round(e.loaded/e.total*100));};
+  xhr.onload=()=>{let d={};try{d=JSON.parse(xhr.responseText);}catch(_){ }xhr.status<300?resolve(d):reject(new Error(d.error||'Upload failed'));};
+  xhr.onerror=()=>reject(new Error('Network error'));
+  const fd=new FormData();fd.append('file',file);xhr.send(fd);
+ });
+}
+function ppProg(show,pct,label){
+ const w=$('ppUploadProg');if(!w)return;
+ w.classList.toggle('hidden',!show);
+ if($('ppUploadBar'))$('ppUploadBar').style.width=(pct||0)+'%';
+ if($('ppUploadLabel'))$('ppUploadLabel').textContent=label||'Uploading…';
+}
+async function ppUploadPortfolio(input){
+ const files=Array.from(input.files||[]);input.value='';if(!files.length)return;
+ const m=$('ppPhotoMsg');m.textContent='';m.style.color='';
+ for(let fi=0;fi<files.length;fi++){
+  ppProg(true,0,`Uploading photo ${fi+1} of ${files.length}…`);
+  try{const d=await ppUploadFile('/api/me/professional-profile/portfolio',files[fi],p=>ppProg(true,p,`Uploading photo ${fi+1} of ${files.length}… ${p}%`));ppPortfolio.push(d);}
+  catch(e){m.textContent=e.message;m.style.color='var(--bad)';break;}
+ }
+ ppProg(false);ppRenderPhotos();ppLive();
+}
+async function ppUploadProfilePhoto(input){
+ const f=(input.files||[])[0];input.value='';if(!f)return;
+ try{await ppUploadFile('/api/me/professional-profile/profile-photo',f);await ppOpen();}
+ catch(e){alert(e.message);}
+}
+async function ppRemoveProfilePhoto(){
+ try{await api('/api/me/professional-profile/profile-photo',{method:'DELETE'});await ppOpen();}
+ catch(e){alert(e.message);}
+}
+async function ppRemovePhoto(id){
+ try{await api('/api/me/professional-profile/portfolio/'+id,{method:'DELETE'});ppPortfolio=ppPortfolio.filter(p=>p.id!==id);ppRenderPhotos();ppLive();}
+ catch(e){const m=$('ppPhotoMsg');if(m)m.textContent=e.message;}
+}
+async function ppMove(i,dir){
+ const jx=i+dir;if(jx<0||jx>=ppPortfolio.length)return;
+ const ids=ppPortfolio.map(p=>p.id);[ids[i],ids[jx]]=[ids[jx],ids[i]];
+ try{const d=await api('/api/me/professional-profile/portfolio/order',{method:'PATCH',body:JSON.stringify({ids})});ppPortfolio=d.portfolio;ppRenderPhotos();}
+ catch(e){const m=$('ppPhotoMsg');if(m)m.textContent=e.message;}
+}
+// Shared public profile card renderer (public page + live preview)
+function ppPublicCard(d,preview){
+ return `<div class="card"${preview?' style="border:1px dashed var(--line)"':''}>
+  <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+   ${d.profile_photo?`<img src="${esc(d.profile_photo.url)}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--line)">`:'<span style="font-size:44px">⚙️</span>'}
+   <div><h3 style="margin:0;overflow-wrap:anywhere">${esc(d.display_name||'')} <span class="badge-pill" style="color:var(--ok);background:#1d3a2f;font-size:11px;vertical-align:middle">✓ HAPA Verified</span></h3>
+   <p class="muted" style="margin:2px 0 0;font-size:13px">${esc(d.verified_category||'Professional')}${d.town||d.county?' · '+esc([d.town,d.county].filter(Boolean).join(', ')):''}</p></div></div>
+  ${d.headline?`<p style="font-weight:700;margin:0 0 8px;overflow-wrap:anywhere">${esc(d.headline)}</p>`:''}
+  ${d.service_description?`<p style="font-size:14px;margin:0 0 12px;white-space:pre-wrap;overflow-wrap:anywhere">${esc(d.service_description)}</p>`:''}
+  ${(d.skills||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${d.skills.map(s=>`<span class="badge-pill" style="background:var(--p2);color:var(--fg);font-size:12px">${esc(s)}</span>`).join('')}</div>`:''}
+  <div class="list" style="margin-bottom:12px;font-size:13px">
+   ${d.starting_price!=null?`<div class="row"><span class="muted">Starting price</span><b>KES ${fmtNum(d.starting_price)}${d.pricing_unit?' '+esc(d.pricing_unit):''}</b></div>`:''}
+   ${d.availability?`<div class="row"><span class="muted">Availability</span><span>${esc(d.availability)}</span></div>`:''}
+   ${d.service_area?`<div class="row"><span class="muted">Service area</span><span>${esc(d.service_area)}</span></div>`:''}</div>
+  ${(d.portfolio||[]).length?`<p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">PORTFOLIO</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:12px">${d.portfolio.map(ph=>`<img src="${esc(ph.url)}" alt="Portfolio" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">`).join('')}</div>`:''}
+  <div style="display:flex;gap:8px">${d.phone?`<a class="btn primary" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="tel:${esc(d.phone)}">📞 Call</a>`:''}${d.whatsapp?`<a class="btn ok" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="https://wa.me/${esc(String(d.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</div>
+ </div>`;
+}
+async function ppViewPublic(){
+ await ppFetch();
+ $('ug-select').classList.add('hidden');$('pp-edit').classList.add('hidden');$('pp-public').classList.remove('hidden');
+ const body=$('ppPublicBody');body.innerHTML='<p class="muted">Loading…</p>';
+ if(!ppProfile){body.innerHTML='<div class="card"><p class="muted" style="margin:0">You have no profile yet. Choose “Manage professional profile” to create one.</p></div>';return;}
+ if(ppProfile.status!=='active'){
+  const why=ppProfile.status==='paused'?'paused':ppProfile.status==='owner_hidden'?'hidden by HAPA moderation':'a draft';
+  body.innerHTML=`<div class="card"><div class="notice warn" style="margin:0"><b>Your profile is ${why} and not visible to the public.</b></div></div>`;return;
+ }
+ try{const d=await api('/api/public/professionals/'+ppProfile.id);body.innerHTML=ppPublicCard(d,false);}
+ catch(e){body.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
 }
 
 function ugRenderSelect(){
@@ -749,6 +984,13 @@ function ugRenderSelect(){
   const btn=!s||s==='rejected'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Apply for ${title}</button>`:
    s==='draft'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Continue application</button>`:
    s==='corrections_requested'?`<button class="btn" style="width:100%;margin-top:14px;border-color:var(--a);color:var(--a)" onclick="ugSelectType('${type}')">Make corrections</button>`:
+   (type==='professional'&&s==='approved'&&me&&me.capabilities&&me.capabilities.professional===true)?
+    `<div style="display:grid;gap:8px;margin-top:14px">
+      <div class="notice" style="margin:0;padding:8px 12px;font-size:13px"><b>✓ Professional role active</b></div>
+      <button class="btn primary" style="width:100%" onclick="ppOpen()">Manage professional profile</button>
+      <div style="display:flex;gap:8px"><button class="btn" style="flex:1" onclick="ppViewPublic()">View public profile</button><button class="btn" id="ppPauseBtn" style="flex:1" onclick="ppToggleActive()">Pause profile</button></div>
+      <button class="btn" style="width:100%;font-size:13px" onclick="ugSelectType('${type}')">View verified application</button>
+     </div>`:
    `<button class="btn" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">View application</button>`;
   return `<div class="card" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px"><div><span style="font-size:32px;line-height:1">${icon}</span><h3 style="margin:8px 0 4px">${title}</h3><p class="muted" style="margin:0 0 10px;font-size:14px">${desc}</p></div>${badge}</div><div style="font-size:13px;display:grid;gap:4px"><div><span class="muted">Enables: </span>${enables}</div><div><span class="muted">Requires: </span>${reqs}</div></div>${btn}</div>`;
  }).join('');
@@ -1628,7 +1870,34 @@ async function loadOwnerStats(){
   renderAccessRequests();
    renderUpgradeQueue(u);
   loadOwnerReports();
+  loadOwnerProProfiles();
  }catch(e){console.error(e);}
+}
+// ── Owner moderation of public Professional profiles (public profile only —
+// never touches role, capabilities or the verified application) ──
+async function loadOwnerProProfiles(){
+ const el=$('ownerProProfiles');if(!el)return;
+ try{
+  const rows=await api('/api/owner/professional-profiles');
+  el.innerHTML=rows.length?rows.map(p=>{
+   const c=p.status==='active'?'var(--ok)':p.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+   return `<div class="row" style="flex-wrap:wrap;gap:8px">
+    <div style="flex:1;min-width:160px"><b>${esc(p.display_name||p.account_name)}</b> <span class="badge-pill" style="color:${c};background:${c}22;font-size:11px">${esc(p.status)}</span>
+     <div class="muted" style="font-size:12px">${esc(p.verified_category||'')} · ${esc(p.email)}</div>
+     ${p.moderation_note?`<div class="muted" style="font-size:12px">Note: ${esc(p.moderation_note)}</div>`:''}</div>
+    <div style="display:flex;gap:6px">
+     ${p.status==='owner_hidden'
+      ?`<button class="btn ok" style="min-height:44px" onclick="ownerProSetStatus('${p.id}','active')">Restore</button>`
+      :p.status==='active'?`<button class="btn bad" style="min-height:44px" onclick="ownerProSetStatus('${p.id}','owner_hidden')">Hide</button>`:''}
+    </div></div>`;
+  }).join(''):'<p class="muted" style="font-size:13px;margin:0">No professional profiles yet.</p>';
+ }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+async function ownerProSetStatus(id,status){
+ let note=null;
+ if(status==='owner_hidden'){note=prompt('Moderation note (visible to the professional):','');if(note===null)return;}
+ try{await api('/api/owner/professional-profiles/'+id+'/status',{method:'PATCH',body:JSON.stringify({status,moderation_note:note})});loadOwnerProProfiles();}
+ catch(e){alert(e.message);}
 }
 
 function renderAccessRequests(){
