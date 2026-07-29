@@ -1,0 +1,63 @@
+modules = ["nodejs-20", "python-base-3.13"]
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5000 JWT_SECRET=hapa_local_dev_secret OWNER_PASSWORD=LocalDev2024 OWNER_NAME='HAPA Owner' node server.js"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3003
+
+[[ports]]
+localPort = 5099
+externalPort = 3000
+
+[[ports]]
+localPort = 5100
+externalPort = 4200
+
+[[ports]]
+localPort = 5101
+externalPort = 3001
+
+[[ports]]
+localPort = 5102
+externalPort = 3002
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.development]
+DOCUMENT_STORAGE_MODE = "s3"
+
+[userenv.shared]
+PUBLIC_MEDIA_S3_ENDPOINT = "https://a2d4acee5afd1cefae687cf7402670a4.r2.cloudflarestorage.com"
+PUBLIC_MEDIA_S3_BUCKET = "hapa-staging-public-media"
+PUBLIC_MEDIA_STORAGE_MODE = "s3"
+PUBLIC_MEDIA_S3_REGION = "auto"
+PUBLIC_MEDIA_S3_FORCE_PATH_STYLE = "false"
