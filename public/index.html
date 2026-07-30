@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA — Buy &amp; Sell in Embu</title>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA — Buy &amp; Sell in Embu</title><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#11182b"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icon.svg">
 <style>
 :root{--bg:#0b1020;--p:#17213a;--p2:#10182c;--card:#1b2744;--line:#33405f;--text:#f7f8fc;--muted:#c0c8e0;--a:#ffb12d;--ok:#41d997;--bad:#ff6c76;--wa:#25d366}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 10% 0,#26385f,#0b1020 55%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
@@ -215,7 +215,10 @@ button,input,select,textarea{font:inherit}
 <div class="nav" id="mainNav">
  <button class="btn" id="navHome" onclick="tab('home')">Home</button>
  <button class="btn" id="navMarket" onclick="tab('market')">Marketplace</button>
+ <button class="btn" id="navRequests" onclick="tab('requests')">Requests</button>
  <button class="btn" id="navUpgrade" onclick="tab('upgrade')">Professional roles</button>
+ <button class="btn" id="navAccount" onclick="tab('account')">Account</button>
+ <button class="btn" id="navHelp" onclick="tab('help')">Help</button>
  <button class="btn hidden" id="navOwner" onclick="tab('owner')">Owner dashboard</button>
 </div>
 
@@ -251,9 +254,30 @@ button,input,select,textarea{font:inherit}
 
 <div class="mp-subnav">
  <button class="mp-tab active" id="mpTab-browse" onclick="mpView('browse')">Browse</button>
+ <button class="mp-tab" id="mpTab-pros" onclick="mpView('pros')">⚙️ Pros</button>
+ <button class="mp-tab" id="mpTab-shops" onclick="mpView('shops')">🏪 Shops</button>
+ <button class="mp-tab" id="mpTab-transport" onclick="mpView('transport')">🚗 Transport</button>
  <button class="mp-tab" id="mpTab-create" onclick="mpView('create')">+ Sell</button>
  <button class="mp-tab" id="mpTab-mylistings" onclick="mpView('mylistings')">My Listings</button>
  <button class="mp-tab" id="mpTab-favorites" onclick="mpView('favorites')">♡ Saved</button>
+</div>
+
+<!-- Provider discovery: Professionals / Shops / Transport -->
+<div id="mp-pros" class="hidden">
+ <div class="mp-search-row"><input id="svQ-professional" placeholder="Search professionals — e.g. electrician, plumber…" oninput="svDebounce('professional')"></div>
+ <div id="svList-professional"></div>
+</div>
+<div id="mp-shops" class="hidden">
+ <div class="mp-search-row"><input id="svQ-merchant" placeholder="Search shops and businesses…" oninput="svDebounce('merchant')"></div>
+ <div id="svList-merchant"></div>
+</div>
+<div id="mp-transport" class="hidden">
+ <div class="mp-search-row"><input id="svQ-driver" placeholder="Search transport — boda, taxi, lorry…" oninput="svDebounce('driver')"></div>
+ <div id="svList-driver"></div>
+</div>
+<div id="mp-provider" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="mpBack()">← Back</button></div>
+ <div id="svDetail"></div>
 </div>
 
 <!-- Browse -->
@@ -400,6 +424,66 @@ button,input,select,textarea{font:inherit}
 </div>
 </section>
 
+<!-- ═══════════════════ REQUESTS ═══════════════════ -->
+<section id="requests" class="hidden">
+<div class="mp-subnav">
+ <button class="mp-tab active" id="rqTab-mine" onclick="rqView('mine')">My requests</button>
+ <button class="mp-tab hidden" id="rqTab-inbox" onclick="rqView('inbox')">Incoming <span id="rqInboxBadge"></span></button>
+</div>
+<div id="rq-mine"><div id="rqMineList" class="list"></div></div>
+<div id="rq-inbox" class="hidden"><div id="rqInboxList" class="list"></div></div>
+<div id="rq-detail" class="hidden">
+ <div class="mp-back-bar"><button class="btn" onclick="rqBackToList()">← Back</button></div>
+ <div id="rqDetailBody"></div>
+</div>
+</section>
+
+<!-- ═══════════════════ ACCOUNT ═══════════════════ -->
+<section id="account" class="hidden">
+<div class="grid">
+ <div class="card">
+  <h3 style="margin:0 0 12px">Profile details</h3>
+  <div class="field"><label for="acName">Full name</label><input id="acName" maxlength="80"></div>
+  <div class="field"><label for="acLocation">Location</label><input id="acLocation" maxlength="120" placeholder="e.g. Embu Town" list="locationList"></div>
+  <div class="field"><label for="acPhone">Phone</label><input id="acPhone" type="tel" placeholder="0712 345 678"><div class="muted" style="font-size:12px">Changing your phone requires re-verification.</div></div>
+  <div class="field"><label for="acEmail">Email</label><input id="acEmail" type="email"><div class="muted" style="font-size:12px">Changing your email requires re-verification.</div></div>
+  <button class="btn primary" style="width:100%" onclick="acSaveProfile()">Save changes</button>
+  <div id="acProfileMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+ </div>
+ <div>
+  <div class="card" style="margin-bottom:14px">
+   <h3 style="margin:0 0 12px">Change password</h3>
+   <div class="field"><label for="acCurPw">Current password</label><input id="acCurPw" type="password" autocomplete="current-password"></div>
+   <div class="field"><label for="acNewPw">New password</label><input id="acNewPw" type="password" autocomplete="new-password"><div class="muted" style="font-size:12px">At least 10 characters with letters and numbers.</div></div>
+   <button class="btn primary" style="width:100%" onclick="acChangePassword()">Change password</button>
+   <div id="acPwMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div class="card" id="acDangerCard">
+   <h3 style="margin:0 0 8px">Deactivate account</h3>
+   <p class="muted" style="font-size:13px;margin:0 0 12px">Your account, listings and public profiles will be hidden immediately. Contact HAPA support if you later want it restored.</p>
+   <button class="btn bad" style="width:100%" onclick="$('acDeactBox').classList.toggle('hidden')">Deactivate my account</button>
+   <div id="acDeactBox" class="hidden" style="margin-top:12px">
+    <div class="field"><label for="acDeactPw">Confirm with your password</label><input id="acDeactPw" type="password"></div>
+    <button class="btn bad" style="width:100%" onclick="acDeactivate()">Yes, deactivate my account</button>
+    <div id="acDeactMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+   </div>
+  </div>
+ </div>
+</div>
+</section>
+
+<!-- ═══════════════════ HELP & LEGAL ═══════════════════ -->
+<section id="help" class="hidden">
+<div class="mp-subnav">
+ <button class="mp-tab active" id="hpTab-support" onclick="hpView('support')">Help &amp; Support</button>
+ <button class="mp-tab" id="hpTab-safety" onclick="hpView('safety')">Safety tips</button>
+ <button class="mp-tab" id="hpTab-rules" onclick="hpView('rules')">Community rules</button>
+ <button class="mp-tab" id="hpTab-terms" onclick="hpView('terms')">Terms</button>
+ <button class="mp-tab" id="hpTab-privacy" onclick="hpView('privacy')">Privacy</button>
+</div>
+<div class="card" id="hpBody"></div>
+</section>
+
 <!-- Professional roles (Upgrade) -->
 <section id="upgrade" class="hidden">
 <div id="ug-select">
@@ -425,6 +509,14 @@ button,input,select,textarea{font:inherit}
 <div id="pp-public" class="hidden">
  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="ppBack()">← Back</button><h2 style="margin:0">Public Profile</h2></div>
  <div id="ppPublicBody"></div>
+</div>
+<div id="mc-edit" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="mcBack()">← Back</button><h2 style="margin:0">Business Profile</h2></div>
+ <div id="mcEditBody"></div>
+</div>
+<div id="dv-edit" class="hidden">
+ <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><button class="btn" onclick="dvBack()">← Back</button><h2 style="margin:0">Driver Profile</h2></div>
+ <div id="dvEditBody"></div>
 </div>
 </section>
 
@@ -459,6 +551,58 @@ button,input,select,textarea{font:inherit}
    <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerProProfiles()">Refresh</button>
   </div>
   <div id="ownerProProfiles" class="list"></div>
+ </div>
+ <div class="grid" style="margin-top:14px">
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Public business profiles</h3>
+    <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerMcProfiles()">Refresh</button>
+   </div>
+   <div id="ownerMcProfiles" class="list"></div>
+  </div>
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Public driver profiles</h3>
+    <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerDvProfiles()">Refresh</button>
+   </div>
+   <div id="ownerDvProfiles" class="list"></div>
+  </div>
+ </div>
+ <div class="grid" style="margin-top:14px">
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Reports queue</h3>
+    <select id="oGenReportFilter" onchange="loadOwnerGenReports()" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit">
+     <option value="pending">Pending</option><option value="reviewed">Reviewed</option><option value="dismissed">Dismissed</option><option value="all">All</option>
+    </select>
+   </div>
+   <div id="ownerGenReports" class="list"></div>
+  </div>
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Reviews</h3>
+    <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerReviews()">Refresh</button>
+   </div>
+   <div id="ownerReviews" class="list"></div>
+  </div>
+ </div>
+ <div class="grid" style="margin-top:14px">
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Requests overview</h3>
+    <select id="oReqFilter" onchange="loadOwnerRequests()" style="background:#0d1528;color:white;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit">
+     <option value="">All</option><option value="pending">Pending</option><option value="accepted">Accepted</option><option value="completed">Completed</option><option value="declined">Declined</option><option value="cancelled">Cancelled</option>
+    </select>
+   </div>
+   <div id="ownerRequests" class="list"></div>
+  </div>
+  <div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h3 style="margin:0">Owner action log</h3>
+    <button class="btn" style="font-size:12px;padding:6px 10px" onclick="loadOwnerAudit()">Refresh</button>
+   </div>
+   <div id="ownerAudit" class="list" style="max-height:400px;overflow:auto"></div>
+  </div>
  </div>
  <div class="card" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
@@ -514,8 +658,8 @@ const PRO=['Carpenter','Mason','Plumber','Electrician','Painter','Tiler','Roofer
 const STATUS_LABELS={active:'Live',hidden:'Hidden',sold:'Sold',removed:'Removed'};
 const OWNER_STAT_LABELS={users:'Total Users',pendingAccess:'Pending Approvals',pendingUpgrades:'Pending Professional Applications',activeListings:'Active Listings',pendingReports:'Pending Reports'};
 function DRAFT_KEY(){return 'hapa_draft_v2_'+(me?.id||'anon');}
-const MP_VIEWS=['browse','detail','create','edit','mylistings','favorites','seller'];
-const MP_TABS=['browse','create','mylistings','favorites'];
+const MP_VIEWS=['browse','detail','create','edit','mylistings','favorites','seller','pros','shops','transport','provider'];
+const MP_TABS=['browse','pros','shops','transport','create','mylistings','favorites'];
 // ── Image placeholder ─────────────────────────────────────────────────────────
 const PH_IMG="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%2310182a'/%3E%3Cpath d='M166 116 L228 116 L248 138 L272 138 L272 200 L128 200 L128 138 L152 138 Z' fill='none' stroke='%2344526a' stroke-width='7' stroke-linejoin='round'/%3E%3Ccircle cx='200' cy='165' r='24' fill='none' stroke='%2344526a' stroke-width='7'/%3E%3C/svg%3E";
 function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
@@ -699,7 +843,7 @@ function updateSelfiePreview(input){const f=input.files?.[0];if(!f)return;const 
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function setActiveMainNav(section){
- const map={home:'navHome',market:'navMarket',upgrade:'navUpgrade',owner:'navOwner'};
+ const map={home:'navHome',market:'navMarket',requests:'navRequests',account:'navAccount',help:'navHelp',upgrade:'navUpgrade',owner:'navOwner'};
  Object.entries(map).forEach(([sec,btnId])=>{
   const b=$(btnId);if(!b)return;
   const on=sec===section;
@@ -720,11 +864,14 @@ function setActiveMarketplaceTab(view){
  });
 }
 function tab(id){
- ['home','market','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ ['home','market','requests','account','help','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
  setActiveMainNav(id);
  if(id==='market')mpView('browse');
  if(id==='owner')loadOwner();
  if(id==='upgrade')loadUpgradeSection();
+ if(id==='requests')rqLoad();
+ if(id==='account')acLoad();
+ if(id==='help')hpView('support');
 }
 async function requestAgain(){await api('/api/me/request-again',{method:'POST'});location.reload();}
 
@@ -750,6 +897,8 @@ async function loadUpgradeSection(){
  $('ug-status').classList.add('hidden');
  $('pp-edit').classList.add('hidden');
  $('pp-public').classList.add('hidden');
+ $('mc-edit').classList.add('hidden');
+ $('dv-edit').classList.add('hidden');
  $('ugCards').innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
  try{ugCurrentApps=await api('/api/me/upgrades');}catch(e){ugCurrentApps={};}
  ugRenderSelect();
@@ -948,7 +1097,8 @@ async function ppMove(i,dir){
 // The token is never placed in URLs, attributes or logs.
 const PP_OWNER_MEDIA_PREFIX='/api/me/professional-profile/media/';
 let ppBlobUrls={}; // authenticated media url -> object URL
-function ppImgAttr(url){return url&&url.startsWith(PP_OWNER_MEDIA_PREFIX)?`data-auth-src="${esc(url)}"`:`src="${esc(url||'')}"`;}
+const PM_OWNER_MEDIA_PREFIX='/api/me/provider-media/';
+function ppImgAttr(url){return url&&(url.startsWith(PP_OWNER_MEDIA_PREFIX)||url.startsWith(PM_OWNER_MEDIA_PREFIX))?`data-auth-src="${esc(url)}"`:`src="${esc(url||'')}"`;}
 function ppRevokeBlobUrls(keep){
  for(const k of Object.keys(ppBlobUrls)){
   if(keep&&keep.has(k))continue;
@@ -972,6 +1122,8 @@ async function ppHydrateAuthImgs(){
  }
  // garbage-collect object URLs for media no longer referenced (replaced/removed/rerendered)
  const keep=new Set([...(ppProfilePhoto?[ppProfilePhoto.url]:[]),...ppPortfolio.map(p=>p.url)].filter(u=>u&&u.startsWith(PP_OWNER_MEDIA_PREFIX)));
+ // Provider media (merchant/driver editors) is kept until section change or logout.
+ for(const k of Object.keys(ppBlobUrls))if(k.startsWith(PM_OWNER_MEDIA_PREFIX))keep.add(k);
  ppRevokeBlobUrls(keep);
 }
 // Shared public profile card renderer (public page + live preview)
@@ -1017,6 +1169,18 @@ function ugRenderSelect(){
   const btn=!s||s==='rejected'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Apply for ${title}</button>`:
    s==='draft'?`<button class="btn primary" style="width:100%;margin-top:14px" onclick="ugSelectType('${type}')">Continue application</button>`:
    s==='corrections_requested'?`<button class="btn" style="width:100%;margin-top:14px;border-color:var(--a);color:var(--a)" onclick="ugSelectType('${type}')">Make corrections</button>`:
+   (type==='merchant'&&s==='approved'&&me&&me.capabilities&&me.capabilities.merchant===true)?
+    `<div style="display:grid;gap:8px;margin-top:14px">
+      <div class="notice" style="margin:0;padding:8px 12px;font-size:13px"><b>✓ Merchant role active</b></div>
+      <button class="btn primary" style="width:100%" onclick="mcOpen()">Manage business profile &amp; products</button>
+      <button class="btn" style="width:100%;font-size:13px" onclick="ugSelectType('${type}')">View verified application</button>
+     </div>`:
+   (type==='driver'&&s==='approved'&&me&&me.capabilities&&me.capabilities.driver===true)?
+    `<div style="display:grid;gap:8px;margin-top:14px">
+      <div class="notice" style="margin:0;padding:8px 12px;font-size:13px"><b>✓ Driver role active</b></div>
+      <button class="btn primary" style="width:100%" onclick="dvOpen()">Manage driver profile</button>
+      <button class="btn" style="width:100%;font-size:13px" onclick="ugSelectType('${type}')">View verified application</button>
+     </div>`:
    (type==='professional'&&s==='approved'&&me&&me.capabilities&&me.capabilities.professional===true)?
     `<div style="display:grid;gap:8px;margin-top:14px">
       <div class="notice" style="margin:0;padding:8px 12px;font-size:13px"><b>✓ Professional role active</b></div>
@@ -1516,6 +1680,9 @@ function mpView(view){
  if(MP_TABS.includes(view))setActiveMarketplaceTab(view);
  setActiveMainNav('market');
  mpPrevView=mpCurView;mpCurView=view;
+ if(view==='pros')svBrowse('professional');
+ if(view==='shops')svBrowse('merchant');
+ if(view==='transport')svBrowse('driver');
  if(view==='browse')mpBrowse(mpPage);
  if(view==='mylistings')mpMyListings();
  if(view==='favorites')mpFavorites();
@@ -1542,7 +1709,7 @@ function mpView(view){
  }
 }
 function mpBack(){
- const dest=(['detail','seller'].includes(mpCurView))?mpPrevView:mpCurView==='edit'?'mylistings':'browse';
+ const dest=(['detail','seller'].includes(mpCurView))?mpPrevView:mpCurView==='edit'?'mylistings':mpCurView==='provider'?(svCurType==='merchant'?'shops':svCurType==='driver'?'transport':'pros'):'browse';
  MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!==dest));
  setActiveMarketplaceTab(dest);
  setActiveMainNav('market');
@@ -1904,6 +2071,7 @@ async function loadOwnerStats(){
    renderUpgradeQueue(u);
   loadOwnerReports();
   loadOwnerProProfiles();
+  loadOwnerMcProfiles();loadOwnerDvProfiles();loadOwnerGenReports();loadOwnerReviews();loadOwnerRequests();loadOwnerAudit();
  }catch(e){console.error(e);}
 }
 // ── Owner moderation of public Professional profiles (public profile only —
@@ -2129,4 +2297,543 @@ async function setUserStatus(userId,status){try{await api('/api/owner/users/'+us
 function confirmUserStatus(userId,status){if(confirm('Are you sure you want to '+status+' this user?'))setUserStatus(userId,status);}
 async function setListingStatus(listingId,status,sellerId){try{await api('/api/owner/listings/'+listingId+'/status',{method:'PATCH',body:JSON.stringify({status})});openListingDetail(listingId,sellerId);}catch(e){mpInlineAlert(e.message);}}
 function confirmListingStatus(listingId,status,sellerId){if(confirm('Are you sure you want to '+status+' this listing?'))setListingStatus(listingId,status,sellerId);}
+
+// ═══════════════ PROVIDER DISCOVERY (Pros / Shops / Transport) ═══════════════
+let svCurType=null,svCurProfile=null,svDt=null;
+const SV_CFG={
+ professional:{list:'/api/public/professionals',one:'/api/public/professionals/',icon:'⚙️',nameKey:'display_name',subKey:'verified_category',reqTypes:[['service','Request service']],reportTarget:'professional_profile'},
+ merchant:{list:'/api/public/merchants',one:'/api/public/merchants/',icon:'🏪',nameKey:'business_name',subKey:'verified_category',reqTypes:[['enquiry','Send enquiry'],['order','Place order'],['reservation','Reserve']],reportTarget:'merchant_profile'},
+ driver:{list:'/api/public/drivers',one:'/api/public/drivers/',icon:'🚗',nameKey:'display_name',subKey:'vehicle_type',reqTypes:[['ride','Request ride'],['delivery','Request delivery'],['transport','Request transport']],reportTarget:'driver_profile'}
+};
+function svDebounce(t){clearTimeout(svDt);svDt=setTimeout(()=>svBrowse(t),500);}
+function svStars(avg,n){return n?`<span style="color:var(--a)">★ ${(+avg).toFixed(1)}</span> <span class="muted" style="font-size:12px">(${n})</span>`:'<span class="muted" style="font-size:12px">No reviews yet</span>';}
+async function svBrowse(t){
+ const cfg=SV_CFG[t],el=$('svList-'+t);if(!el)return;
+ el.innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
+ try{
+  const qv=($('svQ-'+t)||{}).value||'';
+  const rows=await publicApi(cfg.list+(qv?'?q='+encodeURIComponent(qv):''));
+  el.innerHTML=rows.length?rows.map(p=>`<div class="mp-seller-card" onclick="svOpen('${t}','${esc(p.id)}')">
+   ${p.profile_photo||p.logo?`<img src="${esc((p.profile_photo||p.logo).url)}" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--line)" onerror="mpImgError(this)">`:`<span style="font-size:40px">${cfg.icon}</span>`}
+   <div style="flex:1;min-width:0">
+    <b style="overflow-wrap:anywhere">${esc(p[cfg.nameKey]||'')}</b> <span class="hapa-verified">✓ HAPA Verified</span>
+    <div class="muted" style="font-size:13px">${esc(p[cfg.subKey]||'')}${p.town||p.county?' · '+esc([p.town,p.county].filter(Boolean).join(', ')):''}</div>
+    <div style="font-size:13px;margin-top:2px">${svStars(p.rating_avg,p.rating_count)}${p.starting_price!=null?` · <span style="color:var(--a);font-weight:700">from KES ${fmtNum(p.starting_price)}</span>`:''}</div>
+   </div><span class="muted">›</span></div>`).join('')
+  :`<div class="mp-empty"><div style="font-size:44px;margin-bottom:10px">${cfg.icon}</div><p class="muted">No ${t==='merchant'?'shops':t==='driver'?'transport providers':'professionals'} found${qv?' for that search':' yet'}.</p></div>`;
+ }catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function svOpen(t,id){
+ svCurType=t;const cfg=SV_CFG[t];
+ MP_VIEWS.forEach(v=>$('mp-'+v).classList.toggle('hidden',v!=='provider'));
+ mpPrevView=mpCurView;mpCurView='provider';
+ const el=$('svDetail');el.innerHTML='<p class="muted" style="text-align:center;padding:20px">Loading…</p>';
+ try{
+  const[p,rv]=await Promise.all([publicApi(cfg.one+id),publicApi(`/api/public/providers/${t}/${id}/reviews`).catch(()=>({reviews:[],rating_count:0}))]);
+  svCurProfile=p;
+  const imgs=[...(p.gallery||[]),...(p.portfolio||[])];
+  el.innerHTML=`<div class="card">
+   <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+    ${p.profile_photo||p.logo?`<img src="${esc((p.profile_photo||p.logo).url)}" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)" onerror="mpImgError(this)">`:`<span style="font-size:52px">${cfg.icon}</span>`}
+    <div style="flex:1;min-width:0"><h2 style="margin:0;overflow-wrap:anywhere">${esc(p[cfg.nameKey]||'')} <span class="hapa-verified">✓ HAPA Verified</span></h2>
+     <p class="muted" style="margin:2px 0 0;font-size:14px">${esc(p[cfg.subKey]||'')}${p.town||p.county?' · '+esc([p.town,p.county].filter(Boolean).join(', ')):''}</p>
+     <div style="margin-top:4px">${svStars(rv.rating_avg,rv.rating_count)}</div></div></div>
+   ${p.headline?`<p style="font-weight:700;margin:0 0 8px">${esc(p.headline)}</p>`:''}
+   ${p.description||p.service_description||p.vehicle_description?`<p style="font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 12px">${esc(p.description||p.service_description||p.vehicle_description)}</p>`:''}
+   ${(p.skills||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${p.skills.map(s=>`<span class="badge-pill" style="background:var(--p2);font-size:12px">${esc(s)}</span>`).join('')}</div>`:''}
+   <div class="list" style="margin-bottom:12px;font-size:13px">
+    ${p.starting_price!=null?`<div class="row"><span class="muted">Starting price</span><b>KES ${fmtNum(p.starting_price)}${p.pricing_unit?' '+esc(p.pricing_unit):''}</b></div>`:''}
+    ${p.pricing_info?`<div class="row"><span class="muted">Pricing</span><span>${esc(p.pricing_info)}</span></div>`:''}
+    ${p.opening_hours?`<div class="row"><span class="muted">Opening hours</span><span>${esc(p.opening_hours)}</span></div>`:''}
+    ${p.availability?`<div class="row"><span class="muted">Availability</span><span>${esc(p.availability)}</span></div>`:''}
+    ${p.service_area?`<div class="row"><span class="muted">Service area</span><span>${esc(p.service_area)}</span></div>`:''}</div>
+   ${imgs.length?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:12px">${imgs.map(im=>`<img src="${esc(im.url)}" alt="" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)" onerror="mpImgError(this)">`).join('')}</div>`:''}
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+    ${p.phone?`<a class="btn primary" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="tel:${esc(p.phone)}">📞 Call</a>`:''}
+    ${p.whatsapp?`<a class="btn ok" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="https://wa.me/${esc(String(p.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${cfg.reqTypes.map(([rt,lbl])=>`<button class="btn" style="flex:1;min-height:44px;border-color:var(--a);color:var(--a)" onclick="svRequestForm('${rt}')">${lbl}</button>`).join('')}</div>
+   <div id="svReqForm"></div>
+   <div style="text-align:right;margin-top:10px"><button class="btn" style="font-size:12px;padding:6px 10px" onclick="svReport()">🚩 Report</button><div id="svReportBox"></div></div>
+  </div>
+  ${t==='merchant'?`<div style="margin-top:14px"><h3 style="margin:0 0 10px">Products &amp; services</h3><div class="grid3">${(p.items||[]).map(it=>`<div class="mp-card" onclick="svRequestForm('order','${esc(it.id)}','${esc(it.title)}')">
+    ${it.images&&it.images[0]?`<img class="mp-card-img" src="${esc(it.images[0].url)}" alt="" onerror="mpImgError(this)">`:`<div class="mp-no-img">${esc(it.title||'')}</div>`}
+    <div class="mp-card-body"><b style="overflow-wrap:anywhere">${esc(it.title)}</b>${it.description?`<p class="muted" style="font-size:12px;margin:4px 0">${esc(it.description).slice(0,90)}</p>`:''}
+    <div class="mp-price">${it.price!=null?'KES '+fmtNum(it.price)+(it.price_unit?' <span style="font-size:11px;color:var(--muted)">'+esc(it.price_unit)+'</span>':''):'Ask for price'}</div>
+    ${it.in_stock===false?'<span class="badge-pill" style="background:#3a1c25;color:var(--bad);font-size:11px">Out of stock</span>':''}</div></div>`).join('')||'<p class="muted">No products listed yet.</p>'}</div></div>`:''}
+  <div class="card" style="margin-top:14px"><h3 style="margin:0 0 10px">Reviews ${rv.rating_count?`· ★ ${(+rv.rating_avg).toFixed(1)} (${rv.rating_count})`:''}</h3>
+   <div class="list">${(rv.reviews||[]).map(r=>`<div class="row" style="flex-direction:column;align-items:flex-start;gap:4px"><div><span style="color:var(--a)">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</span> <b style="font-size:13px">${esc(r.reviewer_name)}</b> <span class="muted" style="font-size:12px">${fmtDate(r.created_at)}</span></div>${r.comment?`<p style="margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere">${esc(r.comment)}</p>`:''}</div>`).join('')||'<p class="muted" style="font-size:13px;margin:0">No reviews yet. Reviews come from completed requests.</p>'}</div></div>`;
+ }catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+function svRequestForm(rt,itemId,itemTitle){
+ if(!requireActive('send a request'))return;
+ const isDriver=svCurType==='driver';
+ $('svReqForm').innerHTML=`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+  <h4 style="margin:0 0 8px">${itemTitle?`Order: ${esc(itemTitle)}`:{service:'Request service',enquiry:'Send enquiry',order:'Place order',reservation:'Make reservation',ride:'Request ride',delivery:'Request delivery',transport:'Request transport'}[rt]||'Send request'}</h4>
+  ${isDriver?`<div class="field"><label>Pickup location *</label><input id="svPickup" maxlength="300" placeholder="e.g. Embu town CBD, near market"></div>
+  <div class="field"><label>Destination *</label><input id="svDest" maxlength="300" placeholder="e.g. Kangaru"></div>`:''}
+  <div class="field"><label>When do you need it?</label><input id="svWhen" maxlength="120" placeholder="e.g. Today 4pm, This weekend"></div>
+  <div class="field"><label>${isDriver?'Extra details (optional)':'Describe what you need *'}</label><textarea id="svNote" rows="3" maxlength="1000" placeholder="${isDriver?'Luggage, passengers, special instructions…':'Give the provider enough detail to respond quickly…'}"></textarea></div>
+  <button class="btn primary" style="width:100%;min-height:44px" onclick="svSendRequest('${rt}'${itemId?`,'${itemId}'`:''})">Send request</button>
+  <div id="svReqMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div></div>`;
+ $('svReqForm').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function svSendRequest(rt,itemId){
+ const m=$('svReqMsg');m.textContent='Sending…';m.style.color='';
+ try{
+  const body={provider_type:svCurType,profile_id:svCurProfile.id,request_type:rt,note:($('svNote')||{}).value||'',requested_for:($('svWhen')||{}).value||''};
+  if(itemId)body.item_id=itemId;
+  if($('svPickup'))body.pickup_text=$('svPickup').value;
+  if($('svDest'))body.destination_text=$('svDest').value;
+  await api('/api/requests',{method:'POST',body:JSON.stringify(body)});
+  $('svReqForm').innerHTML='<div class="notice" style="margin-top:12px"><b>✓ Request sent.</b> Track it under <a href="#" style="color:var(--a)" onclick="tab(\'requests\');return false">Requests</a>. The provider will accept or decline shortly.</div>';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+function svReport(){
+ if(!requireActive('report'))return;
+ $('svReportBox').innerHTML=`<div style="text-align:left;margin-top:8px;background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:12px">
+  <div class="field" style="margin:0 0 8px"><label>Reason</label><select id="svRepReason"><option value="scam">Scam or fraud</option><option value="fake_profile">Fake profile</option><option value="offensive_content">Offensive content</option><option value="unsafe_behaviour">Unsafe behaviour</option><option value="wrong_information">Wrong information</option><option value="spam">Spam</option><option value="other">Other</option></select></div>
+  <div class="field" style="margin:0 0 8px"><label>Details (optional)</label><textarea id="svRepDetails" rows="2" maxlength="1000"></textarea></div>
+  <button class="btn bad" style="width:100%" onclick="svSendReport()">Submit report</button><div id="svRepMsg" style="font-size:13px;margin-top:6px" aria-live="polite"></div></div>`;
+}
+async function svSendReport(){
+ const m=$('svRepMsg');
+ try{await api('/api/reports',{method:'POST',body:JSON.stringify({target_type:SV_CFG[svCurType].reportTarget,target_id:svCurProfile.id,reason:$('svRepReason').value,details:$('svRepDetails').value})});
+  $('svReportBox').innerHTML='<div class="notice" style="margin-top:8px;text-align:left">✓ Report sent. HAPA will review it.</div>';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+
+// ═══════════════════════════ REQUESTS SCREEN ═══════════════════════════
+let rqCurView='mine',rqCurId=null,rqIsProvider=false;
+const RQ_STATUS_META={pending:['var(--a)','Pending'],accepted:['var(--ok)','Accepted'],completed:['var(--ok)','Completed'],declined:['var(--bad)','Declined'],cancelled:['var(--muted)','Cancelled']};
+const RQ_TYPE_LABEL={service:'Service',enquiry:'Enquiry',order:'Order',reservation:'Reservation',ride:'Ride',delivery:'Delivery',transport:'Transport'};
+function rqBadge(s){const[c,l]=RQ_STATUS_META[s]||['var(--muted)',s];return`<span class="badge-pill" style="color:${c};background:${c}22;font-size:12px">${l}</span>`;}
+async function rqLoad(){
+ rqIsProvider=!!(me&&me.capabilities&&(me.capabilities.professional||me.capabilities.merchant||me.capabilities.driver));
+ $('rqTab-inbox').classList.toggle('hidden',!rqIsProvider);
+ rqView(rqCurView==='inbox'&&rqIsProvider?'inbox':'mine');
+}
+function rqView(v){
+ rqCurView=v;
+ ['mine','inbox','detail'].forEach(x=>$('rq-'+x).classList.toggle('hidden',x!==v));
+ $('rqTab-mine').className='mp-tab'+(v==='mine'?' active':'');
+ $('rqTab-inbox').className='mp-tab'+(v==='inbox'?' active':'')+(rqIsProvider?'':' hidden');
+ if(v==='mine')rqLoadMine();
+ if(v==='inbox')rqLoadInbox();
+}
+function rqBackToList(){rqView(rqIsProvider&&rqCurViewWasInbox?'inbox':'mine');}
+let rqCurViewWasInbox=false;
+function rqRow(r,who){
+ const title=r.item_title?`${esc(r.item_title)} — ${esc(r.provider_name)}`:esc(r.provider_name||'');
+ return`<div class="row" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="rqOpen('${r.id}',${who==='provider'})">
+  <span style="flex:1;min-width:0"><b>${RQ_TYPE_LABEL[r.request_type]||r.request_type}</b> · ${who==='provider'?esc(r.customer_name||'Customer'):title}
+  <br><small class="muted">${r.pickup_text?esc(r.pickup_text)+' → '+esc(r.destination_text)+' · ':''}${fmtDate(r.created_at)}</small></span>
+  ${rqBadge(r.status)}</div>`;
+}
+async function rqLoadMine(){
+ const el=$('rqMineList');el.innerHTML='<p class="muted">Loading…</p>';
+ try{const rows=await api('/api/me/requests');
+  el.innerHTML=rows.length?rows.map(r=>rqRow(r,'customer')).join(''):'<div class="mp-empty"><div style="font-size:44px;margin-bottom:10px">📨</div><p class="muted">No requests yet. Find professionals, shops and transport in the Marketplace.</p><button class="btn primary" onclick="tab(\'market\');mpView(\'pros\')">Browse providers</button></div>';
+ }catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function rqLoadInbox(){
+ const el=$('rqInboxList');el.innerHTML='<p class="muted">Loading…</p>';
+ try{const rows=await api('/api/me/provider-requests');
+  const pend=rows.filter(r=>r.status==='pending').length;
+  $('rqInboxBadge').innerHTML=pend?`<span class="badge-pill" style="color:var(--a);background:var(--a)22;font-size:11px">${pend}</span>`:'';
+  el.innerHTML=rows.length?rows.map(r=>rqRow(r,'provider')).join(''):'<p class="muted" style="text-align:center;padding:20px">No incoming requests yet. Keep your public profile complete and active to attract customers.</p>';
+ }catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function rqOpen(id,fromInbox){
+ rqCurId=id;rqCurViewWasInbox=!!fromInbox;
+ ['mine','inbox'].forEach(x=>$('rq-'+x).classList.add('hidden'));
+ $('rq-detail').classList.remove('hidden');
+ const el=$('rqDetailBody');el.innerHTML='<p class="muted">Loading…</p>';
+ try{
+  const r=await api('/api/requests/'+id);
+  const isProv=r.role==='provider',isCust=r.role==='customer';
+  const acts=[];
+  if(isProv&&r.status==='pending'){acts.push(`<button class="btn ok" style="flex:1;min-height:44px" onclick="rqAction('accepted')">✓ Accept</button>`,`<button class="btn bad" style="flex:1;min-height:44px" onclick="rqAction('declined')">Decline</button>`);}
+  if(isProv&&r.status==='accepted')acts.push(`<button class="btn primary" style="flex:1;min-height:44px" onclick="rqAction('completed')">Mark completed</button>`);
+  if(isCust&&['pending','accepted'].includes(r.status))acts.push(`<button class="btn bad" style="flex:1;min-height:44px" onclick="rqAction('cancelled')">Cancel request</button>`);
+  el.innerHTML=`<div class="card">
+   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+    <h3 style="margin:0">${RQ_TYPE_LABEL[r.request_type]||r.request_type}${r.item_title?' — '+esc(r.item_title):''}</h3>${rqBadge(r.status)}</div>
+   <div class="list" style="font-size:13px;margin-bottom:12px">
+    <div class="row"><span class="muted">${isProv?'Customer':'Provider'}</span><b>${esc(isProv?r.customer_name:r.provider_name)}</b></div>
+    ${r.customer_phone?`<div class="row"><span class="muted">Customer phone</span><a href="tel:${esc(r.customer_phone)}" style="color:var(--a);font-weight:700">${esc(r.customer_phone)}</a></div>`:''}
+    ${r.provider_phone?`<div class="row"><span class="muted">Provider phone</span><a href="tel:${esc(r.provider_phone)}" style="color:var(--a);font-weight:700">${esc(r.provider_phone)}</a></div>`:''}
+    ${r.pickup_text?`<div class="row"><span class="muted">Pickup</span><span>${esc(r.pickup_text)}</span></div><div class="row"><span class="muted">Destination</span><span>${esc(r.destination_text)}</span></div>`:''}
+    ${r.requested_for?`<div class="row"><span class="muted">Requested for</span><span>${esc(r.requested_for)}</span></div>`:''}
+    <div class="row"><span class="muted">Created</span><span>${new Date(r.created_at).toLocaleString()}</span></div></div>
+   ${r.note?`<div style="background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere">${esc(r.note)}</div>`:''}
+   ${isProv&&r.status==='pending'?'<p class="muted" style="font-size:12px;margin:0 0 10px">The customer\'s phone number is shared once you accept.</p>':''}
+   ${acts.length?`<div style="display:flex;gap:8px;flex-wrap:wrap">${acts.join('')}</div>`:''}
+   ${isCust&&r.status==='completed'&&!r.reviewed?`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+    <h4 style="margin:0 0 8px">Rate this provider</h4>
+    <div id="rqStars" style="font-size:30px;cursor:pointer;letter-spacing:4px;margin-bottom:8px">${[1,2,3,4,5].map(i=>`<span data-star="${i}" onclick="rqSetStars(${i})" style="color:var(--line)">★</span>`).join('')}</div>
+    <div class="field"><label>Comment (optional)</label><textarea id="rqRevComment" rows="2" maxlength="1000"></textarea></div>
+    <button class="btn primary" style="width:100%" onclick="rqSubmitReview()">Submit review</button>
+    <div id="rqRevMsg" style="font-size:13px;margin-top:6px" aria-live="polite"></div></div>`:''}
+   ${isCust&&r.reviewed?'<div class="notice" style="margin-top:12px;margin-bottom:0">✓ You reviewed this request.</div>':''}
+  </div>
+  <div class="card" style="margin-top:14px"><h4 style="margin:0 0 10px">Conversation</h4>
+   <div class="list" style="margin-bottom:12px">${(r.events||[]).map(e=>e.event_type==='message'
+    ?`<div style="max-width:85%;padding:10px 12px;border-radius:12px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;${e.mine?'margin-left:auto;background:#2d3f66':'background:var(--p2);border:1px solid var(--line)'}"><small class="muted" style="display:block;font-size:11px">${esc(e.actor_name||'')} · ${new Date(e.created_at).toLocaleString()}</small>${esc(e.message)}</div>`
+    :`<p class="muted" style="text-align:center;font-size:12px;margin:2px 0">${e.event_type==='created'?'Request sent':esc(e.actor_name||'')+' — '+(RQ_STATUS_META[e.status]?RQ_STATUS_META[e.status][1]:e.status)} · ${new Date(e.created_at).toLocaleString()}</p>`).join('')||'<p class="muted" style="font-size:13px">No messages yet.</p>'}</div>
+   ${['declined','cancelled'].includes(r.status)?'<p class="muted" style="font-size:13px;margin:0">This request is closed.</p>':`<div style="display:flex;gap:8px"><input id="rqMsgInput" placeholder="Write a message…" style="flex:1;background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:11px" maxlength="1000" onkeydown="if(event.key==='Enter')rqSendMsg()"><button class="btn primary" style="min-height:44px" onclick="rqSendMsg()">Send</button></div>`}
+   <div id="rqMsgErr" style="font-size:13px;color:var(--bad);margin-top:6px" aria-live="polite"></div></div>`;
+ }catch(e){el.innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function rqAction(status){
+ if(status==='cancelled'&&!confirm('Cancel this request?'))return;
+ try{await api(`/api/requests/${rqCurId}/status`,{method:'POST',body:JSON.stringify({status})});rqOpen(rqCurId,rqCurViewWasInbox);}
+ catch(e){mpInlineAlert(e.message);}
+}
+async function rqSendMsg(){
+ const inp=$('rqMsgInput');if(!inp||!inp.value.trim())return;
+ try{await api(`/api/requests/${rqCurId}/message`,{method:'POST',body:JSON.stringify({message:inp.value})});rqOpen(rqCurId,rqCurViewWasInbox);}
+ catch(e){$('rqMsgErr').textContent=e.message;}
+}
+let rqStarVal=0;
+function rqSetStars(n){rqStarVal=n;document.querySelectorAll('#rqStars span').forEach(s=>{s.style.color=+s.dataset.star<=n?'var(--a)':'var(--line)';});}
+async function rqSubmitReview(){
+ const m=$('rqRevMsg');
+ if(!rqStarVal){m.textContent='Tap the stars to choose a rating.';m.style.color='var(--bad)';return;}
+ try{await api(`/api/requests/${rqCurId}/review`,{method:'POST',body:JSON.stringify({rating:rqStarVal,comment:$('rqRevComment').value})});rqStarVal=0;rqOpen(rqCurId,rqCurViewWasInbox);}
+ catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+
+// ═══════════════════════════ ACCOUNT SETTINGS ═══════════════════════════
+function acLoad(){
+ if(!me)return;
+ $('acName').value=me.name||'';$('acLocation').value=me.location||'';
+ $('acPhone').value=me.phone||'';$('acEmail').value=me.email||'';
+ ['acProfileMsg','acPwMsg','acDeactMsg'].forEach(id=>{$(id).textContent='';});
+ $('acDangerCard').classList.toggle('hidden',me.role==='owner');
+}
+async function acSaveProfile(){
+ const m=$('acProfileMsg');m.textContent='Saving…';m.style.color='';
+ try{
+  const body={name:$('acName').value,location:$('acLocation').value};
+  if($('acPhone').value!==(me.phone||''))body.phone=$('acPhone').value;
+  if($('acEmail').value!==(me.email||''))body.email=$('acEmail').value;
+  const changedContact='phone'in body||'email'in body;
+  me={...me,...await api('/api/me',{method:'PATCH',body:JSON.stringify(body)})};
+  $('badge').textContent=`${me.name} \u00b7 ${me.role}`;
+  m.textContent=changedContact?'✓ Saved. Changed contact details need re-verification at your next login.':'✓ Saved.';m.style.color='var(--ok)';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function acChangePassword(){
+ const m=$('acPwMsg');m.textContent='Working…';m.style.color='';
+ try{
+  const d=await api('/api/me/password',{method:'POST',body:JSON.stringify({currentPassword:$('acCurPw').value,newPassword:$('acNewPw').value})});
+  token=d.token;localStorage.setItem('hapa_token',token);
+  $('acCurPw').value='';$('acNewPw').value='';
+  m.textContent='✓ Password changed. Other devices were logged out.';m.style.color='var(--ok)';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function acDeactivate(){
+ const m=$('acDeactMsg');
+ if(!confirm('Deactivate your account? Your listings and profiles will be hidden immediately.'))return;
+ try{await api('/api/me/deactivate',{method:'POST',body:JSON.stringify({password:$('acDeactPw').value})});logout();}
+ catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+
+// ═══════════════════════════ HELP & LEGAL ═══════════════════════════
+let hpSiteInfo=null;
+async function hpView(v){
+ ['support','safety','rules','terms','privacy'].forEach(x=>{const b=$('hpTab-'+x);if(b)b.className='mp-tab'+(x===v?' active':'');});
+ const el=$('hpBody');
+ if(v==='support'){
+  el.innerHTML='<p class="muted">Loading…</p>';
+  if(!hpSiteInfo){try{hpSiteInfo=await publicApi('/api/public/site-info');}catch(e){hpSiteInfo={};}}
+  el.innerHTML=`<h3 style="margin:0 0 10px">Help &amp; Support</h3>
+   <div class="list" style="margin-bottom:14px">
+    <div class="row"><span class="muted">Support email</span>${hpSiteInfo.supportEmail?`<a href="mailto:${esc(hpSiteInfo.supportEmail)}" style="color:var(--a)">${esc(hpSiteInfo.supportEmail)}</a>`:'<span class="muted">Coming soon</span>'}</div>
+    <div class="row"><span class="muted">Support phone</span>${hpSiteInfo.supportPhone?`<a href="tel:${esc(hpSiteInfo.supportPhone)}" style="color:var(--a)">${esc(hpSiteInfo.supportPhone)}</a>`:'<span class="muted">Coming soon</span>'}</div></div>
+   <h4 style="margin:0 0 8px">Common questions</h4>
+   <div class="list" style="font-size:14px">
+    <div class="row" style="flex-direction:column;align-items:flex-start"><b>Why is my account pending?</b><span class="muted" style="font-size:13px">Every new account is personally reviewed by HAPA, usually within a few hours.</span></div>
+    <div class="row" style="flex-direction:column;align-items:flex-start"><b>How do payments work?</b><span class="muted" style="font-size:13px">HAPA does not process payments. You agree on price and pay the seller or provider directly — meet in person and inspect before paying.</span></div>
+    <div class="row" style="flex-direction:column;align-items:flex-start"><b>How do I become a driver, merchant or professional?</b><span class="muted" style="font-size:13px">Open Professional roles, choose a role and submit your documents. HAPA verifies every application.</span></div>
+    <div class="row" style="flex-direction:column;align-items:flex-start"><b>Something looks wrong or broken?</b><span class="muted" style="font-size:13px">Tell us below and we'll look into it.</span></div></div>
+   ${me&&me.status==='active'?`<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><h4 style="margin:0 0 8px">Report a problem</h4>
+    <div class="field"><label>What happened?</label><textarea id="hpProblem" rows="3" maxlength="1000" placeholder="Describe the problem…"></textarea></div>
+    <button class="btn primary" onclick="hpSendProblem()">Send to HAPA</button><div id="hpProblemMsg" style="font-size:13px;margin-top:6px" aria-live="polite"></div></div>`:''}`;
+ }
+ if(v==='safety')el.innerHTML=`<h3 style="margin:0 0 10px">Safety tips</h3><div class="list" style="font-size:14px">
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>🤝 Meet in public places</b><span class="muted" style="font-size:13px">Meet buyers and sellers in busy, public locations during daylight — markets, malls, petrol stations.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>💵 Pay only after inspecting</b><span class="muted" style="font-size:13px">Never send money in advance. Check the item, then pay in person.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>🪪 Look for the HAPA Verified badge</b><span class="muted" style="font-size:13px">Verified providers submitted real ID documents that HAPA reviewed. Guests and unverified users cannot sell.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>📞 Keep communication on record</b><span class="muted" style="font-size:13px">Use request messages in the app so there is a record if something goes wrong.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>🚩 Report suspicious activity</b><span class="muted" style="font-size:13px">Use the Report button on any listing or profile. HAPA reviews every report.</span></div></div>`;
+ if(v==='rules')el.innerHTML=`<h3 style="margin:0 0 10px">Community rules</h3><div class="list" style="font-size:14px">
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>Be honest</b><span class="muted" style="font-size:13px">Describe items and services accurately. No counterfeit goods, no misleading photos or prices.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>Sell only what is legal</b><span class="muted" style="font-size:13px">No stolen goods, weapons, drugs, or anything prohibited under Kenyan law.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>Respect other members</b><span class="muted" style="font-size:13px">No harassment, hate speech, threats or spam — in listings, profiles, messages or reviews.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>One person, one account</b><span class="muted" style="font-size:13px">Accounts are personally verified. Do not impersonate others or share your account.</span></div>
+  <div class="row" style="flex-direction:column;align-items:flex-start"><b>Breaking the rules has consequences</b><span class="muted" style="font-size:13px">HAPA may hide content, suspend roles or block accounts that violate these rules.</span></div></div>`;
+ if(v==='terms')el.innerHTML=`<h3 style="margin:0 0 10px">Terms of use</h3><div style="font-size:14px;line-height:1.7" class="muted">
+  <p><b style="color:var(--text)">1. The service.</b> HAPA is a local marketplace for Embu, Kenya that connects buyers with sellers, professionals, merchants and transport providers. HAPA is a venue only — it is not a party to any transaction between members.</p>
+  <p><b style="color:var(--text)">2. Accounts.</b> You must provide accurate details when registering. Every account is reviewed before activation and roles require verified documents. You are responsible for activity on your account.</p>
+  <p><b style="color:var(--text)">3. Payments.</b> HAPA does not process payments and never asks for money on behalf of a seller. All payments happen directly between members at their own risk.</p>
+  <p><b style="color:var(--text)">4. Content.</b> You keep ownership of what you post but grant HAPA permission to display it in the app. HAPA may hide or remove content that breaks the community rules or the law.</p>
+  <p><b style="color:var(--text)">5. Liability.</b> HAPA provides the service "as is" and is not liable for the quality, safety or legality of items and services offered by members, nor for disputes between members.</p>
+  <p><b style="color:var(--text)">6. Termination.</b> You may deactivate your account at any time from Account settings. HAPA may suspend or block accounts that violate these terms.</p>
+  <p><b style="color:var(--text)">7. Changes.</b> These terms may be updated as the service evolves; continued use means you accept the current version.</p></div>`;
+ if(v==='privacy')el.innerHTML=`<h3 style="margin:0 0 10px">Privacy policy</h3><div style="font-size:14px;line-height:1.7" class="muted">
+  <p><b style="color:var(--text)">What we collect.</b> Your name, phone/email, a selfie for identity review, and — for professional roles — the verification documents you submit. Plus the content you post (listings, profiles, requests, reviews).</p>
+  <p><b style="color:var(--text)">How it is used.</b> To verify accounts, run the marketplace, connect you with other members, and keep the community safe. We do not sell your personal data.</p>
+  <p><b style="color:var(--text)">Verification documents</b> are stored encrypted in private storage, are visible only to the HAPA owner during review, and are never shown publicly.</p>
+  <p><b style="color:var(--text)">What is public.</b> Only what you choose to publish: your listings, your public profile, your first name on reviews, and your phone number if you enable it or accept a request.</p>
+  <p><b style="color:var(--text)">Photos.</b> Location metadata (EXIF) is automatically removed from every uploaded image.</p>
+  <p><b style="color:var(--text)">Your choices.</b> You can edit your details, hide your phone number, pause your public profiles or deactivate your account at any time from Account settings.</p>
+  <p><b style="color:var(--text)">Contact.</b> Questions about your data? Reach us via Help &amp; Support.</p></div>`;
+}
+async function hpSendProblem(){
+ const m=$('hpProblemMsg');
+ try{await api('/api/reports',{method:'POST',body:JSON.stringify({target_type:'problem',reason:'app_problem',details:$('hpProblem').value})});
+  $('hpProblem').value='';m.textContent='✓ Sent. Thank you!';m.style.color='var(--ok)';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+
+// ═══════════════════ MERCHANT BUSINESS PROFILE EDITOR ═══════════════════
+let mcP=null,mcMedia={logo:null,gallery:[]},mcItems=[];
+function mcBack(){$('mc-edit').classList.add('hidden');$('ug-select').classList.remove('hidden');ppRevokeBlobUrls();}
+async function mcFetch(){const d=await api('/api/me/merchant-profile');mcP=d.profile;mcMedia={logo:d.logo||null,gallery:d.gallery||[]};mcItems=(await api('/api/me/merchant-items')).items||[];}
+async function mcOpen(){
+ $('ug-select').classList.add('hidden');$('mc-edit').classList.remove('hidden');
+ const body=$('mcEditBody');body.innerHTML='<p class="muted">Loading…</p>';
+ try{await mcFetch();}catch(e){
+  try{const d=await api('/api/me/merchant-profile',{method:'POST'});mcP=d.profile;mcMedia={logo:null,gallery:[]};mcItems=[];}
+  catch(e2){body.innerHTML=`<div class="notice bad">${esc(e2.message)}</div>`;return;}
+ }
+ const p=mcP;
+ const stC=p.status==='active'?'var(--ok)':p.status==='paused'?'var(--a)':p.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+ const stL=p.status==='active'?'Live — visible to the public':p.status==='paused'?'Paused — hidden from the public':p.status==='owner_hidden'?'Hidden by HAPA moderation':'Draft — not public yet';
+ body.innerHTML=`<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+   <span class="badge-pill" style="color:${stC};background:${stC}22">${stL}</span>
+   <div style="display:flex;gap:8px">${p.status==='owner_hidden'?'':p.status==='active'?`<button class="btn" onclick="mcStatus('pause')">Pause</button>`:p.status==='paused'?`<button class="btn ok" onclick="mcStatus('reactivate')">Reactivate</button>`:`<button class="btn ok" onclick="mcStatus('publish')">Publish shop</button>`}</div></div>
+  ${p.status==='owner_hidden'?`<div class="notice bad" style="margin-bottom:12px"><b>Your business profile was hidden by HAPA.</b>${p.moderation_note?`<p style="margin:4px 0 0;font-size:13px">Note: ${esc(p.moderation_note)}</p>`:''}<p style="margin:4px 0 0;font-size:13px">Contact HAPA support. Your Merchant role is not affected.</p></div>`:''}
+  <div class="notice" style="margin-bottom:14px;font-size:13px"><b>Verified business category (locked):</b> ${esc(p.verified_category||'Merchant')}<br><span class="muted">Contact HAPA support to change your verified category.</span></div>
+  <h4 style="margin:0 0 8px">Shop identity</h4>
+  <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+   ${mcMedia.logo?`<img ${ppImgAttr(mcMedia.logo.url)} alt="Logo" style="width:72px;height:72px;border-radius:14px;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:14px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">🏪</div>`}
+   <div style="display:grid;gap:6px">
+    <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${mcMedia.logo?'Replace logo':'Add logo'}<input type="file" accept="image/*" style="display:none" onchange="mcUpload('logo',this)"></label>
+    ${mcMedia.logo?`<button class="btn bad" onclick="mcDelMedia('${mcMedia.logo.id}')">Remove logo</button>`:''}</div></div>
+  <div class="field"><label>Business name *</label><input id="mcName" maxlength="120" value="${esc(p.business_name||'')}"></div>
+  <div class="field"><label>Description *</label><textarea id="mcDesc" rows="4" maxlength="2000" placeholder="What do you sell? What makes your shop special?">${esc(p.description||'')}</textarea></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+   <div class="field"><label>County</label><input id="mcCounty" maxlength="80" value="${esc(p.county||'')}"></div>
+   <div class="field"><label>Town</label><input id="mcTown" maxlength="80" value="${esc(p.town||'')}"></div>
+   <div class="field"><label>Service area</label><input id="mcArea" maxlength="200" value="${esc(p.service_area||'')}" placeholder="e.g. Embu town, deliveries within 10km"></div>
+   <div class="field"><label>Opening hours</label><input id="mcHours" maxlength="120" value="${esc(p.opening_hours||'')}" placeholder="Mon–Sat 8am–6pm"></div></div>
+  <h4 style="margin:14px 0 8px">Contact visibility</h4>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:6px"><input type="checkbox" id="mcPhoneVis" ${p.phone_visible?'checked':''} style="width:22px;height:22px"><span>Show my phone number publicly</span></label>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:14px"><input type="checkbox" id="mcWaVis" ${p.whatsapp_visible?'checked':''} style="width:22px;height:22px"><span>Show WhatsApp button publicly</span></label>
+  <button class="btn primary" style="width:100%;min-height:48px" onclick="mcSave()">Save changes</button>
+  <div id="mcMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+  <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
+   <h4 style="margin:0 0 4px">Shop photos <span class="muted" style="font-weight:400;font-size:12px">(${mcMedia.gallery.length}/12 · public)</span></h4>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:10px">${mcMedia.gallery.map(g=>`<div style="position:relative"><img ${ppImgAttr(g.url)} alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)"><button class="btn bad" style="position:absolute;top:4px;right:4px;min-width:36px;min-height:36px;padding:0" onclick="mcDelMedia('${g.id}')">✕</button></div>`).join('')||'<p class="muted" style="font-size:13px;grid-column:1/-1;margin:0">No photos yet.</p>'}</div>
+   <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">🖼 Add shop photos<input type="file" accept="image/*" multiple style="display:none" onchange="mcUpload('gallery',this)"></label>
+   <div id="mcMediaMsg" aria-live="polite" style="font-size:13px;margin-top:6px"></div></div>
+ </div>
+ <div class="card" style="margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+   <h3 style="margin:0">Products &amp; services <span class="muted" style="font-size:13px;font-weight:400">(${mcItems.filter(i=>i.status!=='archived').length}/50)</span></h3>
+   <button class="btn primary" onclick="mcItemForm()">+ Add product</button></div>
+  <div id="mcItemFormBox"></div>
+  <div class="list" id="mcItemList">${mcItems.map(it=>{
+   const c=it.status==='active'?'var(--ok)':it.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+   return`<div class="row" style="flex-wrap:wrap;gap:8px">
+    ${it.images&&it.images[0]?`<img ${ppImgAttr(it.images[0].url)} alt="" class="mp-my-thumb">`:''}
+    <span style="flex:1;min-width:140px"><b>${esc(it.title)}</b> <span class="badge-pill" style="color:${c};background:${c}22;font-size:11px">${it.status==='owner_hidden'?'Hidden by HAPA':it.status}</span><br>
+     <small class="muted">${it.price!=null?'KES '+fmtNum(it.price)+(it.price_unit?' '+esc(it.price_unit):''):'No price'}${it.in_stock===false?' · Out of stock':''}</small></span>
+    <span style="display:flex;gap:6px;flex-wrap:wrap">
+     ${it.status==='owner_hidden'?'':`<button class="btn" style="font-size:12px" onclick="mcItemForm('${it.id}')">Edit</button>
+     <button class="btn" style="font-size:12px" onclick="mcItemStatus('${it.id}','${it.status==='active'?'paused':'active'}')">${it.status==='active'?'Pause':'Activate'}</button>
+     <button class="btn bad" style="font-size:12px" onclick="if(confirm('Archive this product?'))mcItemStatus('${it.id}','archived')">Archive</button>`}</span></div>`;}).join('')||'<p class="muted" style="font-size:13px">No products yet. Add your first product so customers can order.</p>'}</div>
+ </div>`;
+ ppHydrateAuthImgs();
+}
+function mcForm(){return{business_name:$('mcName').value,description:$('mcDesc').value,county:$('mcCounty').value,town:$('mcTown').value,service_area:$('mcArea').value,opening_hours:$('mcHours').value,phone_visible:$('mcPhoneVis').checked,whatsapp_visible:$('mcWaVis').checked};}
+async function mcSave(){
+ const m=$('mcMsg');m.textContent='Saving…';m.style.color='';
+ try{await api('/api/me/merchant-profile',{method:'PATCH',body:JSON.stringify(mcForm())});m.textContent='✓ Saved.';m.style.color='var(--ok)';}
+ catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function mcStatus(a){try{await api('/api/me/merchant-profile/'+a,{method:'POST'});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+async function mcUpload(kind,input){
+ const files=Array.from(input.files||[]);input.value='';if(!files.length)return;
+ const m=$('mcMediaMsg')||$('mcMsg');
+ try{for(const f of files)await ppUploadFile('/api/me/merchant-profile/'+(kind==='logo'?'logo':'gallery'),f);await mcOpen();}
+ catch(e){if(m){m.textContent=e.message;m.style.color='var(--bad)';}}
+}
+async function mcDelMedia(id){try{await api('/api/me/provider-media/'+id,{method:'DELETE'});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+function mcItemForm(id){
+ const it=id?mcItems.find(x=>x.id===id):null;
+ $('mcItemFormBox').innerHTML=`<div style="background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">
+  <h4 style="margin:0 0 8px">${it?'Edit product':'New product'}</h4>
+  <div class="field"><label>Title *</label><input id="miTitle" maxlength="120" value="${esc(it?.title||'')}"></div>
+  <div class="field"><label>Description</label><textarea id="miDesc" rows="2" maxlength="1000">${esc(it?.description||'')}</textarea></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+   <div class="field"><label>Price (KES)</label><input id="miPrice" type="number" min="0" inputmode="numeric" value="${it?.price??''}"></div>
+   <div class="field"><label>Price unit</label><select id="miUnit">${['','per piece','per kg','per litre','per plate','per hour','per day','per service'].map(u=>`<option value="${u}"${it?.price_unit===u?' selected':''}>${u||'—'}</option>`).join('')}</select></div></div>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:10px"><input type="checkbox" id="miStock" ${it?(it.in_stock!==false?'checked':''):'checked'} style="width:22px;height:22px"><span>In stock / available</span></label>
+  ${it?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${(it.images||[]).map(im=>`<div style="position:relative"><img ${ppImgAttr(im.url)} alt="" class="mp-my-thumb"><button class="btn bad" style="position:absolute;top:-6px;right:-6px;min-width:30px;min-height:30px;padding:0;font-size:12px" onclick="mcDelMedia('${im.id}');event.stopPropagation()">✕</button></div>`).join('')}
+   <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-width:auto">📷 Add photo<input type="file" accept="image/*" multiple style="display:none" onchange="mcItemUpload('${it.id}',this)"></label></div>`:'<p class="muted" style="font-size:12px;margin:0 0 10px">Save the product first, then add photos.</p>'}
+  <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" onclick="mcItemSave('${id||''}')">${it?'Save product':'Add product'}</button><button class="btn" onclick="$('mcItemFormBox').innerHTML=''">Cancel</button></div>
+  <div id="miMsg" style="font-size:13px;margin-top:6px" aria-live="polite"></div></div>`;
+ ppHydrateAuthImgs();
+}
+async function mcItemSave(id){
+ const m=$('miMsg');m.textContent='Saving…';m.style.color='';
+ const body={title:$('miTitle').value,description:$('miDesc').value,price:$('miPrice').value===''?null:$('miPrice').value,price_unit:$('miUnit').value,in_stock:$('miStock').checked};
+ try{
+  if(id)await api('/api/me/merchant-items/'+id,{method:'PATCH',body:JSON.stringify(body)});
+  else await api('/api/me/merchant-items',{method:'POST',body:JSON.stringify(body)});
+  await mcOpen();
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function mcItemStatus(id,status){try{await api(`/api/me/merchant-items/${id}/status`,{method:'PATCH',body:JSON.stringify({status})});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+async function mcItemUpload(id,input){
+ const files=Array.from(input.files||[]);input.value='';if(!files.length)return;
+ try{for(const f of files)await ppUploadFile(`/api/me/merchant-items/${id}/images`,f);await mcOpen();mcItemForm(id);}
+ catch(e){mpInlineAlert(e.message);}
+}
+
+// ═══════════════════════ DRIVER PROFILE EDITOR ═══════════════════════
+let dvP=null,dvPhoto=null;
+function dvBack(){$('dv-edit').classList.add('hidden');$('ug-select').classList.remove('hidden');ppRevokeBlobUrls();}
+async function dvOpen(){
+ $('ug-select').classList.add('hidden');$('dv-edit').classList.remove('hidden');
+ const body=$('dvEditBody');body.innerHTML='<p class="muted">Loading…</p>';
+ try{const d=await api('/api/me/driver-profile');dvP=d.profile;dvPhoto=d.profile_photo||null;}
+ catch(e){
+  try{const d=await api('/api/me/driver-profile',{method:'POST'});dvP=d.profile;dvPhoto=null;}
+  catch(e2){body.innerHTML=`<div class="notice bad">${esc(e2.message)}</div>`;return;}
+ }
+ const p=dvP;
+ const stC=p.status==='active'?'var(--ok)':p.status==='paused'?'var(--a)':p.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+ const stL=p.status==='active'?'Live — visible to the public':p.status==='paused'?'Paused — hidden from the public':p.status==='owner_hidden'?'Hidden by HAPA moderation':'Draft — not public yet';
+ body.innerHTML=`<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+   <span class="badge-pill" style="color:${stC};background:${stC}22">${stL}</span>
+   <div style="display:flex;gap:8px">${p.status==='owner_hidden'?'':p.status==='active'?`<button class="btn" onclick="dvStatus('pause')">Pause</button>`:p.status==='paused'?`<button class="btn ok" onclick="dvStatus('reactivate')">Reactivate</button>`:`<button class="btn ok" onclick="dvStatus('publish')">Publish profile</button>`}</div></div>
+  ${p.status==='owner_hidden'?`<div class="notice bad" style="margin-bottom:12px"><b>Your driver profile was hidden by HAPA.</b>${p.moderation_note?`<p style="margin:4px 0 0;font-size:13px">Note: ${esc(p.moderation_note)}</p>`:''}<p style="margin:4px 0 0;font-size:13px">Contact HAPA support. Your Driver role is not affected.</p></div>`:''}
+  <div class="notice" style="margin-bottom:14px;font-size:13px"><b>Verified vehicle type (locked):</b> ${esc(p.vehicle_type||'Driver')}<br><span class="muted">Contact HAPA support to change your verified vehicle type.</span></div>
+  <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+   ${dvPhoto?`<img ${ppImgAttr(dvPhoto.url)} alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">🚗</div>`}
+   <div style="display:grid;gap:6px">
+    <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${dvPhoto?'Replace photo':'Add profile photo'}<input type="file" accept="image/*" style="display:none" onchange="dvUploadPhoto(this)"></label>
+    ${dvPhoto?`<button class="btn bad" onclick="dvDelPhoto('${dvPhoto.id}')">Remove photo</button>`:''}</div></div>
+  <div class="field"><label>Public display name *</label><input id="dvName" maxlength="80" value="${esc(p.display_name||'')}"></div>
+  <div class="field"><label>Vehicle description</label><textarea id="dvDesc" rows="3" maxlength="1000" placeholder="e.g. Clean 14-seater matatu, licensed and insured…">${esc(p.vehicle_description||'')}</textarea></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+   <div class="field"><label>County</label><input id="dvCounty" maxlength="80" value="${esc(p.county||'')}"></div>
+   <div class="field"><label>Town</label><input id="dvTown" maxlength="80" value="${esc(p.town||'')}"></div>
+   <div class="field"><label>Service area</label><input id="dvArea" maxlength="200" value="${esc(p.service_area||'')}" placeholder="Embu town and environs"></div>
+   <div class="field"><label>Availability</label><input id="dvAvail" maxlength="120" value="${esc(p.availability||'')}" placeholder="Daily 6am–9pm"></div></div>
+  <div class="field"><label>Pricing info</label><input id="dvPricing" maxlength="200" value="${esc(p.pricing_info||'')}" placeholder="Leave empty for “Price agreed with driver”"></div>
+  <h4 style="margin:14px 0 8px">Contact visibility</h4>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:6px"><input type="checkbox" id="dvPhoneVis" ${p.phone_visible?'checked':''} style="width:22px;height:22px"><span>Show my phone number publicly</span></label>
+  <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:14px"><input type="checkbox" id="dvWaVis" ${p.whatsapp_visible?'checked':''} style="width:22px;height:22px"><span>Show WhatsApp button publicly</span></label>
+  <button class="btn primary" style="width:100%;min-height:48px" onclick="dvSave()">Save changes</button>
+  <div id="dvMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+ </div>`;
+ ppHydrateAuthImgs();
+}
+async function dvSave(){
+ const m=$('dvMsg');m.textContent='Saving…';m.style.color='';
+ try{await api('/api/me/driver-profile',{method:'PATCH',body:JSON.stringify({display_name:$('dvName').value,vehicle_description:$('dvDesc').value,county:$('dvCounty').value,town:$('dvTown').value,service_area:$('dvArea').value,availability:$('dvAvail').value,pricing_info:$('dvPricing').value,phone_visible:$('dvPhoneVis').checked,whatsapp_visible:$('dvWaVis').checked})});
+  m.textContent='✓ Saved.';m.style.color='var(--ok)';
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+async function dvStatus(a){try{await api('/api/me/driver-profile/'+a,{method:'POST'});await dvOpen();}catch(e){mpInlineAlert(e.message);}}
+async function dvUploadPhoto(input){
+ const f=(input.files||[])[0];input.value='';if(!f)return;
+ try{await ppUploadFile('/api/me/driver-profile/profile-photo',f);await dvOpen();}catch(e){mpInlineAlert(e.message);}
+}
+async function dvDelPhoto(id){try{await api('/api/me/provider-media/'+id,{method:'DELETE'});await dvOpen();}catch(e){mpInlineAlert(e.message);}}
+
+// ═══════════════ OWNER: merchant/driver moderation, reports, reviews, requests, audit ═══════════════
+async function ownerProviderList(url,el,nameFn,setFn){
+ const box=$(el);if(!box)return;
+ try{
+  const rows=await api(url);
+  box.innerHTML=rows.length?rows.map(p=>{
+   const c=p.status==='active'?'var(--ok)':p.status==='owner_hidden'?'var(--bad)':'var(--muted)';
+   return`<div class="row" style="flex-wrap:wrap;gap:8px">
+    <div style="flex:1;min-width:160px"><b>${esc(nameFn(p))}</b> <span class="badge-pill" style="color:${c};background:${c}22;font-size:11px">${esc(p.status)}</span>
+     <div class="muted" style="font-size:12px">${esc(p.verified_category||p.vehicle_type||'')} · ${esc(p.email||p.account_name||'')}</div>
+     ${p.moderation_note?`<div class="muted" style="font-size:12px">Note: ${esc(p.moderation_note)}</div>`:''}</div>
+    <div style="display:flex;gap:6px">${p.status==='owner_hidden'?`<button class="btn ok" onclick="${setFn}('${p.id}','active')">Restore</button>`:p.status==='active'?`<button class="btn bad" onclick="${setFn}('${p.id}','owner_hidden')">Hide</button>`:''}</div></div>`;
+  }).join(''):'<p class="muted" style="font-size:13px;margin:0">None yet.</p>';
+ }catch(e){box.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+const loadOwnerMcProfiles=()=>ownerProviderList('/api/owner/merchant-profiles','ownerMcProfiles',p=>p.business_name||p.account_name||'—','ownerMcSetStatus');
+const loadOwnerDvProfiles=()=>ownerProviderList('/api/owner/driver-profiles','ownerDvProfiles',p=>p.display_name||p.account_name||'—','ownerDvSetStatus');
+async function ownerProviderSetStatus(kind,id,status,reload){
+ let note=null;
+ if(status==='owner_hidden'){note=prompt('Moderation note (visible to the provider):','');if(note===null)return;}
+ try{await api(`/api/owner/${kind}-profiles/${id}/status`,{method:'PATCH',body:JSON.stringify({status,moderation_note:note})});reload();}
+ catch(e){alert(e.message);}
+}
+const ownerMcSetStatus=(id,s)=>ownerProviderSetStatus('merchant',id,s,loadOwnerMcProfiles);
+const ownerDvSetStatus=(id,s)=>ownerProviderSetStatus('driver',id,s,loadOwnerDvProfiles);
+async function loadOwnerGenReports(){
+ const el=$('ownerGenReports');if(!el)return;
+ try{
+  const s=($('oGenReportFilter')||{}).value||'pending';
+  const rows=await api('/api/owner/reports?status='+s);
+  el.innerHTML=rows.length?rows.map(r=>`<div class="row" style="flex-wrap:wrap;gap:8px">
+   <span style="flex:1;min-width:160px"><b>${esc(r.target_type.replace(/_/g,' '))}</b> · ${esc(r.reason.replace(/_/g,' '))}<br>
+    <small class="muted">${esc(r.reporter_name||'—')} · ${fmtDate(r.created_at)} · ${esc(r.status)}</small>
+    ${r.details?`<div style="font-size:13px;margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere">${esc(r.details)}</div>`:''}</span>
+   ${r.status==='pending'?`<span style="display:flex;gap:6px"><button class="btn bad" onclick="ownerGenReport('${r.id}','reviewed')">Mark actioned</button><button class="btn" onclick="ownerGenReport('${r.id}','dismissed')">Dismiss</button></span>`:''}</div>`).join(''):'<p class="muted" style="font-size:13px;margin:0">No reports.</p>';
+ }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+async function ownerGenReport(id,status){try{await api('/api/owner/reports/'+id,{method:'PATCH',body:JSON.stringify({status})});loadOwnerGenReports();}catch(e){mpInlineAlert(e.message);}}
+async function loadOwnerReviews(){
+ const el=$('ownerReviews');if(!el)return;
+ try{
+  const rows=await api('/api/owner/reviews');
+  el.innerHTML=rows.length?rows.map(r=>`<div class="row" style="flex-wrap:wrap;gap:8px">
+   <span style="flex:1;min-width:160px"><span style="color:var(--a)">${'★'.repeat(r.rating)}</span> <b>${esc(r.reviewer_name)}</b> → ${esc(r.provider_account_name)} <span class="badge-pill" style="font-size:11px;color:${r.status==='active'?'var(--ok)':'var(--bad)'};background:${r.status==='active'?'var(--ok)':'var(--bad)'}22">${esc(r.status)}</span><br>
+    ${r.comment?`<span style="font-size:13px">${esc(r.comment)}</span><br>`:''}<small class="muted">${fmtDate(r.created_at)}</small></span>
+   <button class="btn ${r.status==='active'?'bad':'ok'}" onclick="ownerReviewStatus('${r.id}','${r.status==='active'?'owner_hidden':'active'}')">${r.status==='active'?'Hide':'Restore'}</button></div>`).join(''):'<p class="muted" style="font-size:13px;margin:0">No reviews yet.</p>';
+ }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+async function ownerReviewStatus(id,status){
+ let note=null;
+ if(status==='owner_hidden'){note=prompt('Moderation note:','');if(note===null)return;}
+ try{await api(`/api/owner/reviews/${id}/status`,{method:'PATCH',body:JSON.stringify({status,moderation_note:note})});loadOwnerReviews();}
+ catch(e){mpInlineAlert(e.message);}
+}
+async function loadOwnerRequests(){
+ const el=$('ownerRequests');if(!el)return;
+ try{
+  const s=($('oReqFilter')||{}).value||'';
+  const rows=await api('/api/owner/requests'+(s?'?status='+s:''));
+  el.innerHTML=rows.length?rows.slice(0,30).map(r=>`<div class="row" style="flex-wrap:wrap;gap:8px">
+   <span style="flex:1;min-width:160px"><b>${RQ_TYPE_LABEL[r.request_type]||r.request_type}</b> · ${esc(r.customer_name)} → ${esc(r.provider_name||r.provider_account_name)}<br>
+    <small class="muted">${fmtDate(r.created_at)}</small></span>${rqBadge(r.status)}</div>`).join(''):'<p class="muted" style="font-size:13px;margin:0">No requests yet.</p>';
+ }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+async function loadOwnerAudit(){
+ const el=$('ownerAudit');if(!el)return;
+ try{
+  const rows=await api('/api/owner/audit-log');
+  el.innerHTML=rows.length?rows.map(a=>`<div class="row" style="flex-wrap:wrap;gap:8px;padding:9px 12px">
+   <span style="flex:1;min-width:160px;font-size:13px"><b>${esc(a.action.replace(/_/g,' '))}</b> · ${esc(a.target_type||'')}${a.note?` — <span class="muted">${esc(a.note)}</span>`:''}<br>
+    <small class="muted">${esc(a.actor_name||'')} · ${new Date(a.created_at).toLocaleString()}</small></span></div>`).join(''):'<p class="muted" style="font-size:13px;margin:0">No actions logged yet.</p>';
+ }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
+}
+
+// ═══════════════ PWA ═══════════════
+if('serviceWorker'in navigator)window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
 </script></body></html>
