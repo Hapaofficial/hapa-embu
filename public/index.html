@@ -630,7 +630,7 @@ function showAuthPrompt(msg,isPending){
 }
 function hideAuthPrompt(){ $('authPromptPanel').classList.add('hidden'); }
 
-function logout(){localStorage.removeItem('hapa_token');location.href=location.pathname;}
+function logout(){try{ppRevokeBlobUrls();}catch{}localStorage.removeItem('hapa_token');location.href=location.pathname;}
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
@@ -765,7 +765,7 @@ async function ppRefreshCardState(){
  const b=$('ppPauseBtn');
  if(b){b.textContent=!ppProfile||ppProfile.status==='draft'?'Publish profile':ppProfile.status==='paused'?'Reactivate profile':ppProfile.status==='owner_hidden'?'Hidden by HAPA':'Pause profile';b.disabled=ppProfile&&ppProfile.status==='owner_hidden';}
 }
-function ppBack(){$('pp-edit').classList.add('hidden');$('pp-public').classList.add('hidden');$('ug-select').classList.remove('hidden');ppRefreshCardState();}
+function ppBack(){$('pp-edit').classList.add('hidden');$('pp-public').classList.add('hidden');$('ug-select').classList.remove('hidden');ppRevokeBlobUrls();ppRefreshCardState();}
 async function ppToggleActive(){
  await ppFetch();
  try{
@@ -807,7 +807,7 @@ async function ppOpen(){
 
   <h4 style="margin:0 0 8px">Public identity</h4>
   <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
-   <div style="position:relative">${ppProfilePhoto?`<img src="${esc(ppProfilePhoto.url)}" alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">⚙️</div>`}</div>
+   <div style="position:relative">${ppProfilePhoto?`<img ${ppImgAttr(ppProfilePhoto.url)} alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">⚙️</div>`}</div>
    <div style="display:grid;gap:6px">
     <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-height:44px" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${ppProfilePhoto?'Replace photo':'Add profile photo'}<input type="file" accept="image/*" style="display:none" onchange="ppUploadProfilePhoto(this)"></label>
     ${ppProfilePhoto?`<button class="btn bad" style="min-height:44px" onclick="ppRemoveProfilePhoto()">Remove photo</button>`:''}</div></div>
@@ -873,16 +873,18 @@ function ppLive(){
  if($('ppPctLabel'))$('ppPctLabel').textContent=pct+'%';
  if($('ppPctBar')){$('ppPctBar').style.width=pct+'%';$('ppPctBar').style.background=pct>=80?'var(--ok)':'var(--a)';}
  $('ppLivePreview').innerHTML=ppPublicCard({display_name:f.display_name,verified_category:ppProfile.verified_category,headline:f.headline,service_description:f.service_description,skills:f.skills,county:f.county,town:f.town,service_area:f.service_area,availability:f.availability,starting_price:f.starting_price===null?null:+f.starting_price,pricing_unit:f.pricing_unit,phone:f.phone_visible&&me.phone?me.phone:null,whatsapp:f.whatsapp_visible&&me.phone?me.phone:null,profile_photo:ppProfilePhoto,portfolio:ppPortfolio},true);
+ ppHydrateAuthImgs();
 }
 function ppRenderPhotos(){
  const g=$('ppPhotoGrid');if(!g)return;
  if($('ppPortCount'))$('ppPortCount').textContent=ppPortfolio.length;
  g.innerHTML=ppPortfolio.map((ph,i)=>`<div style="position:relative">
-  <img src="${esc(ph.url)}" alt="Portfolio photo ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">
+  <img ${ppImgAttr(ph.url)} alt="Portfolio photo ${i+1}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">
   <div style="display:flex;gap:4px;justify-content:center;margin-top:4px">
    <button class="btn" style="min-width:44px;min-height:44px;padding:2px" ${i===0?'disabled':''} aria-label="Move left" onclick="ppMove(${i},-1)">←</button>
    <button class="btn" style="min-width:44px;min-height:44px;padding:2px" ${i===ppPortfolio.length-1?'disabled':''} aria-label="Move right" onclick="ppMove(${i},1)">→</button>
    <button class="btn bad" style="min-width:44px;min-height:44px;padding:2px" aria-label="Remove photo" onclick="ppRemovePhoto('${ph.id}')">✕</button></div></div>`).join('')||'<p class="muted" style="font-size:13px;grid-column:1/-1;margin:0">No photos yet.</p>';
+ ppHydrateAuthImgs();
 }
 async function ppSave(){
  const m=$('ppMsg');
@@ -941,11 +943,42 @@ async function ppMove(i,dir){
  try{const d=await api('/api/me/professional-profile/portfolio/order',{method:'PATCH',body:JSON.stringify({ids})});ppPortfolio=d.portfolio;ppRenderPhotos();}
  catch(e){const m=$('ppPhotoMsg');if(m)m.textContent=e.message;}
 }
+// Authenticated owner media: <img> tags cannot attach the Authorization header,
+// so owner-only image URLs are fetched with the JWT and shown via blob object URLs.
+// The token is never placed in URLs, attributes or logs.
+const PP_OWNER_MEDIA_PREFIX='/api/me/professional-profile/media/';
+let ppBlobUrls={}; // authenticated media url -> object URL
+function ppImgAttr(url){return url&&url.startsWith(PP_OWNER_MEDIA_PREFIX)?`data-auth-src="${esc(url)}"`:`src="${esc(url||'')}"`;}
+function ppRevokeBlobUrls(keep){
+ for(const k of Object.keys(ppBlobUrls)){
+  if(keep&&keep.has(k))continue;
+  try{URL.revokeObjectURL(ppBlobUrls[k]);}catch{}
+  delete ppBlobUrls[k];
+ }
+}
+async function ppHydrateAuthImgs(){
+ const imgs=document.querySelectorAll('img[data-auth-src]');
+ for(const img of imgs){
+  const u=img.getAttribute('data-auth-src');
+  img.removeAttribute('data-auth-src');
+  if(ppBlobUrls[u]){img.src=ppBlobUrls[u];continue;}
+  try{
+   const r=await fetch(u,{headers:token?{Authorization:'Bearer '+token}:{}});
+   if(!r.ok)throw new Error('unavailable');
+   const b=await r.blob();
+   if(!ppBlobUrls[u])ppBlobUrls[u]=URL.createObjectURL(b);
+   img.src=ppBlobUrls[u];
+  }catch{img.removeAttribute('src');img.style.opacity='.35';} // grey placeholder, no retry loop, no error details
+ }
+ // garbage-collect object URLs for media no longer referenced (replaced/removed/rerendered)
+ const keep=new Set([...(ppProfilePhoto?[ppProfilePhoto.url]:[]),...ppPortfolio.map(p=>p.url)].filter(u=>u&&u.startsWith(PP_OWNER_MEDIA_PREFIX)));
+ ppRevokeBlobUrls(keep);
+}
 // Shared public profile card renderer (public page + live preview)
 function ppPublicCard(d,preview){
  return `<div class="card"${preview?' style="border:1px dashed var(--line)"':''}>
   <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
-   ${d.profile_photo?`<img src="${esc(d.profile_photo.url)}" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--line)">`:'<span style="font-size:44px">⚙️</span>'}
+   ${d.profile_photo?`<img ${ppImgAttr(d.profile_photo.url)} alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;background:var(--line)">`:'<span style="font-size:44px">⚙️</span>'}
    <div><h3 style="margin:0;overflow-wrap:anywhere">${esc(d.display_name||'')} <span class="badge-pill" style="color:var(--ok);background:#1d3a2f;font-size:11px;vertical-align:middle">✓ HAPA Verified</span></h3>
    <p class="muted" style="margin:2px 0 0;font-size:13px">${esc(d.verified_category||'Professional')}${d.town||d.county?' · '+esc([d.town,d.county].filter(Boolean).join(', ')):''}</p></div></div>
   ${d.headline?`<p style="font-weight:700;margin:0 0 8px;overflow-wrap:anywhere">${esc(d.headline)}</p>`:''}
@@ -955,7 +988,7 @@ function ppPublicCard(d,preview){
    ${d.starting_price!=null?`<div class="row"><span class="muted">Starting price</span><b>KES ${fmtNum(d.starting_price)}${d.pricing_unit?' '+esc(d.pricing_unit):''}</b></div>`:''}
    ${d.availability?`<div class="row"><span class="muted">Availability</span><span>${esc(d.availability)}</span></div>`:''}
    ${d.service_area?`<div class="row"><span class="muted">Service area</span><span>${esc(d.service_area)}</span></div>`:''}</div>
-  ${(d.portfolio||[]).length?`<p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">PORTFOLIO</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:12px">${d.portfolio.map(ph=>`<img src="${esc(ph.url)}" alt="Portfolio" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">`).join('')}</div>`:''}
+  ${(d.portfolio||[]).length?`<p class="muted" style="font-size:12px;font-weight:700;margin:0 0 6px">PORTFOLIO</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:12px">${d.portfolio.map(ph=>`<img ${ppImgAttr(ph.url)} alt="Portfolio" loading="lazy" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)">`).join('')}</div>`:''}
   <div style="display:flex;gap:8px">${d.phone?`<a class="btn primary" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="tel:${esc(d.phone)}">📞 Call</a>`:''}${d.whatsapp?`<a class="btn ok" style="flex:1;text-align:center;min-height:44px;line-height:30px" href="https://wa.me/${esc(String(d.whatsapp).replace(/[^0-9]/g,''))}" target="_blank" rel="noopener">WhatsApp</a>`:''}</div>
  </div>`;
 }
