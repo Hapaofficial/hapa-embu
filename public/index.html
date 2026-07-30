@@ -2623,7 +2623,7 @@ async function mcOpen(){
    ${mcMedia.logo?`<img ${ppImgAttr(mcMedia.logo.url)} alt="Logo" style="width:72px;height:72px;border-radius:14px;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:14px;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">🏪</div>`}
    <div style="display:grid;gap:6px">
     <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${mcMedia.logo?'Replace logo':'Add logo'}<input type="file" accept="image/*" style="display:none" onchange="mcUpload('logo',this)"></label>
-    ${mcMedia.logo?`<button class="btn bad" onclick="mcDelMedia('${mcMedia.logo.id}')">Remove logo</button>`:''}</div></div>
+    ${mcMedia.logo?`<button class="btn bad" onclick="mcDelLogo()">Remove logo</button>`:''}</div></div>
   <div class="field"><label>Business name *</label><input id="mcName" maxlength="120" value="${esc(p.business_name||'')}"></div>
   <div class="field"><label>Description *</label><textarea id="mcDesc" rows="4" maxlength="2000" placeholder="What do you sell? What makes your shop special?">${esc(p.description||'')}</textarea></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2638,7 +2638,7 @@ async function mcOpen(){
   <div id="mcMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
   <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
    <h4 style="margin:0 0 4px">Shop photos <span class="muted" style="font-weight:400;font-size:12px">(${mcMedia.gallery.length}/12 · public)</span></h4>
-   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:10px">${mcMedia.gallery.map(g=>`<div style="position:relative"><img ${ppImgAttr(g.url)} alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)"><button class="btn bad" style="position:absolute;top:4px;right:4px;min-width:36px;min-height:36px;padding:0" onclick="mcDelMedia('${g.id}')">✕</button></div>`).join('')||'<p class="muted" style="font-size:13px;grid-column:1/-1;margin:0">No photos yet.</p>'}</div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-bottom:10px">${mcMedia.gallery.map(g=>`<div style="position:relative"><img ${ppImgAttr(g.url)} alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--line)"><button class="btn bad" style="position:absolute;top:4px;right:4px;min-width:36px;min-height:36px;padding:0" onclick="mcDelGallery('${g.id}')">✕</button></div>`).join('')||'<p class="muted" style="font-size:13px;grid-column:1/-1;margin:0">No photos yet.</p>'}</div>
    <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">🖼 Add shop photos<input type="file" accept="image/*" multiple style="display:none" onchange="mcUpload('gallery',this)"></label>
    <div id="mcMediaMsg" aria-live="polite" style="font-size:13px;margin-top:6px"></div></div>
  </div>
@@ -2673,7 +2673,9 @@ async function mcUpload(kind,input){
  try{for(const f of files)await ppUploadFile('/api/me/merchant-profile/'+(kind==='logo'?'logo':'gallery'),f);await mcOpen();}
  catch(e){if(m){m.textContent=e.message;m.style.color='var(--bad)';}}
 }
-async function mcDelMedia(id){try{await api('/api/me/provider-media/'+id,{method:'DELETE'});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+async function mcDelLogo(){try{await api('/api/me/merchant-profile/logo',{method:'DELETE'});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+async function mcDelGallery(id){try{await api('/api/me/merchant-profile/gallery/'+id,{method:'DELETE'});await mcOpen();}catch(e){mpInlineAlert(e.message);}}
+async function mcDelItemImage(itemId,mediaId){try{await api(`/api/me/merchant-items/${itemId}/images/${mediaId}`,{method:'DELETE'});await mcOpen();mcItemForm(itemId);}catch(e){mpInlineAlert(e.message);}}
 function mcItemForm(id){
  const it=id?mcItems.find(x=>x.id===id):null;
  $('mcItemFormBox').innerHTML=`<div style="background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px">
@@ -2684,7 +2686,7 @@ function mcItemForm(id){
    <div class="field"><label>Price (KES)</label><input id="miPrice" type="number" min="0" inputmode="numeric" value="${it?.price??''}"></div>
    <div class="field"><label>Price unit</label><select id="miUnit">${['','per piece','per kg','per litre','per plate','per hour','per day','per service'].map(u=>`<option value="${u}"${it?.price_unit===u?' selected':''}>${u||'—'}</option>`).join('')}</select></div></div>
   <label class="row" style="cursor:pointer;gap:10px;justify-content:flex-start;margin-bottom:10px"><input type="checkbox" id="miStock" ${it?(it.in_stock!==false?'checked':''):'checked'} style="width:22px;height:22px"><span>In stock / available</span></label>
-  ${it?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${(it.images||[]).map(im=>`<div style="position:relative"><img ${ppImgAttr(im.url)} alt="" class="mp-my-thumb"><button class="btn bad" style="position:absolute;top:-6px;right:-6px;min-width:30px;min-height:30px;padding:0;font-size:12px" onclick="mcDelMedia('${im.id}');event.stopPropagation()">✕</button></div>`).join('')}
+  ${it?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${(it.images||[]).map(im=>`<div style="position:relative"><img ${ppImgAttr(im.url)} alt="" class="mp-my-thumb"><button class="btn bad" style="position:absolute;top:-6px;right:-6px;min-width:30px;min-height:30px;padding:0;font-size:12px" onclick="mcDelItemImage('${it.id}','${im.id}');event.stopPropagation()">✕</button></div>`).join('')}
    <label role="button" tabindex="0" class="btn ug-doc-btn" style="min-width:auto">📷 Add photo<input type="file" accept="image/*" multiple style="display:none" onchange="mcItemUpload('${it.id}',this)"></label></div>`:'<p class="muted" style="font-size:12px;margin:0 0 10px">Save the product first, then add photos.</p>'}
   <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" onclick="mcItemSave('${id||''}')">${it?'Save product':'Add product'}</button><button class="btn" onclick="$('mcItemFormBox').innerHTML=''">Cancel</button></div>
   <div id="miMsg" style="font-size:13px;margin-top:6px" aria-live="polite"></div></div>`;
@@ -2730,7 +2732,7 @@ async function dvOpen(){
    ${dvPhoto?`<img ${ppImgAttr(dvPhoto.url)} alt="Profile photo" style="width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--line)">`:`<div style="width:72px;height:72px;border-radius:50%;background:var(--line);display:flex;align-items:center;justify-content:center;font-size:30px">🚗</div>`}
    <div style="display:grid;gap:6px">
     <label role="button" tabindex="0" class="btn ug-doc-btn" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click();}">📷 ${dvPhoto?'Replace photo':'Add profile photo'}<input type="file" accept="image/*" style="display:none" onchange="dvUploadPhoto(this)"></label>
-    ${dvPhoto?`<button class="btn bad" onclick="dvDelPhoto('${dvPhoto.id}')">Remove photo</button>`:''}</div></div>
+    ${dvPhoto?`<button class="btn bad" onclick="dvDelPhoto()">Remove photo</button>`:''}</div></div>
   <div class="field"><label>Public display name *</label><input id="dvName" maxlength="80" value="${esc(p.display_name||'')}"></div>
   <div class="field"><label>Vehicle description</label><textarea id="dvDesc" rows="3" maxlength="1000" placeholder="e.g. Clean 14-seater matatu, licensed and insured…">${esc(p.vehicle_description||'')}</textarea></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2758,7 +2760,7 @@ async function dvUploadPhoto(input){
  const f=(input.files||[])[0];input.value='';if(!f)return;
  try{await ppUploadFile('/api/me/driver-profile/profile-photo',f);await dvOpen();}catch(e){mpInlineAlert(e.message);}
 }
-async function dvDelPhoto(id){try{await api('/api/me/provider-media/'+id,{method:'DELETE'});await dvOpen();}catch(e){mpInlineAlert(e.message);}}
+async function dvDelPhoto(){try{await api('/api/me/driver-profile/profile-photo',{method:'DELETE'});await dvOpen();}catch(e){mpInlineAlert(e.message);}}
 
 // ═══════════════ OWNER: merchant/driver moderation, reports, reviews, requests, audit ═══════════════
 async function ownerProviderList(url,el,nameFn,setFn){
