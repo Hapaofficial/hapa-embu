@@ -20,7 +20,7 @@ WHERE role='partner';
 -- Owner/customer assignment is enforced transactionally in server.js at startup.
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
-ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked'));
+ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked','deactivated'));
 UPDATE users SET capabilities=jsonb_set(capabilities,'{driver}','true',true),role='customer' WHERE role='driver';
 UPDATE users SET capabilities=jsonb_set(capabilities,'{merchant}','true',true),role='customer' WHERE role='merchant';
 UPDATE users SET role='customer',status=CASE WHEN status='blocked' THEN 'rejected' ELSE status END WHERE role='partner';
@@ -192,3 +192,173 @@ CREATE TABLE IF NOT EXISTS professional_portfolio_images(
  removed_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_portfolioimg_profile ON professional_portfolio_images(professional_profile_id,status);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- MVP completion sprint (all idempotent, additive only)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Account settings / deactivation
+ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
+
+-- Merchant public business profile (mirrors professional_profiles; separate
+-- from the verified application and private documents)
+CREATE TABLE IF NOT EXISTS merchant_profiles(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+ application_id UUID REFERENCES upgrade_applications(id) ON DELETE SET NULL,
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','active','paused','owner_hidden')),
+ verified_category TEXT NOT NULL DEFAULT '',
+ business_name TEXT NOT NULL DEFAULT '',
+ description TEXT NOT NULL DEFAULT '',
+ county TEXT NOT NULL DEFAULT '',
+ town TEXT NOT NULL DEFAULT '',
+ service_area TEXT NOT NULL DEFAULT '',
+ opening_hours TEXT NOT NULL DEFAULT '',
+ phone_visible BOOLEAN NOT NULL DEFAULT false,
+ whatsapp_visible BOOLEAN NOT NULL DEFAULT false,
+ logo_image_id UUID,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ published_at TIMESTAMPTZ, paused_at TIMESTAMPTZ, hidden_at TIMESTAMPTZ,
+ hidden_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ moderation_note TEXT, status_before_hidden TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_merchprofile_status ON merchant_profiles(status);
+
+-- Driver public profile
+CREATE TABLE IF NOT EXISTS driver_profiles(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+ application_id UUID REFERENCES upgrade_applications(id) ON DELETE SET NULL,
+ status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','active','paused','owner_hidden')),
+ vehicle_type TEXT NOT NULL DEFAULT '',
+ display_name TEXT NOT NULL DEFAULT '',
+ vehicle_description TEXT NOT NULL DEFAULT '',
+ county TEXT NOT NULL DEFAULT '',
+ town TEXT NOT NULL DEFAULT '',
+ service_area TEXT NOT NULL DEFAULT '',
+ availability TEXT NOT NULL DEFAULT '',
+ pricing_info TEXT NOT NULL DEFAULT '',
+ phone_visible BOOLEAN NOT NULL DEFAULT false,
+ whatsapp_visible BOOLEAN NOT NULL DEFAULT false,
+ profile_photo_id UUID,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ published_at TIMESTAMPTZ, paused_at TIMESTAMPTZ, hidden_at TIMESTAMPTZ,
+ hidden_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ moderation_note TEXT, status_before_hidden TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_driverprofile_status ON driver_profiles(status);
+
+-- Merchant items (products/services offered by a merchant business)
+CREATE TABLE IF NOT EXISTS merchant_items(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ merchant_profile_id UUID NOT NULL REFERENCES merchant_profiles(id) ON DELETE CASCADE,
+ title TEXT NOT NULL,
+ description TEXT NOT NULL DEFAULT '',
+ category TEXT NOT NULL DEFAULT '',
+ price NUMERIC(14,2),
+ price_unit TEXT NOT NULL DEFAULT '',
+ in_stock BOOLEAN NOT NULL DEFAULT true,
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','paused','archived','owner_hidden')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_merchitem_profile ON merchant_items(merchant_profile_id,status);
+
+-- Shared public media for merchant/driver modules (PII-free keys, soft delete).
+CREATE TABLE IF NOT EXISTS provider_media(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ owner_kind TEXT NOT NULL CHECK(owner_kind IN('merchant_profile','merchant_item','driver_profile')),
+ owner_id UUID NOT NULL,
+ kind TEXT NOT NULL CHECK(kind IN('logo','gallery','item','profile_photo')),
+ storage_provider TEXT NOT NULL,
+ storage_key TEXT NOT NULL UNIQUE,
+ mime_type TEXT NOT NULL,
+ size_bytes BIGINT NOT NULL,
+ width INTEGER, height INTEGER,
+ sha256 TEXT NOT NULL,
+ sort_order INTEGER NOT NULL DEFAULT 0,
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','removed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ removed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_providermedia_owner ON provider_media(owner_kind,owner_id,status);
+
+-- Unified request/enquiry/booking system
+CREATE TABLE IF NOT EXISTS service_requests(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider_type TEXT NOT NULL CHECK(provider_type IN('professional','merchant','driver')),
+ profile_id UUID NOT NULL,
+ item_id UUID REFERENCES merchant_items(id) ON DELETE SET NULL,
+ request_type TEXT NOT NULL CHECK(request_type IN('service','enquiry','order','reservation','ride','delivery','transport')),
+ pickup_text TEXT NOT NULL DEFAULT '',
+ destination_text TEXT NOT NULL DEFAULT '',
+ requested_for TEXT NOT NULL DEFAULT '',
+ note TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','accepted','declined','cancelled','completed')),
+ cancelled_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ accepted_at TIMESTAMPTZ, declined_at TIMESTAMPTZ, cancelled_at TIMESTAMPTZ, completed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_svcreq_customer ON service_requests(customer_id,status);
+CREATE INDEX IF NOT EXISTS idx_svcreq_provider ON service_requests(provider_user_id,status);
+
+-- Status history + in-request messages
+CREATE TABLE IF NOT EXISTS request_events(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ request_id UUID NOT NULL REFERENCES service_requests(id) ON DELETE CASCADE,
+ actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ event_type TEXT NOT NULL CHECK(event_type IN('created','status','message')),
+ status TEXT, message TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reqevents_request ON request_events(request_id,created_at);
+
+-- Reviews: one per completed request
+CREATE TABLE IF NOT EXISTS reviews(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ request_id UUID NOT NULL UNIQUE REFERENCES service_requests(id) ON DELETE CASCADE,
+ reviewer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider_type TEXT NOT NULL CHECK(provider_type IN('professional','merchant','driver')),
+ rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+ comment TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','owner_hidden')),
+ moderation_note TEXT,
+ hidden_at TIMESTAMPTZ,
+ hidden_by UUID REFERENCES users(id) ON DELETE SET NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_provider ON reviews(provider_user_id,provider_type,status);
+
+-- Generic reports (users, profiles, items, reviews, requests, general problems)
+CREATE TABLE IF NOT EXISTS reports(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reporter_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ target_type TEXT NOT NULL CHECK(target_type IN('user','professional_profile','merchant_profile','driver_profile','merchant_item','review','request','problem')),
+ target_id UUID,
+ reason TEXT NOT NULL,
+ details TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','reviewed','dismissed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ reviewed_at TIMESTAMPTZ,
+ reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reports_generic_status ON reports(status,target_type);
+
+-- Owner action audit trail
+CREATE TABLE IF NOT EXISTS owner_audit_log(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ action TEXT NOT NULL,
+ target_type TEXT NOT NULL DEFAULT '',
+ target_id TEXT NOT NULL DEFAULT '',
+ note TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_owneraudit_created ON owner_audit_log(created_at DESC);

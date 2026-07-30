@@ -31,11 +31,27 @@ app.use((req,res,next)=>{
  if(PRIVATE_PATH_RE.test(path.posix.normalize(p)))return res.status(404).json({error:'Not found'});
  next();
 });
+// ── Security headers (CSP allows the inline-script SPA; no external origins
+// except https images/signed-URL fetches) ─────────────────────────────────────
+app.use((req,res,next)=>{
+ res.setHeader('X-Content-Type-Options','nosniff');
+ res.setHeader('X-Frame-Options','DENY');
+ res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+ res.setHeader('Permissions-Policy','geolocation=(), microphone=(), payment=()');
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
+ if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
+ next();
+});
 app.use(express.static(path.join(__dirname,'public')));
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
-const authLimiter=rateLimit({windowMs:15*60*1000,max:10,standardHeaders:true,legacyHeaders:false,message:{error:'Too many attempts. Please try again in 15 minutes.'}});
-const otpLimiter=rateLimit({windowMs:10*60*1000,max:3,standardHeaders:true,legacyHeaders:false,message:{error:'Too many code requests. Please try again in 10 minutes.'}});
+// Demo/dev mode relaxes limits so automated test suites can run; production
+// (AUTH_MODE unset or not 'demo') keeps strict limits.
+const RL=n=>authMode==='demo'?1000:n;
+const authLimiter=rateLimit({windowMs:15*60*1000,max:RL(10),standardHeaders:true,legacyHeaders:false,message:{error:'Too many attempts. Please try again in 15 minutes.'}});
+const otpLimiter=rateLimit({windowMs:10*60*1000,max:RL(3),standardHeaders:true,legacyHeaders:false,message:{error:'Too many code requests. Please try again in 10 minutes.'}});
+const uploadLimiter=rateLimit({windowMs:15*60*1000,max:RL(40),standardHeaders:true,legacyHeaders:false,message:{error:'Too many uploads. Please try again shortly.'}});
+const writeLimiter=rateLimit({windowMs:15*60*1000,max:RL(30),standardHeaders:true,legacyHeaders:false,message:{error:'Too many requests. Please slow down and try again shortly.'}});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const email=v=>String(v||'').trim().toLowerCase()||null;
@@ -49,7 +65,7 @@ const tok=u=>jwt.sign({sub:u.id,tv:+u.token_version||0},secret,{expiresIn:'7d',i
 const isVerifiedExpr=(t='u')=>
  `(${t}.status='active' AND (${t}.email_verified=true OR ${t}.phone_verified=true) AND ${t}.profile_photo_url IS NOT NULL AND ${t}.profile_photo_url<>'')`;
 
-async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||r.rows[0].status==='blocked')throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
+async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||['blocked','deactivated'].includes(r.rows[0].status))throw 0;if((+r.rows[0].token_version||0)!==(+d.tv||0))throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
 const owner=(req,res,next)=>req.user.role==='owner'?next():res.status(403).json({error:'Owner only'});
 const active=(req,res,next)=>(req.user.role==='owner'||req.user.status==='active')?next():res.status(403).json({error:'Account not active'});
 async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.random()*900000));await q(`INSERT INTO verification_codes(user_id,channel,purpose,code,expires_at) VALUES($1,$2,$3,$4,NOW()+interval '10 min')`,[userId,channel,purpose,c]);return c}
@@ -79,6 +95,12 @@ async function boot(){
  finally{client.release();}
 }
 
+// Owner action audit trail (best-effort; never blocks the action)
+async function audit(actorId,action,targetType,targetId,note){
+ try{await q(`INSERT INTO owner_audit_log(actor_id,action,target_type,target_id,note) VALUES($1,$2,$3,$4,$5)`,
+  [actorId,String(action).slice(0,80),String(targetType||'').slice(0,40),String(targetId||'').slice(0,64),String(note||'').slice(0,500)]);}catch(e){console.error('audit failed',e.message);}
+}
+
 // ── Core ──────────────────────────────────────────────────────────────────────
 app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
 
@@ -99,6 +121,7 @@ app.post('/api/auth/login',authLimiter,async(req,res)=>{
  let id=String(req.body.identifier||'').trim(),e=email(id),p=phone(id),r=await q(`SELECT * FROM users WHERE lower(coalesce(email,''))=lower($1) OR phone=$2 LIMIT 1`,[e||'',p||'']),u=r.rows[0];
  if(!u||!await bcrypt.compare(String(req.body.password||''),u.password_hash))return res.status(401).json({error:'Wrong login or password'});
  if(u.status==='blocked')return res.status(403).json({error:'Account blocked'});
+ if(u.status==='deactivated')return res.status(403).json({error:'This account was deactivated. Contact HAPA support to restore it.'});
  res.json({token:tok(u),user:safe(u)});
 });
 
@@ -624,7 +647,13 @@ app.get('/api/owner/dashboard',auth,owner,async(req,res)=>res.json({
  pendingAccess:+(await q(`SELECT count(*) n FROM access_requests WHERE status='pending'`)).rows[0].n,
  pendingUpgrades:+(await q(`SELECT count(*) n FROM upgrade_applications WHERE status='pending'`)).rows[0].n,
  activeListings:+(await q(`SELECT count(*) n FROM marketplace_listings WHERE status='active'`)).rows[0].n,
- pendingReports:+(await q(`SELECT count(*) n FROM listing_reports WHERE status='pending'`)).rows[0].n
+ pendingReports:+(await q(`SELECT count(*) n FROM listing_reports WHERE status='pending'`)).rows[0].n,
+ pendingGenericReports:+(await q(`SELECT count(*) n FROM reports WHERE status='pending'`)).rows[0].n,
+ openRequests:+(await q(`SELECT count(*) n FROM service_requests WHERE status IN('pending','accepted')`)).rows[0].n,
+ activeProfessionalProfiles:+(await q(`SELECT count(*) n FROM professional_profiles WHERE status='active'`)).rows[0].n,
+ activeMerchantProfiles:+(await q(`SELECT count(*) n FROM merchant_profiles WHERE status='active'`)).rows[0].n,
+ activeDriverProfiles:+(await q(`SELECT count(*) n FROM driver_profiles WHERE status='active'`)).rows[0].n,
+ reviews:+(await q(`SELECT count(*) n FROM reviews`)).rows[0].n
 }));
 
 app.get('/api/owner/access',auth,owner,async(req,res)=>res.json((await q(`SELECT a.*,u.name,u.email,u.phone,u.profile_photo_url FROM access_requests a JOIN users u ON u.id=a.user_id ORDER BY a.created_at DESC`)).rows));
@@ -681,6 +710,7 @@ app.patch('/api/owner/upgrades/:id/status',auth,owner,async(req,res)=>{
   }else if(status==='rejected'&&['approved','suspended'].includes(a.status)){
    await q(`UPDATE users SET capabilities=jsonb_set(capabilities,ARRAY[$2],'false',true) WHERE id=$1`,[a.user_id,a.type]);
   }
+  await audit(req.user.id,'upgrade_'+status,'upgrade_application',req.params.id,note);
   res.json({id:r.rows[0].id,type:r.rows[0].type,status:r.rows[0].status,review_note:r.rows[0].review_note,reviewed_at:r.rows[0].reviewed_at});
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
@@ -745,6 +775,7 @@ app.patch('/api/owner/users/:id/status',auth,owner,async(req,res)=>{
   if(!chk.rowCount)return res.status(404).json({error:'User not found'});
   if(chk.rows[0].role==='owner')return res.status(403).json({error:'Cannot modify owner account'});
   const r=await q('UPDATE users SET status=$2 WHERE id=$1 RETURNING id,name,email,role,status',[req.params.id,s]);
+  await audit(req.user.id,'set_user_status_'+s,'user',req.params.id,String(req.body.note||''));
   res.json(r.rows[0]);
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
@@ -763,6 +794,7 @@ app.patch('/api/owner/listings/:id/status',auth,owner,async(req,res)=>{
   if(!['active','hidden','removed'].includes(s))return res.status(400).json({error:'Invalid status'});
   const r=await q('UPDATE marketplace_listings SET status=$2,updated_at=NOW() WHERE id=$1 RETURNING *',[req.params.id,s]);
   if(!r.rowCount)return res.status(404).json({error:'Listing not found'});
+  await audit(req.user.id,'set_listing_status_'+s,'listing',req.params.id,'');
   res.json(r.rows[0]);
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
@@ -1053,11 +1085,19 @@ app.patch('/api/owner/professional-profiles/:id/status',auth,owner,async(req,res
     hidden_at=CASE WHEN $2='owner_hidden' THEN NOW() ELSE NULL END,
     hidden_by=CASE WHEN $2='owner_hidden' THEN $4::uuid ELSE NULL END
     WHERE id=$1 RETURNING *`,[p.id,newStatus,moderation_note?String(moderation_note).slice(0,500):null,req.user.id,p.status])).rows[0];
+  await audit(req.user.id,status==='owner_hidden'?'hide_professional_profile':'restore_professional_profile','professional_profile',p.id,moderation_note);
   res.json({...ppSafe(r),moderation_note:r.moderation_note});
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
+// ── MVP modules: account, merchant, driver, unified requests/reviews/reports ─
+const pm=require('./lib/providerMedia').init({q,auth,active});
+pm.registerRoutes(app);
+const moduleDeps={q,pool,auth,active,owner,docUpload,pm,audit,isVerifiedExpr,bcrypt,tok,safe,email,phone,strong,uploadLimiter,writeLimiter};
+require('./routes/account')(app,moduleDeps);
+require('./routes/merchant')(app,moduleDeps);
+require('./routes/driver')(app,moduleDeps);
+require('./routes/requests')(app,moduleDeps);
 
 app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
 boot().then(()=>app.listen(PORT,'0.0.0.0',()=>console.log('HAPA v1.6 running on '+PORT))).catch(e=>{console.error(e);process.exit(1)});
