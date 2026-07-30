@@ -1,16 +1,32 @@
-# Deploy HAPA v1.5 on Render
+# Deploy HAPA v1.6 on Render
 
 1. Upload the **contents** of this folder to the root of the `hapa-embu` GitHub repository.
 2. Keep Render Root Directory empty.
-3. Confirm Environment contains `DATABASE_URL`, `JWT_SECRET`, `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME`, `PAYMENT_MODE`.
-4. Use **Manual Deploy → Clear build cache & deploy** once after replacing the old v1.2 package.
-5. Check `/api/health`; it should report `version: 1.4.0` and `database: postgres`.
+3. Confirm Environment contains the variables listed below.
+4. Use **Manual Deploy → Clear build cache & deploy** after replacing an older package.
+5. Check `/api/health`; it should report `version: 1.6.0` and `database: postgres`.
 6. Log in with the owner email/password.
 
-## v1.5 password recovery
+## Environment variables
 
-For testing on Render add:
+### Required
+- `DATABASE_URL` — PostgreSQL connection string.
+- `JWT_SECRET` — long random string; changing it logs everyone out.
+- `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME` — the single owner account.
 
-`RECOVERY_MODE=demo`
+### Auth / payments / recovery modes
+- `AUTH_MODE` — **must NOT be `demo` in production.** Demo mode returns verification codes in API responses and relaxes rate limits.
+- `PAYMENT_MODE` — keep `off` (no payment processing is implemented).
+- `RECOVERY_MODE` — `demo` for testing; `live` with Resend (email) and/or Twilio (SMS) env vars per README.md.
 
-After the flow is verified, switch to `RECOVERY_MODE=live` and configure either Resend (email) and/or Twilio (SMS) using the environment variables documented in README.md.
+### Storage
+- `PUBLIC_MEDIA_STORAGE_MODE` — `s3` or `local`; with `s3` set `PUBLIC_MEDIA_S3_BUCKET`, `PUBLIC_MEDIA_S3_ENDPOINT`, `PUBLIC_MEDIA_S3_REGION`, `PUBLIC_MEDIA_S3_ACCESS_KEY_ID`, `PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY`, optional `PUBLIC_MEDIA_S3_FORCE_PATH_STYLE`.
+- `DOCUMENT_STORAGE_MODE` — `s3` or `local`; with `s3` set `DOCUMENT_S3_BUCKET`, `DOCUMENT_S3_ENDPOINT`, `DOCUMENT_S3_ACCESS_KEY_ID`, `DOCUMENT_S3_SECRET_ACCESS_KEY`, and `DOCUMENT_ENCRYPTION_KEY` (verification documents are encrypted at rest).
+
+### Site info (shown on the Help & Support page; all optional, hidden when unset)
+- `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `LEGAL_ENTITY_NAME`, `LEGAL_ADDRESS`.
+
+## v1.6 notes
+- Migrations in `sql/schema.sql` are additive and idempotent; they run automatically at boot.
+- New modules: merchant shops + products, driver profiles, unified customer↔provider requests with reviews, account settings (profile edit / password change / deactivation), generic reports, owner audit log.
+- PWA: `manifest.webmanifest` + `sw.js` (service worker never caches `/api/` responses).
