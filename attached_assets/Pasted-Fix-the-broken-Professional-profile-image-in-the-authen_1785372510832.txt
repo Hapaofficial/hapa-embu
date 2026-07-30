@@ -1,0 +1,61 @@
+Fix the broken Professional profile image in the authenticated profile editor.
+
+Current branch:
+feature/professional-public-profile
+
+Known root cause:
+The editor uses:
+GET /api/public/professional-media/:imageId
+
+That route correctly requires the profile to be publicly active, so images from draft, paused, or owner_hidden profiles return 404 inside the owner's own editor.
+
+Implement only the minimal safe fix:
+
+1. Add an authenticated route such as:
+   GET /api/me/professional-profile/media/:imageId
+
+2. This route must:
+   - require authentication
+   - confirm the image belongs to the logged-in user's own Professional profile
+   - allow the owner to view their own image when the profile is draft, active, paused, or owner_hidden
+   - reject images belonging to another user
+   - use the existing publicMediaStorage adapter
+   - generate a fresh short-lived signed URL or use the existing safe serving method
+   - never expose storage credentials or storage keys
+
+3. Keep the existing public route unchanged:
+   GET /api/public/professional-media/:imageId
+   It must continue serving images only for publicly active profiles.
+
+4. Update authenticated editor/profile responses so profile and portfolio image URLs use the new /api/me/... route.
+
+5. Public marketplace and public profile responses must continue using the existing /api/public/... route.
+
+6. Add tests proving:
+   - authenticated owner can view their own draft profile photo
+   - authenticated owner can view their own paused and owner_hidden media
+   - unauthenticated request is rejected
+   - another customer cannot access the image
+   - draft media remains unavailable through the public route
+   - active media remains available through the public route
+   - no private-document route or bucket is affected
+
+7. Do not address the separate local-mode fixture issue in this commit.
+8. Do not change Cloudflare, secrets, database schema, or migrations.
+9. Run the complete test suite.
+
+If all tests pass:
+- create one commit:
+  fix: serve professional media in authenticated editor
+- push only feature/professional-public-profile
+
+Do not merge into main.
+Do not deploy production.
+Do not manually deploy Render.
+
+Return:
+- exact files changed
+- test results
+- commit SHA
+- push result
+- whether Render staging auto-deployment started
