@@ -220,6 +220,26 @@ async function makeUser(ownerTok, label, capType, details) {
   ok('frontend uses secure storage bridge', html.includes('SecureStoragePlugin') && html.includes('secureLoadToken'));
   ok('frontend never puts token in URL', !/[?&]token=/.test(html));
 
+  // ══ 9. UI DESIGN SYSTEM & OWNER POLISH (static) ══
+  ok('design system: hapa css variables defined', ['--hapa-background:#F5F7FA', '--hapa-surface:#FFFFFF', '--hapa-header:#101C2C', '--hapa-primary:#F5A623', '--hapa-danger:#C63C49', '--hapa-success:#198754', '--hapa-border:#E1E6ED'].every(v => html.includes(v)));
+  ok('design system: legacy vars remapped to hapa tokens', html.includes('--bg:var(--hapa-background)') && html.includes('--a:var(--hapa-primary)') && html.includes('--bad:var(--hapa-danger)'));
+  ok('design system: no dark-theme input backgrounds remain', !html.includes('#0d1528') && !html.includes('#0b1020') && !html.includes('#11182b'));
+  ok('design system: primary and destructive buttons styled distinctly', html.includes('.btn.primary{background:var(--hapa-primary)') && html.includes('.btn.bad{background:var(--hapa-surface);color:var(--hapa-danger)'));
+  ok('owner stats: all dashboard keys have english labels', ['pendingGenericReports', 'openRequests', 'activeProfessionalProfiles', 'activeMerchantProfiles', 'activeDriverProfiles', 'reviews'].every(k => new RegExp(k + ":'[A-Z]").test(html)));
+  ok('owner stats: listing vs user/content reports named distinctly', html.includes("pendingReports:'Pending listing reports'") && html.includes("pendingGenericReports:'Pending user & content reports'"));
+  ok('owner stats: unknown keys humanized, never raw', html.includes('function ownerStatLabel(') && !html.includes('OWNER_STAT_LABELS[k]||k}'));
+  ok('owner actions: suspend/reactivate labels, no block/unblock', html.includes('>Suspend account<') && html.includes('>Reactivate account<') && !html.includes('>Block<') && !html.includes('>Unblock<'));
+  ok('owner actions: reject only shown for pending users', /u\.status==='pending'\?[\s\S]{0,220}Reject application/.test(html) && !/u\.status!=='rejected'/.test(html));
+  ok('owner actions: confirmation modal replaces browser confirm', html.includes('function hapaConfirm(') && !html.includes("confirm('Are you sure you want to '"));
+  ok('owner actions: suspension consequence explains history preserved', html.includes('verification history are preserved'));
+  ok('activity tab: no future-release placeholder', !html.includes('future release') && html.includes('No additional activity recorded yet.'));
+  ok('application view: KES price formatting helper', html.includes('function ugFieldValue(') && html.includes("'KES '+fmtNum"));
+  ok('application view: county capitalized for display', /county\|town\|city/.test(html));
+  ok('application view: open securely action for private docs', html.includes('ugOpenDocSecure') && html.includes('>Open securely<'));
+  ok('help: no coming-soon placeholders anywhere', !/coming soon/i.test(html));
+  ok('help: fallback when no support contact configured', html.includes('Direct support contact details are not configured yet.'));
+  ok('theme-color matches header navy', html.includes('<meta name="theme-color" content="#101C2C">'));
+
   // ══ CLEANUP — deactivate synthetic users ══
   for (const u of [cust, stranger, merch, merch2, drv]) {
     await j('POST', '/api/me/deactivate', u.tok, { password: PW });
