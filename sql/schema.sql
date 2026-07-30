@@ -429,3 +429,222 @@ CREATE TABLE IF NOT EXISTS fare_rate_cards(
  updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS fare_cards_area_idx ON fare_rate_cards(area_id,vehicle_category,effective_from DESC);
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- REAL-TIME RIDE-HAILING (Embu pilot; Kenya-wide via geo_areas). All additive.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Extended fare components (additive to existing fare_rate_cards)
+ALTER TABLE fare_rate_cards ADD COLUMN IF NOT EXISTS booking_fee NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE fare_rate_cards ADD COLUMN IF NOT EXISTS waiting_per_min NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE fare_rate_cards ADD COLUMN IF NOT EXISTS cancellation_fee NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE fare_rate_cards ADD COLUMN IF NOT EXISTS commission_pct NUMERIC(5,2) NOT NULL DEFAULT 15;
+
+-- Audited operational/legal configuration (no hardcoded legal limits in code)
+CREATE TABLE IF NOT EXISTS compliance_settings(
+ key TEXT PRIMARY KEY, value JSONB NOT NULL,
+ note TEXT NOT NULL DEFAULT '', updated_by UUID REFERENCES users(id),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS user_agreement_acceptances(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ agreement TEXT NOT NULL, version TEXT NOT NULL,
+ accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(user_id,agreement,version)
+);
+
+-- Driver fleet & eligibility
+CREATE TABLE IF NOT EXISTS driver_vehicles(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ category TEXT NOT NULL, make TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '',
+ colour TEXT NOT NULL DEFAULT '', registration_number TEXT NOT NULL,
+ year INTEGER, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','approved','rejected','retired')),
+ moderation_note TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS driver_vehicles_reg_uniq ON driver_vehicles(LOWER(registration_number)) WHERE status IN('pending','approved');
+CREATE TABLE IF NOT EXISTS driver_document_status(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ doc_type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','approved','rejected','expired')),
+ reference TEXT NOT NULL DEFAULT '', expires_on DATE,
+ reviewed_by UUID REFERENCES users(id), reviewed_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ,
+ UNIQUE(driver_user_id,doc_type)
+);
+CREATE TABLE IF NOT EXISTS driver_operating_zones(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ zone_id UUID NOT NULL REFERENCES geo_areas(id) ON DELETE CASCADE,
+ status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN('approved','revoked')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(driver_user_id,zone_id)
+);
+CREATE TABLE IF NOT EXISTS driver_availability_sessions(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ zone_id UUID NOT NULL REFERENCES geo_areas(id),
+ vehicle_id UUID NOT NULL REFERENCES driver_vehicles(id),
+ status TEXT NOT NULL DEFAULT 'online' CHECK(status IN('online','paused','ended')),
+ started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ended_at TIMESTAMPTZ,
+ online_seconds INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_session_per_driver ON driver_availability_sessions(driver_user_id) WHERE status IN('online','paused');
+CREATE TABLE IF NOT EXISTS driver_presence(
+ driver_user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ session_id UUID REFERENCES driver_availability_sessions(id) ON DELETE SET NULL,
+ lat DOUBLE PRECISION, lng DOUBLE PRECISION, accuracy_m REAL, heading REAL, speed_mps REAL,
+ seq BIGINT NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Quotes & rides
+CREATE TABLE IF NOT EXISTS fare_quotes(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ rider_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ zone_id UUID NOT NULL REFERENCES geo_areas(id),
+ rate_card_id UUID NOT NULL REFERENCES fare_rate_cards(id),
+ vehicle_category TEXT NOT NULL, currency TEXT NOT NULL DEFAULT 'KES',
+ distance_m INTEGER NOT NULL, duration_s INTEGER NOT NULL,
+ components JSONB NOT NULL, total NUMERIC(10,2) NOT NULL,
+ demand_pricing BOOLEAN NOT NULL DEFAULT FALSE, route_source TEXT NOT NULL DEFAULT 'manual',
+ expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ride_requests(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ rider_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ quote_id UUID NOT NULL REFERENCES fare_quotes(id),
+ zone_id UUID NOT NULL REFERENCES geo_areas(id),
+ vehicle_category TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'searching' CHECK(status IN('draft','quoted','searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','completed','rider_cancelled','driver_cancelled','declined','no_driver_available','payment_pending','payment_failed','closed')),
+ driver_user_id UUID REFERENCES users(id), vehicle_id UUID REFERENCES driver_vehicles(id),
+ pickup_lat DOUBLE PRECISION NOT NULL, pickup_lng DOUBLE PRECISION NOT NULL,
+ dest_lat DOUBLE PRECISION NOT NULL, dest_lng DOUBLE PRECISION NOT NULL,
+ pickup_address TEXT NOT NULL DEFAULT '', dest_address TEXT NOT NULL DEFAULT '',
+ pickup_note TEXT NOT NULL DEFAULT '', landmark TEXT NOT NULL DEFAULT '',
+ payment_method TEXT NOT NULL DEFAULT 'cash' CHECK(payment_method IN('cash','mpesa')),
+ pin_hash TEXT NOT NULL DEFAULT '', pin_attempts INTEGER NOT NULL DEFAULT 0,
+ idempotency_key TEXT NOT NULL,
+ search_started_at TIMESTAMPTZ, assigned_at TIMESTAMPTZ, arrived_at TIMESTAMPTZ,
+ started_at TIMESTAMPTZ, completed_at TIMESTAMPTZ, cancelled_at TIMESTAMPTZ, closed_at TIMESTAMPTZ,
+ cancel_reason TEXT NOT NULL DEFAULT '', cancelled_by UUID REFERENCES users(id),
+ final_fare NUMERIC(10,2), final_components JSONB, fare_difference_note TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ride_idem_uniq ON ride_requests(rider_id,idempotency_key);
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_ride_per_rider ON ride_requests(rider_id) WHERE status IN('searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','payment_pending');
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_ride_per_driver ON ride_requests(driver_user_id) WHERE status IN('driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress');
+CREATE TABLE IF NOT EXISTS ride_offers(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ round INTEGER NOT NULL DEFAULT 1,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','accepted','declined','expired','withdrawn')),
+ pickup_distance_m INTEGER, expires_at TIMESTAMPTZ NOT NULL,
+ responded_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(ride_id,driver_user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_pending_offer_per_driver ON ride_offers(driver_user_id) WHERE status='pending';
+CREATE UNIQUE INDEX IF NOT EXISTS one_pending_offer_per_ride ON ride_offers(ride_id) WHERE status='pending';
+CREATE TABLE IF NOT EXISTS ride_events(
+ id BIGSERIAL PRIMARY KEY,
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ actor_id UUID REFERENCES users(id), event_type TEXT NOT NULL,
+ payload JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ride_events_ride_idx ON ride_events(ride_id,id);
+CREATE TABLE IF NOT EXISTS ride_location_samples(
+ id BIGSERIAL PRIMARY KEY,
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE CASCADE,
+ session_id UUID REFERENCES driver_availability_sessions(id) ON DELETE CASCADE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ lat DOUBLE PRECISION NOT NULL, lng DOUBLE PRECISION NOT NULL,
+ accuracy_m REAL, heading REAL, speed_mps REAL, seq BIGINT NOT NULL,
+ recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ride_loc_ride_idx ON ride_location_samples(ride_id,id);
+CREATE TABLE IF NOT EXISTS ride_messages(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body TEXT NOT NULL, flagged BOOLEAN NOT NULL DEFAULT FALSE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Payments, receipts, ledgers
+CREATE TABLE IF NOT EXISTS ride_payments(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ method TEXT NOT NULL CHECK(method IN('cash','mpesa')),
+ mode TEXT NOT NULL DEFAULT 'mock' CHECK(mode IN('mock','sandbox','live','cash')),
+ amount NUMERIC(10,2) NOT NULL, currency TEXT NOT NULL DEFAULT 'KES',
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','initiated','confirmed','failed','cancelled','refund_pending','refunded')),
+ provider_ref TEXT, provider_request_id TEXT, phone_masked TEXT NOT NULL DEFAULT '',
+ idempotency_key TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ride_payment_provider_ref_uniq ON ride_payments(provider_ref) WHERE provider_ref IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_payment_per_ride ON ride_payments(ride_id) WHERE status IN('pending','initiated');
+CREATE TABLE IF NOT EXISTS ride_payment_events(
+ id BIGSERIAL PRIMARY KEY,
+ payment_id UUID NOT NULL REFERENCES ride_payments(id) ON DELETE CASCADE,
+ event_type TEXT NOT NULL, dedupe_key TEXT,
+ payload JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS payment_event_dedupe ON ride_payment_events(payment_id,dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE TABLE IF NOT EXISTS ride_receipts(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL UNIQUE REFERENCES ride_requests(id) ON DELETE CASCADE,
+ reference TEXT NOT NULL UNIQUE, body JSONB NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS driver_earnings_ledger(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ ride_id UUID UNIQUE REFERENCES ride_requests(id) ON DELETE SET NULL,
+ gross NUMERIC(10,2) NOT NULL, commission NUMERIC(10,2) NOT NULL, net NUMERIC(10,2) NOT NULL,
+ payout_status TEXT NOT NULL DEFAULT 'unsettled' CHECK(payout_status IN('unsettled','processing','paid')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS platform_commission_ledger(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID UNIQUE REFERENCES ride_requests(id) ON DELETE SET NULL,
+ amount NUMERIC(10,2) NOT NULL, pct NUMERIC(5,2) NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Safety
+CREATE TABLE IF NOT EXISTS trusted_contacts(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ name TEXT NOT NULL, phone TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS trip_share_tokens(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ token TEXT NOT NULL UNIQUE, revoked BOOLEAN NOT NULL DEFAULT FALSE,
+ expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS safety_incidents(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE SET NULL,
+ reporter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ kind TEXT NOT NULL CHECK(kind IN('safety','lost_item','payment','other')),
+ description TEXT NOT NULL DEFAULT '',
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','reviewing','resolved')),
+ resolution_note TEXT NOT NULL DEFAULT '', resolved_by UUID REFERENCES users(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS ride_ratings(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ rater_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ ratee_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ role TEXT NOT NULL CHECK(role IN('rider','driver')),
+ rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+ comment TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active' CHECK(status IN('active','owner_hidden')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(ride_id,rater_id)
+);

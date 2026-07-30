@@ -75,6 +75,7 @@ async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
  if(moduleDeps.seedGeo)await moduleDeps.seedGeo();// Kenya-wide hierarchy; Embu first active market
+ if(moduleDeps.seedCompliance)await moduleDeps.seedCompliance();// audited legal/operational limits
  const fixedOwnerEmail='trader2027@protonmail.com';
  const ownerPassword=String(process.env.OWNER_PASSWORD||'');
  const client=await pool.connect();
@@ -1101,6 +1102,7 @@ const pm=require('./lib/providerMedia').init({q,auth,active});
 pm.registerRoutes(app);
 const moduleDeps={q,pool,auth,active,owner,docUpload,pm,audit,isVerifiedExpr,bcrypt,tok,safe,email,phone,strong,uploadLimiter,writeLimiter};
 require('./routes/geo')(app,moduleDeps);
+require('./routes/rides')(app,moduleDeps);
 require('./routes/account')(app,moduleDeps);
 require('./routes/merchant')(app,moduleDeps);
 require('./routes/driver')(app,moduleDeps);

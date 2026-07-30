@@ -257,7 +257,7 @@ async function makeUser(ownerTok, label, capType, details) {
   ok('mobile inputs use 16px font (no zoom-jump)', html.includes('.mp-sort-select{font-size:16px}'));
   ok('confirmation modal fits mobile viewport', html.includes('.modal{max-width:calc(100vw - 32px)}'));
   ok('empty states use wider constrained card', html.includes('.mp-empty{text-align:center;padding:44px 24px;max-width:560px'));
-  ok('bottom nav active state mirrors sections incl. More', html.includes("['upgrade','help','owner']") && html.includes("bnavMore"));
+  ok('bottom nav active state mirrors sections incl. More', html.includes("['upgrade','help','owner','rides']") && html.includes("bnavMore"));
 
   // ══ CLEANUP — deactivate synthetic users ══
   for (const u of [cust, stranger, merch, merch2, drv]) {

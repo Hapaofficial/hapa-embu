@@ -296,6 +296,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
  <button class="btn" id="navHome" onclick="tab('home')">Home</button>
  <button class="btn" id="navMarket" onclick="tab('market')">Marketplace</button>
  <button class="btn" id="navRequests" onclick="tab('requests')">Requests</button>
+ <button class="btn" id="navRides" onclick="tab('rides')">Rides</button>
  <button class="btn" id="navUpgrade" onclick="tab('upgrade')">Professional roles</button>
  <button class="btn" id="navAccount" onclick="tab('account')">Account</button>
  <button class="btn" id="navHelp" onclick="tab('help')">Help</button>
@@ -622,9 +623,44 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 </div>
 </section>
 
+<!-- Rides -->
+<section id="rides" class="hidden">
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Rides</h2><div class="tabs" id="rdModeTabs"><button id="rdTabRider" class="btn primary" onclick="rdMode('rider')">Book a ride</button><button id="rdTabDriver" class="btn hidden" onclick="rdMode('driver')">Drive</button></div></div>
+<p class="muted" id="rdIntro" style="font-size:13px;margin:8px 0 0">Real-time rides in the Embu pilot area. Fares are fixed upfront — no surprises.</p></div>
+
+<div id="rdRiderPanel" style="margin-top:14px">
+ <div class="card" id="rdBookCard">
+  <h3 style="margin-top:0">Where to?</h3>
+  <div class="field"><label>Pickup</label><input id="rdPickA" maxlength="200" placeholder="e.g. Embu Town CBD, near Tuskys"><button class="btn" style="margin-top:6px" onclick="rdUseGps()">📍 Use my location</button><small class="muted" id="rdGpsNote"></small></div>
+  <div class="field"><label>Destination</label><input id="rdDestA" maxlength="200" placeholder="e.g. Kangaru School gate"></div>
+  <div class="field"><label>Note for driver (optional)</label><input id="rdNote" maxlength="200" placeholder="Landmark, gate colour…"></div>
+  <div class="field"><label>Payment</label><select id="rdPay"><option value="cash">Cash</option><option value="mpesa">M-Pesa</option></select></div>
+  <button class="btn primary" id="rdEstBtn" onclick="rdEstimate()">Get fare estimate</button>
+  <div id="rdQuoteBox" class="hidden" style="margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:12px"></div>
+ </div>
+ <div class="card hidden" id="rdActiveCard" style="margin-top:14px"><div id="rdActiveBody"></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Safety</h3>
+  <div id="rdContacts" class="muted" style="font-size:13px"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="rdTcName" placeholder="Contact name" style="flex:1;min-width:120px"><input id="rdTcPhone" placeholder="2547XXXXXXXX" style="flex:1;min-width:120px"><button class="btn" onclick="rdAddContact()">Add trusted contact</button></div>
+ </div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent rides</h3><div id="rdHistory" class="muted" style="font-size:13px">—</div></div>
+</div>
+
+<div id="rdDriverPanel" class="hidden" style="margin-top:14px">
+ <div class="card" id="drvStatusCard"><h3 style="margin-top:0">Driver mode</h3><div id="drvStatusBody">Loading…</div></div>
+ <div class="card hidden" id="drvOfferCard" style="margin-top:14px;border:2px solid var(--hapa-primary)"><div id="drvOfferBody"></div></div>
+ <div class="card hidden" id="drvRideCard" style="margin-top:14px"><div id="drvRideBody"></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">My vehicles</h3><div id="drvVehicles" class="muted" style="font-size:13px"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="dvMake" placeholder="Make" style="width:90px"><input id="dvModel" placeholder="Model" style="width:90px"><input id="dvColour" placeholder="Colour" style="width:80px"><input id="dvReg" placeholder="Reg. e.g. KDA 123A" style="width:130px"><button class="btn" onclick="drvAddVehicle()">Add vehicle</button></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">My documents</h3><div id="drvDocs" class="muted" style="font-size:13px"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="ddType"></select><input id="ddRef" placeholder="Reference no." style="width:130px"><input id="ddExp" type="date"><button class="btn" onclick="drvAddDoc()">Submit</button></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Earnings</h3><div id="drvEarnings" class="muted" style="font-size:13px">—</div></div>
+</div>
+</section>
+
 <!-- Owner -->
 <section id="owner" class="hidden">
-<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Owner Dashboard</h2><div class="tabs"><button id="oTabStats" class="btn primary" onclick="ownerSubTab('stats')">Stats</button><button id="oTabUsers" class="btn" onclick="ownerSubTab('users')">All Users</button><button id="oTabAreas" class="btn" onclick="ownerSubTab('areas')">Areas &amp; pricing</button></div></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Owner Dashboard</h2><div class="tabs"><button id="oTabStats" class="btn primary" onclick="ownerSubTab('stats')">Stats</button><button id="oTabUsers" class="btn" onclick="ownerSubTab('users')">All Users</button><button id="oTabAreas" class="btn" onclick="ownerSubTab('areas')">Areas &amp; pricing</button><button id="oTabTransport" class="btn" onclick="ownerSubTab('transport')">Transport</button></div></div></div>
 
 <div id="ownerStatsPanel" style="margin-top:14px">
  <div class="card"><div id="ownerStats" class="stats"></div></div>
@@ -715,6 +751,14 @@ h1,h2,h3,h4{color:var(--hapa-text)}
   </div>
   <div id="listingReportsEl" class="list"></div>
  </div>
+</div>
+
+<div id="ownerTransportPanel" class="hidden" style="margin-top:14px">
+ <div class="card"><h3 style="margin-top:0">Live operations</h3><div id="otStats" class="stats"></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Launch gates</h3><div id="otGates" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Pending vehicles &amp; documents</h3><div id="otApprovals" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Incidents</h3><div id="otIncidents" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent rides</h3><div id="otRides" class="muted" style="font-size:13px">—</div></div>
 </div>
 
 <div id="ownerAreasPanel" class="hidden" style="margin-top:14px">
@@ -1011,7 +1055,7 @@ function updateSelfiePreview(input){const f=input.files?.[0];if(!f)return;const 
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function setActiveMainNav(section){
- const map={home:'navHome',market:'navMarket',requests:'navRequests',account:'navAccount',help:'navHelp',upgrade:'navUpgrade',owner:'navOwner'};
+ const map={home:'navHome',market:'navMarket',requests:'navRequests',rides:'navRides',account:'navAccount',help:'navHelp',upgrade:'navUpgrade',owner:'navOwner'};
  Object.entries(map).forEach(([sec,btnId])=>{
   const b=$(btnId);if(!b)return;
   const on=sec===section;
@@ -1022,7 +1066,7 @@ function setActiveMainNav(section){
  });
  // Mobile bottom nav mirrors the active section; upgrade/help/owner live under "More"
  const bmap={home:'bnavHome',market:'bnavMarket',requests:'bnavRequests',account:'bnavAccount'};
- const moreSections=['upgrade','help','owner'];
+ const moreSections=['upgrade','help','owner','rides'];
  Object.entries(bmap).forEach(([sec,btnId])=>{
   const b=$(btnId);if(!b)return;
   const on=sec===section;
@@ -1041,6 +1085,7 @@ function moreSheetToggle(){
  w.innerHTML=`<div class="more-sheet-backdrop" onclick="moreSheetClose()"></div>
  <div class="more-sheet" role="menu" aria-label="More options">
   <h4>More</h4>
+  ${!isGuest?item('rides','🚕','Rides'):''}
   ${!isOwner&&!isGuest?item('upgrade','💼','Professional roles'):''}
   ${item('help','❓','Help & Support')}
   ${isOwner?item('owner','🛡️','Owner dashboard'):''}
@@ -1061,8 +1106,9 @@ function setActiveMarketplaceTab(view){
  });
 }
 function tab(id){
- ['home','market','requests','account','help','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+ ['home','market','requests','rides','account','help','upgrade','owner'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
  setActiveMainNav(id);
+ if(id==='rides')ridesInit();
  if(id==='market')mpView('browse');
  if(id==='owner')loadOwner();
  if(id==='upgrade')loadUpgradeSection();
@@ -2253,13 +2299,16 @@ function ownerSubTab(tab){
  $('oTabStats').className='btn'+(tab==='stats'?' primary':'');
  $('oTabUsers').className='btn'+(tab==='users'?' primary':'');
  $('oTabAreas').className='btn'+(tab==='areas'?' primary':'');
+ $('oTabTransport').className='btn'+(tab==='transport'?' primary':'');
  $('ownerStatsPanel').classList.toggle('hidden',tab!=='stats');
  $('ownerUsersPanel').classList.toggle('hidden',tab!=='users');
  $('ownerAreasPanel').classList.toggle('hidden',tab!=='areas');
+ $('ownerTransportPanel').classList.toggle('hidden',tab!=='transport');
  $('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.add('hidden');
  if(tab==='stats')loadOwnerStats();
  if(tab==='users')loadOwnerUsers();
  if(tab==='areas')loadOwnerAreas();
+ if(tab==='transport')loadOwnerTransport();
 }
 
 // ── Owner: service areas & fare rate cards (market expansion by configuration)
@@ -3245,6 +3294,245 @@ async function loadOwnerAudit(){
     <small class="muted">${esc(a.actor_name||'')} · ${new Date(a.created_at).toLocaleString()}</small></span></div>`).join(''):'<p class="muted" style="font-size:13px;margin:0">No actions logged yet.</p>';
  }catch(e){el.innerHTML=`<p class="muted" style="font-size:13px">${esc(e.message)}</p>`;}
 }
+
+// ═══════════════ RIDE-HAILING (Embu pilot) ═══════════════
+const RD_EMBU={lat:-0.5310,lng:37.4575};
+let rdState={cfg:null,quote:null,rideId:localStorage.getItem('hapa_ride')||null,pin:localStorage.getItem('hapa_ride_pin')||null,pickup:null,dest:null,poll:null,es:null,lastEvent:0};
+let drvState={seq:Number(localStorage.getItem('hapa_drv_seq')||0),locTimer:null,poll:null,offerTimer:null};
+const rdStatusCopy={searching:'Looking for a driver near you…',offered:'Contacting a nearby driver…',driver_assigned:'Driver confirmed — heading your way',driver_en_route:'Driver is on the way',driver_arrived:'Your driver has arrived',pin_verified:'PIN verified — ready to go',in_progress:'Trip in progress',payment_pending:'Trip finished — payment due',payment_failed:'Payment failed — try again',completed:'Trip complete',closed:'Trip complete',rider_cancelled:'You cancelled this trip',driver_cancelled:'Driver cancelled — you can request again',no_driver_available:'No drivers available right now'};
+const RD_OPEN=['searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','payment_pending','payment_failed'];
+
+async function ridesInit(){
+ if(appMode==='guest'){$('rdRiderPanel').innerHTML='<div class="card"><p>Please log in to book rides.</p></div>';return;}
+ try{rdState.cfg=await api('/api/rides/config');}catch(e){$('rdRiderPanel').innerHTML=`<div class="card"><p class="muted">${esc(e.message)}</p></div>`;return;}
+ if(!rdState.cfg.enabled){$('rdIntro').textContent='Ride-hailing is not switched on yet. Check back soon.';return;}
+ if(rdState.cfg.mock_routing)$('rdGpsNote').textContent='Map routing runs in estimate mode during the pilot.';
+ $('rdTabDriver').classList.toggle('hidden',!(me&&me.capabilities&&me.capabilities.driver===true));
+ rdConnect();rdRefresh();rdLoadContacts();rdLoadHistory();
+}
+function rdMode(m){
+ $('rdTabRider').className='btn'+(m==='rider'?' primary':'');
+ $('rdTabDriver').className='btn'+(m==='driver'?' primary':'')+($('rdTabDriver').classList.contains('hidden')?' hidden':'');
+ $('rdRiderPanel').classList.toggle('hidden',m!=='rider');
+ $('rdDriverPanel').classList.toggle('hidden',m!=='driver');
+ if(m==='driver')drvLoad();
+}
+async function rdConnect(){
+ // Header-authenticated SSE (token never appears in a URL); polling covers reconnect gaps.
+ if(rdState.es)return;
+ rdState.es=true;
+ try{
+  const ctrl=new AbortController();rdState.esCtrl=ctrl;
+  const resp=await fetch('/api/rides/stream',{headers:{Authorization:'Bearer '+token},signal:ctrl.signal});
+  const reader=resp.body.getReader(),dec=new TextDecoder();let buf='';
+  while(true){
+   const{done,value}=await reader.read();if(done)break;
+   buf+=dec.decode(value,{stream:true});
+   let i;while((i=buf.indexOf('\n\n'))>=0){
+    const chunk=buf.slice(0,i);buf=buf.slice(i+2);
+    const line=chunk.split('\n').find(l=>l.startsWith('data: '));
+    if(!line)continue;
+    try{const d=JSON.parse(line.slice(6));if(d.ride_id||d.type==='offer'||d.type==='offer_expired'){rdRefresh();if(!$('rdDriverPanel').classList.contains('hidden'))drvLoad();}}catch(e){}
+   }
+  }
+ }catch(e){}
+ rdState.es=null;setTimeout(rdConnect,5000);
+}
+async function rdUseGps(){
+ if(!navigator.geolocation){$('rdGpsNote').textContent='Location not available on this device.';return;}
+ navigator.geolocation.getCurrentPosition(p=>{rdState.pickup={lat:p.coords.latitude,lng:p.coords.longitude};$('rdGpsNote').textContent='Pickup set from your location ✓';},()=>{$('rdGpsNote').textContent='Could not read location — using Embu town centre.';});
+}
+async function rdEstimate(){
+ const pick=$('rdPickA').value.trim(),dest=$('rdDestA').value.trim();
+ if(!pick||!dest)return alert('Enter pickup and destination');
+ const p=rdState.pickup||RD_EMBU,d={lat:RD_EMBU.lat+0.03,lng:RD_EMBU.lng+0.01};
+ $('rdEstBtn').disabled=true;
+ try{
+  const r=await api('/api/rides/quote',{method:'POST',body:JSON.stringify({pickup_lat:p.lat,pickup_lng:p.lng,dest_lat:d.lat,dest_lng:d.lng,zone:'zone-embu-pilot',vehicle_category:(rdState.cfg.categories||[])[0]})});
+  rdState.quote=r.quote;rdState.dest=d;
+  const c=r.quote.components;
+  $('rdQuoteBox').classList.remove('hidden');
+  $('rdQuoteBox').innerHTML=`<div class="row"><span>Estimated fare</span><b style="font-size:20px">KES ${Number(r.quote.total).toLocaleString()}</b></div>
+   <small class="muted">Base ${c.base_fare} · Distance ${c.distance_charge} · Time ${c.time_charge} · ~${(r.quote.distance_m/1000).toFixed(1)} km${r.note?`<br>${esc(r.note)}`:''}</small>
+   <p class="muted" style="font-size:12px;margin:8px 0 8px">Fixed upfront price. Valid ${Math.round((new Date(r.quote.expires_at)-Date.now())/60000)} min. Cash or M-Pesa on completion.</p>
+   <button class="btn primary" onclick="rdRequest()" style="width:100%">Request ride — KES ${Number(r.quote.total).toLocaleString()}</button>`;
+ }catch(e){alert(e.message);}
+ $('rdEstBtn').disabled=false;
+}
+async function rdRequest(){
+ if(!rdState.quote)return;
+ try{
+  const p=rdState.pickup||RD_EMBU,d=rdState.dest;
+  const body={quote_id:rdState.quote.id,payment_method:$('rdPay').value,pickup_lat:p.lat,pickup_lng:p.lng,dest_lat:d.lat,dest_lng:d.lng,pickup_address:$('rdPickA').value.trim(),dest_address:$('rdDestA').value.trim(),pickup_note:$('rdNote').value.trim()};
+  let r;
+  try{r=await api('/api/rides',{method:'POST',body:JSON.stringify(body)});}
+  catch(e){
+   if(String(e.message).includes('Rider Terms')){
+    if(!confirm('Before your first ride: you agree to the HAPA Rider Terms — fixed upfront fares, PIN verification at pickup, and respectful conduct. Accept?'))return;
+    await api('/api/agreements/accept',{method:'POST',body:JSON.stringify({agreement:'rider_terms'})});
+    r=await api('/api/rides',{method:'POST',body:JSON.stringify(body)});
+   }else throw e;
+  }
+  rdState.rideId=r.ride.id;localStorage.setItem('hapa_ride',r.ride.id);
+  if(r.pin){rdState.pin=r.pin;localStorage.setItem('hapa_ride_pin',r.pin);}
+  $('rdQuoteBox').classList.add('hidden');rdState.quote=null;
+  rdRefresh();
+ }catch(e){alert(e.message);}
+}
+async function rdRefresh(){
+ if(!rdState.rideId){$('rdActiveCard').classList.add('hidden');$('rdBookCard').classList.remove('hidden');return;}
+ try{
+  const r=await api('/api/rides/'+rdState.rideId+'?since_event='+rdState.lastEvent);
+  if(r.events.length)rdState.lastEvent=r.events[r.events.length-1].id;
+  rdRenderActive(r.ride);
+  if(RD_OPEN.includes(r.ride.status)){
+   if(!rdState.poll)rdState.poll=setInterval(rdRefresh,4000);
+  }else{
+   clearInterval(rdState.poll);rdState.poll=null;
+   if(['closed','rider_cancelled','driver_cancelled'].includes(r.ride.status)){/* keep card until dismissed */}
+  }
+ }catch(e){rdClearRide();}
+}
+function rdClearRide(){rdState.rideId=null;rdState.pin=null;rdState.lastEvent=0;localStorage.removeItem('hapa_ride');localStorage.removeItem('hapa_ride_pin');clearInterval(rdState.poll);rdState.poll=null;$('rdActiveCard').classList.add('hidden');$('rdBookCard').classList.remove('hidden');rdLoadHistory();}
+function rdRenderActive(ride){
+ $('rdBookCard').classList.add('hidden');$('rdActiveCard').classList.remove('hidden');
+ const st=ride.status;
+ let h=`<div class="row"><h3 style="margin:0">${esc(rdStatusCopy[st]||st)}</h3><span class="muted" style="font-size:12px">${esc(ride.pickup_address||'')} → ${esc(ride.dest_address||'')}</span></div>`;
+ if(ride.driver)h+=`<div class="row" style="margin-top:8px;border:1px solid var(--line);border-radius:10px;padding:10px"><span><b>${esc(ride.driver.display_name)}</b> ${ride.driver.rating?`★${ride.driver.rating}`:''} · ${ride.driver.trips} trips<br><small class="muted">${ride.vehicle?esc(`${ride.vehicle.make} ${ride.vehicle.model} · ${ride.vehicle.colour} · ${ride.vehicle.registration_number}`):''}</small></span></div>`;
+ if(rdState.pin&&['searching','offered','driver_assigned','driver_en_route','driver_arrived'].includes(st))
+  h+=`<div style="text-align:center;margin:10px 0;padding:10px;border:2px dashed var(--hapa-primary);border-radius:10px"><small class="muted">Show this PIN to your driver at pickup</small><div style="font-size:32px;font-weight:800;letter-spacing:8px">${esc(rdState.pin)}</div></div>`;
+ if(ride.quote)h+=`<div class="row"><span>Fare (fixed)</span><b>KES ${Number(ride.final_fare||ride.quote.total).toLocaleString()}</b></div>`;
+ if(ride.fare_difference_note)h+=`<small class="muted">${esc(ride.fare_difference_note)}</small>`;
+ if(ride.driver_position)h+=`<small class="muted">Driver location updated ${new Date(ride.driver_position.updated_at).toLocaleTimeString()}</small>`;
+ h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">`;
+ if(['searching','offered','driver_assigned','driver_en_route','driver_arrived'].includes(st))h+=`<button class="btn" onclick="rdCancel()">Cancel</button>`;
+ if(['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(st))h+=`<button class="btn" onclick="rdShare()">Share trip</button><button class="btn" style="color:var(--bad)" onclick="rdEmergency()">Emergency</button>`;
+ if(st==='no_driver_available')h+=`<button class="btn primary" onclick="rdRetry()">Try again</button><button class="btn" onclick="rdClearRide()">New booking</button>`;
+ if(st==='payment_pending'&&ride.payment_method==='mpesa')h+=`<button class="btn primary" onclick="rdPayMpesa()">Pay with M-Pesa</button>`;
+ if(st==='payment_pending'&&ride.payment_method==='cash')h+=`<span class="muted" style="font-size:13px;align-self:center">Pay the driver KES ${Number(ride.final_fare).toLocaleString()} in cash.</span>`;
+ if(st==='payment_failed')h+=`<button class="btn primary" onclick="rdPayMpesa()">Retry M-Pesa</button>`;
+ if(['closed','rider_cancelled','driver_cancelled'].includes(st))h+=`<button class="btn primary" onclick="rdClearRide()">Done</button>`;
+ h+=`</div>`;
+ if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt()">Receipt</button></div>`;
+ if(['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(st))
+  h+=`<div style="margin-top:10px"><div id="rdMsgs" style="max-height:120px;overflow:auto;font-size:13px"></div><div style="display:flex;gap:6px;margin-top:6px"><input id="rdMsgIn" placeholder="Message driver…" style="flex:1" maxlength="500"><button class="btn" onclick="rdChatSend()">Send</button></div></div>`;
+ $('rdActiveBody').innerHTML=h;
+ if($('rdMsgs'))rdChatLoad();
+}
+async function rdCancel(){if(!confirm('Cancel this ride?'))return;try{await api('/api/rides/'+rdState.rideId+'/cancel',{method:'POST',body:JSON.stringify({reason:'Rider cancelled'})});rdRefresh();}catch(e){alert(e.message);}}
+async function rdRetry(){try{await api('/api/rides/'+rdState.rideId+'/retry',{method:'POST'});rdRefresh();}catch(e){alert(e.message);}}
+async function rdShare(){try{const r=await api('/api/rides/'+rdState.rideId+'/share',{method:'POST'});const url=location.origin+'/api/public/trip/'+r.token;if(navigator.share)navigator.share({title:'Follow my HAPA trip',url}).catch(()=>{});else{navigator.clipboard?.writeText(url);alert('Trip link copied — send it to someone you trust:\n'+url);}}catch(e){alert(e.message);}}
+async function rdEmergency(){try{const r=await api('/api/rides/'+rdState.rideId+'/emergency');alert((r.configured?`Emergency line: ${r.emergency_phone}\n`:'')+r.note+`\nRide ref: ${r.ride_reference}`);}catch(e){alert(e.message);}}
+async function rdPayMpesa(){const ph=prompt('M-Pesa phone number (2547XXXXXXXX):');if(!ph)return;try{const r=await api('/api/rides/'+rdState.rideId+'/pay-mpesa',{method:'POST',body:JSON.stringify({phone:ph})});alert(r.note);setTimeout(rdRefresh,2500);}catch(e){alert(e.message);}}
+async function rdRate(n){try{await api('/api/rides/'+rdState.rideId+'/rate',{method:'POST',body:JSON.stringify({rating:n})});$('rdRateBox').innerHTML='<b>Asante! Rating saved.</b> <button class="btn" onclick="rdReceipt()">Receipt</button>';}catch(e){alert(e.message);}}
+async function rdReceipt(){try{const r=await api('/api/rides/'+rdState.rideId+'/receipt');const b=r.body;alert(`HAPA Receipt ${r.reference}\n${b.pickup} → ${b.destination}\nDriver: ${b.driver}\nTotal: KES ${b.total} (${b.payment_method})\n${b.payment_ref?'Ref: '+b.payment_ref:''}`);}catch(e){alert(e.message);}}
+async function rdChatLoad(){try{const m=await api('/api/rides/'+rdState.rideId+'/messages');const el=$('rdMsgs');if(el)el.innerHTML=m.map(x=>`<div style="text-align:${x.mine?'right':'left'}"><span style="background:${x.mine?'var(--hapa-primary)':'var(--hapa-surface)'};border-radius:8px;padding:3px 8px;display:inline-block;margin:2px 0">${esc(x.body)}</span></div>`).join('');el&&(el.scrollTop=el.scrollHeight);}catch(e){}}
+async function rdChatSend(){const v=$('rdMsgIn').value.trim();if(!v)return;try{await api('/api/rides/'+rdState.rideId+'/messages',{method:'POST',body:JSON.stringify({body:v})});$('rdMsgIn').value='';rdChatLoad();}catch(e){alert(e.message);}}
+async function rdLoadContacts(){try{const c=await api('/api/me/trusted-contacts');$('rdContacts').innerHTML=c.length?c.map(x=>`${esc(x.name)} (${esc(x.phone)}) <button class="btn" style="padding:2px 8px;font-size:11px" onclick="rdDelContact('${x.id}')">remove</button>`).join('<br>'):'Add a trusted contact — they can follow your trips when you share.';}catch(e){}}
+async function rdAddContact(){try{await api('/api/me/trusted-contacts',{method:'POST',body:JSON.stringify({name:$('rdTcName').value.trim(),phone:$('rdTcPhone').value.trim()})});$('rdTcName').value='';$('rdTcPhone').value='';rdLoadContacts();}catch(e){alert(e.message);}}
+async function rdDelContact(id){try{await api('/api/me/trusted-contacts/'+id,{method:'DELETE'});rdLoadContacts();}catch(e){}}
+async function rdLoadHistory(){try{const rows=await api('/api/rides/mine');const open=rows.find(r=>RD_OPEN.includes(r.status));if(open&&!rdState.rideId){rdState.rideId=open.id;localStorage.setItem('hapa_ride',open.id);rdRefresh();}
+ $('rdHistory').innerHTML=rows.filter(r=>!RD_OPEN.includes(r.status)).slice(0,5).map(r=>`<div class="row" style="padding:6px 0"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${new Date(r.created_at).toLocaleDateString()} · ${esc(rdStatusCopy[r.status]||r.status)}</small></span><b>${r.final_fare?'KES '+Number(r.final_fare).toLocaleString():''}</b></div>`).join('')||'No rides yet.';}catch(e){}}
+
+// ── Driver mode ──
+async function drvLoad(){
+ try{
+  const h=await api('/api/driver/hub');
+  const s=h.session;
+  $('drvStatusBody').innerHTML=s?`<div class="row"><span><b style="color:var(--ok)">● Online</b> in ${esc(s.zone_name)}<br><small class="muted">${esc(`${s.make} ${s.model} · ${s.registration_number}`)} · ${h.hours.online_min} min online${h.hours.online_min>=h.hours.warn_after_min?' — <b style=\'color:var(--hapa-warning)\'>take a break soon</b>':''}</small></span><button class="btn" onclick="drvOffline()">Go offline</button></div>`
+   :`<div class="row"><span class="muted">You are offline.</span><span></span></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="drvVehSel"></select><button class="btn primary" onclick="drvOnline()">Go online in Embu</button></div>`;
+  if(!s){const vs=await api('/api/me/vehicles');$('drvVehSel').innerHTML=vs.filter(v=>v.status==='approved').map(v=>`<option value="${v.id}">${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</option>`).join('')||'<option value="">No approved vehicle yet</option>';}
+  // Offer
+  if(h.offer){
+   $('drvOfferCard').classList.remove('hidden');
+   const secs=Math.max(0,Math.round((new Date(h.offer.expires_at)-Date.now())/1000));
+   $('drvOfferBody').innerHTML=`<h3 style="margin-top:0">🚕 New ride offer <span id="drvOfferCd">(${secs}s)</span></h3>
+    <p style="margin:6px 0">${esc(h.offer.pickup_address||'Pickup nearby')} · ${h.offer.pickup_distance_m?(h.offer.pickup_distance_m/1000).toFixed(1)+' km away':''}<br><b>KES ${Number(h.offer.quote_total).toLocaleString()}</b> · ${(h.offer.distance_m/1000).toFixed(1)} km trip</p>
+    <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" onclick="drvOfferAct('${h.offer.id}','accept')">Accept</button><button class="btn" onclick="drvOfferAct('${h.offer.id}','decline')">Decline</button></div>`;
+   clearInterval(drvState.offerTimer);
+   drvState.offerTimer=setInterval(()=>{const el=$('drvOfferCd');if(!el)return clearInterval(drvState.offerTimer);const s2=Math.max(0,Math.round((new Date(h.offer.expires_at)-Date.now())/1000));el.textContent=`(${s2}s)`;if(s2<=0){clearInterval(drvState.offerTimer);drvLoad();}},1000);
+  }else{$('drvOfferCard').classList.add('hidden');clearInterval(drvState.offerTimer);}
+  // Active ride
+  if(h.ride){
+   $('drvRideCard').classList.remove('hidden');
+   const r=h.ride,st=r.status;
+   let act='';
+   if(st==='driver_assigned')act=`<button class="btn primary" onclick="drvStep('en-route')">I'm on my way</button>`;
+   else if(st==='driver_en_route')act=`<button class="btn primary" onclick="drvStep('arrived')">I've arrived</button>`;
+   else if(st==='driver_arrived')act=`<div style="display:flex;gap:8px"><input id="drvPinIn" placeholder="Rider PIN" maxlength="4" inputmode="numeric" style="width:110px;font-size:20px;text-align:center"><button class="btn primary" onclick="drvVerifyPin()">Verify PIN</button></div>`;
+   else if(st==='pin_verified')act=`<button class="btn primary" onclick="drvStep('start')">Start trip</button>`;
+   else if(st==='in_progress')act=`<button class="btn primary" onclick="drvStep('complete')">Complete trip</button>`;
+   else if(st==='payment_pending')act=r.payment_method==='cash'?`<button class="btn primary" onclick="drvCash()">Cash collected — KES ${Number(r.final_fare).toLocaleString()}</button><button class="btn" onclick="drvUnpaid()">Not paid</button>`:`<span class="muted">Waiting for M-Pesa payment (KES ${Number(r.final_fare).toLocaleString()})…</span>`;
+   $('drvRideBody').innerHTML=`<h3 style="margin-top:0">${esc(rdStatusCopy[st]||st)}</h3>
+    <p style="margin:6px 0">${esc(r.pickup_address||'')} → ${esc(r.dest_address||'')}${r.pickup_note?`<br><small class="muted">Note: ${esc(r.pickup_note)}</small>`:''}</p>
+    <div class="row"><span>Fare (fixed)</span><b>KES ${Number(r.final_fare||r.quote.total).toLocaleString()}</b></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${act}
+     ${['driver_assigned','driver_en_route','driver_arrived','pin_verified'].includes(st)?`<button class="btn" onclick="drvCancel()">Cancel</button>`:''}</div>`;
+   drvState.rideId=r.id;
+  }else{$('drvRideCard').classList.add('hidden');drvState.rideId=null;}
+  // Vehicles / docs / earnings
+  const vs=await api('/api/me/vehicles');
+  $('drvVehicles').innerHTML=vs.map(v=>`<div class="row" style="padding:4px 0"><span>${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</span><b style="color:${v.status==='approved'?'var(--ok)':v.status==='rejected'?'var(--bad)':'var(--a)'}">${esc(v.status)}</b></div>`).join('')||'No vehicles yet — add one below.';
+  const dd=await api('/api/me/driver-documents');
+  $('ddType').innerHTML=dd.required.map(t=>`<option value="${t}">${t.replace(/_/g,' ')}</option>`).join('');
+  $('drvDocs').innerHTML=dd.required.map(t=>{const d=dd.documents.find(x=>x.doc_type===t);const expSoon=d&&d.expires_on&&new Date(d.expires_on)<new Date(Date.now()+30*86400000);return`<div class="row" style="padding:4px 0"><span>${t.replace(/_/g,' ')}${d&&d.expires_on?`<small class="muted"> · expires ${d.expires_on.slice(0,10)}</small>`:''}</span><b style="color:${!d?'var(--muted)':d.status==='approved'?(expSoon?'var(--hapa-warning)':'var(--ok)'):d.status==='rejected'?'var(--bad)':'var(--a)'}">${d?esc(d.status)+(expSoon?' ⚠':''):'missing'}</b></div>`;}).join('');
+  $('drvEarnings').innerHTML=`<div class="row"><span>Today</span><b>KES ${Number(h.earnings.today).toLocaleString()}</b></div><div class="row"><span>Total (${h.earnings.trips} trips)</span><b>KES ${Number(h.earnings.total).toLocaleString()}</b></div><small class="muted">Earnings are shown net of the platform commission.</small>`;
+  // Location heartbeat while online or on a ride
+  if((s||h.ride)&&!drvState.locTimer)drvState.locTimer=setInterval(drvSendLoc,8000);
+  if(!s&&!h.ride&&drvState.locTimer){clearInterval(drvState.locTimer);drvState.locTimer=null;}
+  if((s||h.ride)&&!drvState.poll)drvState.poll=setInterval(()=>{if(!$('rdDriverPanel').classList.contains('hidden'))drvLoad();},5000);
+ }catch(e){$('drvStatusBody').innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+function drvSendLoc(){
+ drvState.seq++;localStorage.setItem('hapa_drv_seq',drvState.seq);
+ const send=(lat,lng)=>api('/api/driver/location',{method:'POST',body:JSON.stringify({lat,lng,seq:drvState.seq})}).catch(()=>{});
+ if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>send(p.coords.latitude,p.coords.longitude),()=>send(RD_EMBU.lat,RD_EMBU.lng),{maximumAge:5000,timeout:4000});
+ else send(RD_EMBU.lat,RD_EMBU.lng);
+}
+async function drvOnline(){
+ const veh=$('drvVehSel')?.value;
+ if(!veh)return alert('You need an approved vehicle first.');
+ try{
+  try{await api('/api/driver/online',{method:'POST',body:JSON.stringify({zone:'zone-embu-pilot',vehicle_id:veh})});}
+  catch(e){
+   if(String(e.message).includes('online yet'))return alert('Not eligible yet:\n'+e.message);
+   if(String(e.message).toLowerCase().includes('agreement')){
+    if(!confirm('Before driving: you agree to the HAPA Driver Agreement — verified documents, fixed fares, PIN verification, and safe conduct. Accept?'))return;
+    await api('/api/agreements/accept',{method:'POST',body:JSON.stringify({agreement:'driver_agreement'})});
+    await api('/api/driver/online',{method:'POST',body:JSON.stringify({zone:'zone-embu-pilot',vehicle_id:veh})});
+   }else throw e;
+  }
+  await api('/api/me/operating-zones',{method:'POST',body:JSON.stringify({zone:'zone-embu-pilot'})}).catch(()=>{});
+  drvSendLoc();drvLoad();
+ }catch(e){alert(e.message);}
+}
+async function drvOffline(){try{await api('/api/driver/offline',{method:'POST'});clearInterval(drvState.locTimer);drvState.locTimer=null;drvLoad();}catch(e){alert(e.message);}}
+async function drvOfferAct(id,act){try{await api('/api/offers/'+id+'/'+act,{method:'POST'});drvLoad();}catch(e){alert(e.message);drvLoad();}}
+async function drvStep(step){try{await api('/api/rides/'+drvState.rideId+'/'+step,{method:'POST'});drvLoad();}catch(e){alert(e.message);}}
+async function drvVerifyPin(){try{await api('/api/rides/'+drvState.rideId+'/verify-pin',{method:'POST',body:JSON.stringify({pin:$('drvPinIn').value.trim()})});drvLoad();}catch(e){alert(e.message);}}
+async function drvCash(){try{await api('/api/rides/'+drvState.rideId+'/cash-collected',{method:'POST'});drvLoad();}catch(e){alert(e.message);}}
+async function drvUnpaid(){const d=prompt('Describe what happened:');if(d===null)return;try{await api('/api/rides/'+drvState.rideId+'/report-unpaid',{method:'POST',body:JSON.stringify({description:d})});alert('Reported to HAPA support.');}catch(e){alert(e.message);}}
+async function drvCancel(){const r=prompt('Cancellation reason (required):');if(!r)return;try{await api('/api/rides/'+drvState.rideId+'/cancel',{method:'POST',body:JSON.stringify({reason:r})});drvLoad();}catch(e){alert(e.message);}}
+async function drvAddVehicle(){try{await api('/api/me/vehicles',{method:'POST',body:JSON.stringify({category:(rdState.cfg?.categories||['Passenger Car'])[0],make:$('dvMake').value.trim(),model:$('dvModel').value.trim(),colour:$('dvColour').value.trim(),registration_number:$('dvReg').value.trim()})});$('dvReg').value='';alert('Vehicle submitted — HAPA will review it.');drvLoad();}catch(e){alert(e.message);}}
+async function drvAddDoc(){try{await api('/api/me/driver-documents',{method:'POST',body:JSON.stringify({doc_type:$('ddType').value,reference:$('ddRef').value.trim(),expires_on:$('ddExp').value||null})});$('ddRef').value='';alert('Document submitted for review.');drvLoad();}catch(e){alert(e.message);}}
+
+// ── Owner transport ops ──
+async function loadOwnerTransport(){
+ try{
+  const[t,g]=await Promise.all([api('/api/owner/transport'),api('/api/owner/ride-gates')]);
+  const s=t.stats;
+  $('otStats').innerHTML=[['Online drivers',s.online_drivers],['Searching',s.searching],['Active rides',s.active_rides],['Completed today',s.completed_today],['Cancels today',s.cancellations_today],['No-driver today',s.no_driver_today],['Open incidents',s.open_incidents],['Docs expiring 30d',s.docs_expiring_30d],['Commission KES',Number(t.commission_total).toLocaleString()]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('otGates').innerHTML=g.gates.map(x=>`<div class="row" style="padding:4px 0"><span>${esc(x.gate)}<br><small class="muted">${esc(x.detail)}</small></span><b style="color:${x.pass?'var(--ok)':'var(--bad)'}">${x.pass?'READY':'BLOCKED'}</b></div>`).join('')+`<p style="margin:8px 0 0"><b>Production pilot: ${g.production_ready?'<span style="color:var(--ok)">gates clear</span>':'<span style="color:var(--bad)">blocked by external requirements</span>'}</b></p>`;
+  $('otApprovals').innerHTML=(t.pending_vehicles.map(v=>`<div class="row" style="padding:4px 0"><span>🚗 ${esc(v.driver_name)} · ${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</span><span><button class="btn" onclick="otVeh('${v.id}','approved')">Approve</button> <button class="btn" onclick="otVeh('${v.id}','rejected')">Reject</button></span></div>`).join('')+
+   t.pending_documents.map(d=>`<div class="row" style="padding:4px 0"><span>📄 ${esc(d.driver_name)} · ${esc(d.doc_type.replace(/_/g,' '))}${d.expires_on?` · exp ${String(d.expires_on).slice(0,10)}`:''}</span><span><button class="btn" onclick="otDoc('${d.id}','approved')">Approve</button> <button class="btn" onclick="otDoc('${d.id}','rejected')">Reject</button></span></div>`).join(''))||'Nothing pending.';
+  $('otIncidents').innerHTML=t.incidents.map(i=>`<div class="row" style="padding:4px 0"><span><b>${esc(i.kind)}</b> · ${esc(i.reporter_name)} · ${esc(i.description||'')}<br><small class="muted">${new Date(i.created_at).toLocaleString()} · ${esc(i.status)}</small></span>${i.status!=='resolved'?`<button class="btn" onclick="otIncident('${i.id}')">Resolve</button>`:''}</div>`).join('')||'No incidents.';
+  $('otRides').innerHTML=t.rides.map(r=>`<div class="row" style="padding:4px 0"><span>${esc(r.rider_name)}${r.driver_name?' → '+esc(r.driver_name):''} · ${esc(r.pickup_address||'')}<br><small class="muted">${new Date(r.created_at).toLocaleString()} · ${esc(r.status)}${r.final_fare?' · KES '+Number(r.final_fare).toLocaleString():''}</small></span></div>`).join('')||'No rides yet.';
+ }catch(e){$('otStats').innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+async function otVeh(id,st){try{await api('/api/owner/vehicles/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}
+async function otDoc(id,st){try{await api('/api/owner/driver-documents/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}
+async function otIncident(id){const n=prompt('Resolution note:');if(n===null)return;try{await api('/api/owner/incidents/'+id,{method:'PATCH',body:JSON.stringify({status:'resolved',note:n})});loadOwnerTransport();}catch(e){alert(e.message);}}
 
 // ═══════════════ PWA ═══════════════
 if('serviceWorker'in navigator)window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});
