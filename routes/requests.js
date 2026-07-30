@@ -16,6 +16,9 @@ module.exports=function(app,deps){
 
  const reqSafe=r=>({id:r.id,provider_type:r.provider_type,profile_id:r.profile_id,item_id:r.item_id,
   request_type:r.request_type,pickup_text:r.pickup_text,destination_text:r.destination_text,
+  pickup_lat:r.pickup_lat,pickup_lng:r.pickup_lng,destination_lat:r.destination_lat,destination_lng:r.destination_lng,
+  pickup_address:r.pickup_address,destination_address:r.destination_address,pickup_note:r.pickup_note,landmark:r.landmark,
+  route_distance_m:r.route_distance_m,route_duration_s:r.route_duration_s,
   requested_for:r.requested_for,note:r.note,status:r.status,created_at:r.created_at,updated_at:r.updated_at,
   accepted_at:r.accepted_at,declined_at:r.declined_at,cancelled_at:r.cancelled_at,completed_at:r.completed_at});
 
@@ -42,15 +45,37 @@ module.exports=function(app,deps){
     if(!it)return res.status(404).json({error:'Listing not found'});
     itemId=it.id;
    }
-   if(pt==='driver'&&(!String(b.pickup_text||'').trim()||!String(b.destination_text||'').trim()))
+   if(pt==='driver'&&(!String(b.pickup_text||b.pickup_address||'').trim()||!String(b.destination_text||b.destination_address||'').trim()))
     return res.status(400).json({error:'Pickup and destination are required'});
+   // ── Precise GPS coordinates (driver requests only). Server-side validated:
+   // lat+lng of a point must be present together and within valid ranges.
+   // Coordinates are exposed only through the authorized request endpoints
+   // (customer / addressed provider / owner) — never through public APIs.
+   const geo={pickup_lat:null,pickup_lng:null,destination_lat:null,destination_lng:null,pickup_address:null,destination_address:null,pickup_note:null,landmark:null,route_distance_m:null,route_duration_s:null};
+   if(pt==='driver'){
+    for(const side of['pickup','destination']){
+     const la=b[side+'_lat'],ln=b[side+'_lng'];
+     if(la!=null||ln!=null){
+      const vla=Number(la),vln=Number(ln);
+      if(!Number.isFinite(vla)||!Number.isFinite(vln)||Math.abs(vla)>90||Math.abs(vln)>180)return res.status(400).json({error:'Invalid '+side+' coordinates'});
+      geo[side+'_lat']=vla;geo[side+'_lng']=vln;
+     }
+     if(b[side+'_address'])geo[side+'_address']=String(b[side+'_address']).trim().slice(0,300)||null;
+    }
+    if(b.pickup_note)geo.pickup_note=String(b.pickup_note).trim().slice(0,300)||null;
+    if(b.landmark)geo.landmark=String(b.landmark).trim().slice(0,200)||null;
+    if(b.route_distance_m!=null){const d=Math.round(Number(b.route_distance_m));if(Number.isFinite(d)&&d>=0&&d<2e6)geo.route_distance_m=d;}
+    if(b.route_duration_s!=null){const d=Math.round(Number(b.route_duration_s));if(Number.isFinite(d)&&d>=0&&d<2e5)geo.route_duration_s=d;}
+   }
    const note=String(b.note||'').trim().slice(0,1000);
    if(pt!=='driver'&&!note&&!itemId)return res.status(400).json({error:'Please describe what you need'});
    const open=+(await q(`SELECT count(*)::int n FROM service_requests WHERE customer_id=$1 AND provider_user_id=$2 AND status IN('pending','accepted')`,[req.user.id,p.user_id])).rows[0].n;
    if(open>=3)return res.status(409).json({error:'You already have open requests with this provider'});
-   const r=(await q(`INSERT INTO service_requests(customer_id,provider_user_id,provider_type,profile_id,item_id,request_type,pickup_text,destination_text,requested_for,note)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-    [req.user.id,p.user_id,pt,p.id,itemId,rt,String(b.pickup_text||'').trim().slice(0,300),String(b.destination_text||'').trim().slice(0,300),String(b.requested_for||'').trim().slice(0,120),note])).rows[0];
+   const r=(await q(`INSERT INTO service_requests(customer_id,provider_user_id,provider_type,profile_id,item_id,request_type,pickup_text,destination_text,requested_for,note,
+     pickup_lat,pickup_lng,destination_lat,destination_lng,pickup_address,destination_address,pickup_note,landmark,route_distance_m,route_duration_s)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
+    [req.user.id,p.user_id,pt,p.id,itemId,rt,String(b.pickup_text||b.pickup_address||'').trim().slice(0,300),String(b.destination_text||b.destination_address||'').trim().slice(0,300),String(b.requested_for||'').trim().slice(0,120),note,
+     geo.pickup_lat,geo.pickup_lng,geo.destination_lat,geo.destination_lng,geo.pickup_address,geo.destination_address,geo.pickup_note,geo.landmark,geo.route_distance_m,geo.route_duration_s])).rows[0];
    await addEvent(r.id,req.user.id,'created','pending',null);
    res.status(201).json(reqSafe(r));
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}

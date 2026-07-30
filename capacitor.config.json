@@ -1,0 +1,26 @@
+{
+  "appId": "ke.hapa.embu.staging",
+  "appName": "HAPA",
+  "webDir": "public",
+  "server": {
+    "url": "https://hapa-embu-staging.onrender.com",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "always"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#0d1222",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#11182b"
+    }
+  }
+}

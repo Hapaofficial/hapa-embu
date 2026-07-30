@@ -467,6 +467,17 @@ button,input,select,textarea{font:inherit}
     <button class="btn bad" style="width:100%" onclick="acDeactivate()">Yes, deactivate my account</button>
     <div id="acDeactMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
    </div>
+   <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
+    <h3 style="margin:0 0 8px">Delete account permanently</h3>
+    <p class="muted" style="font-size:13px;margin:0 0 12px">Deletion cannot be undone. Your name and contact details are erased, your listings, profiles and photos disappear from HAPA, and you are logged out everywhere. Records required for safety and legal reasons (e.g. moderation history) are kept without your personal details.</p>
+    <button class="btn bad" style="width:100%" onclick="$('acDelBox').classList.toggle('hidden')">Delete my account permanently</button>
+    <div id="acDelBox" class="hidden" style="margin-top:12px">
+     <div class="field"><label for="acDelPw">Your password</label><input id="acDelPw" type="password"></div>
+     <div class="field"><label for="acDelConfirm">Type <b>DELETE</b> to confirm</label><input id="acDelConfirm" autocomplete="off" placeholder="DELETE"></div>
+     <button class="btn bad" style="width:100%" onclick="acDelete()">Permanently delete my account</button>
+     <div id="acDelMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div>
+    </div>
+   </div>
   </div>
  </div>
 </div>
@@ -478,6 +489,7 @@ button,input,select,textarea{font:inherit}
  <button class="mp-tab active" id="hpTab-support" onclick="hpView('support')">Help &amp; Support</button>
  <button class="mp-tab" id="hpTab-safety" onclick="hpView('safety')">Safety tips</button>
  <button class="mp-tab" id="hpTab-rules" onclick="hpView('rules')">Community rules</button>
+ <button class="mp-tab" id="hpTab-data" onclick="hpView('data')">Your data</button>
  <button class="mp-tab" id="hpTab-terms" onclick="hpView('terms')">Terms</button>
  <button class="mp-tab" id="hpTab-privacy" onclick="hpView('privacy')">Privacy</button>
 </div>
@@ -667,6 +679,24 @@ function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s
 
 // ── State ────────────────────────────────────────────────────────────────────
 let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
+// ── Native (Capacitor) bridge: Keystore/Keychain-backed token storage when the
+// SecureStoragePlugin is present. On native builds the token is mirrored to
+// secure storage and read back at boot; failures fall back to web behavior.
+const IS_NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+const capSS=()=>window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.SecureStoragePlugin;
+async function secureSetToken(t){try{const s=capSS();if(s)await s.set({key:'hapa_token',value:t||''});}catch{}}
+async function secureClearToken(){try{const s=capSS();if(s)await s.remove({key:'hapa_token'});}catch{}}
+async function secureLoadToken(){try{const s=capSS();if(s){const r=await s.get({key:'hapa_token'});return(r&&r.value)||null;}}catch{}return null;}
+function saveToken(t){token=t;localStorage.setItem('hapa_token',t);secureSetToken(t);}
+function clearToken(){token=null;localStorage.removeItem('hapa_token');secureClearToken();}
+// Android hardware back button → mirror the in-app back affordances.
+try{if(IS_NATIVE&&window.Capacitor.Plugins.App)window.Capacitor.Plugins.App.addListener('backButton',()=>{
+ if($('rq-detail')&&!$('rq-detail').classList.contains('hidden'))return rqBackToList();
+ if($('mp-provider')&&!$('mp-provider').classList.contains('hidden'))return mpBack();
+ if($('mp-detail')&&!$('mp-detail').classList.contains('hidden'))return mpBack();
+ if($('home')&&$('home').classList.contains('hidden'))return tab('home');
+ window.Capacitor.Plugins.App.minimizeApp&&window.Capacitor.Plugins.App.minimizeApp();
+});}catch{}
 let appMode='auth'; // auth|guest|pending|active|owner
 let pendingListingId=null; // deep link / post-auth redirect
 let mpCurView='browse',mpPrevView='browse',mpEditId=null;
@@ -688,9 +718,12 @@ $('eCat').innerHTML=catOpts;
 $('mpCat').innerHTML=`<option value="">All categories</option>${catOpts}`;
 
 // ── App startup ───────────────────────────────────────────────────────────────
-(function init(){
+(async function init(){
  const lid=new URLSearchParams(location.search).get('listing');
  if(lid) pendingListingId=lid;
+ // Native apps: restore the session from Keystore/Keychain-backed storage
+ // (localStorage in a native webview can be cleared by the OS).
+ if(!token&&IS_NATIVE){const st=await secureLoadToken();if(st){token=st;localStorage.setItem('hapa_token',st);}}
  if(token){ start(); return; }
  if(lid){ enterGuest(); return; } // deep link without token → guest mode
 })();
@@ -774,7 +807,7 @@ function showAuthPrompt(msg,isPending){
 }
 function hideAuthPrompt(){ $('authPromptPanel').classList.add('hidden'); }
 
-function logout(){try{ppRevokeBlobUrls();}catch{}localStorage.removeItem('hapa_token');location.href=location.pathname;}
+function logout(){try{ppRevokeBlobUrls();}catch{}try{if(token)api('/api/me/device-tokens',{method:'DELETE',body:JSON.stringify({})}).catch(()=>{});}catch{}clearToken();location.href=location.pathname;}
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
@@ -789,7 +822,7 @@ $('registerForm').onsubmit=async e=>{e.preventDefault();try{
  const pw=$('regPass').value;
  if(pw.length<10||!/[A-Za-z]/.test(pw)||!/\d/.test(pw)){msg('Password must be at least 10 characters with at least one letter and one number.',true);return;}
  let d=await api('/api/auth/register',{method:'POST',body:JSON.stringify({name:$('regName').value,phone:$('regPhone').value,email:$('regEmail').value,password:pw,selfie:await f64($('regSelfie'))})});
- token=d.token;localStorage.setItem('hapa_token',token);verifyChannel=d.channel;
+ saveToken(d.token);verifyChannel=d.channel;
  authMode('verify');
  $('verifyHint').textContent=`We sent a 6-digit code to your ${d.channel==='phone'?'phone':'email'}. It expires in 10 minutes.`;
  startResendCountdown();
@@ -803,7 +836,7 @@ async function doVerify(){try{
 
 $('loginForm').onsubmit=async e=>{e.preventDefault();try{
  let d=await api('/api/auth/login',{method:'POST',body:JSON.stringify({identifier:$('loginId').value,password:$('loginPass').value})});
- token=d.token;localStorage.setItem('hapa_token',token);start();
+ saveToken(d.token);start();
 }catch(x){msg(x.message,true);}};
 
 $('forgotForm').onsubmit=async e=>{e.preventDefault();resetIdentifier=$('forgotId').value;
@@ -2370,12 +2403,23 @@ function svRequestForm(rt,itemId,itemTitle){
  const isDriver=svCurType==='driver';
  $('svReqForm').innerHTML=`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
   <h4 style="margin:0 0 8px">${itemTitle?`Order: ${esc(itemTitle)}`:{service:'Request service',enquiry:'Send enquiry',order:'Place order',reservation:'Make reservation',ride:'Request ride',delivery:'Request delivery',transport:'Request transport'}[rt]||'Send request'}</h4>
-  ${isDriver?`<div class="field"><label>Pickup location *</label><input id="svPickup" maxlength="300" placeholder="e.g. Embu town CBD, near market"></div>
-  <div class="field"><label>Destination *</label><input id="svDest" maxlength="300" placeholder="e.g. Kangaru"></div>`:''}
+  ${isDriver?`<div id="gmapWrap" class="hidden">
+   <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+    <button type="button" class="btn" style="flex:1;min-height:44px" id="gmapModePickup" onclick="gmSetMode('pickup')">📍 Set pickup</button>
+    <button type="button" class="btn" style="flex:1;min-height:44px" id="gmapModeDest" onclick="gmSetMode('destination')">🏁 Set destination</button>
+    <button type="button" class="btn" style="min-height:44px" onclick="gmUseMyLocation()" title="Use my current location">🎯 My location</button></div>
+   <input id="gmSearch" placeholder="Search a place…" style="width:100%;background:#0d1528;color:white;border:1px solid var(--line);border-radius:11px;padding:11px;margin-bottom:8px">
+   <div id="gmap" style="width:100%;height:280px;border-radius:12px;background:var(--line);margin-bottom:8px" role="application" aria-label="Map for choosing pickup and destination"></div>
+   <div id="gmInfo" class="muted" style="font-size:13px;margin-bottom:8px">Tap the map or search to set your pickup point, then your destination. You can drag the markers to adjust.</div></div>
+  <div class="field"><label>Pickup location *</label><input id="svPickup" maxlength="300" placeholder="e.g. Embu town CBD, near market"></div>
+  <div class="field"><label>Destination *</label><input id="svDest" maxlength="300" placeholder="e.g. Kangaru"></div>
+  <div class="field"><label>Landmark / gate / building (optional)</label><input id="svLandmark" maxlength="200" placeholder="e.g. Blue gate opposite the petrol station"></div>
+  <div class="field"><label>Pickup note (optional)</label><input id="svPickupNote" maxlength="300" placeholder="e.g. Call when you arrive"></div>`:''}
   <div class="field"><label>When do you need it?</label><input id="svWhen" maxlength="120" placeholder="e.g. Today 4pm, This weekend"></div>
   <div class="field"><label>${isDriver?'Extra details (optional)':'Describe what you need *'}</label><textarea id="svNote" rows="3" maxlength="1000" placeholder="${isDriver?'Luggage, passengers, special instructions…':'Give the provider enough detail to respond quickly…'}"></textarea></div>
   <button class="btn primary" style="width:100%;min-height:44px" onclick="svSendRequest('${rt}'${itemId?`,'${itemId}'`:''})">Send request</button>
   <div id="svReqMsg" aria-live="polite" style="font-size:13px;margin-top:8px"></div></div>`;
+ if(isDriver)gmInit();
  $('svReqForm').scrollIntoView({behavior:'smooth',block:'center'});
 }
 async function svSendRequest(rt,itemId){
@@ -2385,9 +2429,118 @@ async function svSendRequest(rt,itemId){
   if(itemId)body.item_id=itemId;
   if($('svPickup'))body.pickup_text=$('svPickup').value;
   if($('svDest'))body.destination_text=$('svDest').value;
+  if($('svLandmark')&&$('svLandmark').value)body.landmark=$('svLandmark').value;
+  if($('svPickupNote')&&$('svPickupNote').value)body.pickup_note=$('svPickupNote').value;
+  // Precise coordinates from the map picker (when Google Maps is configured).
+  // The map is optional; if the customer set points, block submission until
+  // BOTH pickup and destination are chosen so the driver gets a complete trip.
+  if(gmState.pickup||gmState.destination){
+   if(!gmState.pickup||!gmState.destination){m.textContent='Set both pickup and destination on the map, or clear the map selection by typing locations instead.';m.style.color='var(--bad)';return;}
+   body.pickup_lat=gmState.pickup.lat;body.pickup_lng=gmState.pickup.lng;body.pickup_address=gmState.pickup.address||'';
+   body.destination_lat=gmState.destination.lat;body.destination_lng=gmState.destination.lng;body.destination_address=gmState.destination.address||'';
+   if(gmState.distance!=null)body.route_distance_m=gmState.distance;
+   if(gmState.duration!=null)body.route_duration_s=gmState.duration;
+  }
   await api('/api/requests',{method:'POST',body:JSON.stringify(body)});
   $('svReqForm').innerHTML='<div class="notice" style="margin-top:12px"><b>✓ Request sent.</b> Track it under <a href="#" style="color:var(--a)" onclick="tab(\'requests\');return false">Requests</a>. The provider will accept or decline shortly.</div>';
  }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
+
+// ═══════════════ GOOGLE MAPS PICKUP/DESTINATION PICKER ═══════════════
+// Loaded only when the deployment provides a (referrer-restricted) browser
+// key via /api/public/config. Without a key the booking form falls back to
+// manual location text — nothing is faked.
+let gmState={pickup:null,destination:null,distance:null,duration:null,mode:'pickup'};
+let gmMap=null,gmMarkers={},gmDirRenderer=null,gmGeocoder=null,gmCfg;
+async function gmConfig(){if(gmCfg===undefined){try{gmCfg=await publicApi('/api/public/config');}catch{gmCfg={};}}return gmCfg;}
+let gmLoadP=null;
+function gmLoadScript(key){
+ if(window.google&&window.google.maps)return Promise.resolve();
+ if(gmLoadP)return gmLoadP;
+ gmLoadP=new Promise((ok,bad)=>{
+  const s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&libraries=places&loading=async&callback=__gmReady';
+  window.__gmReady=()=>ok();s.onerror=()=>bad(new Error('Google Maps failed to load'));
+  document.head.appendChild(s);
+ });
+ return gmLoadP;
+}
+async function gmInit(){
+ gmState={pickup:null,destination:null,distance:null,duration:null,mode:'pickup'};gmMarkers={};
+ const cfg=await gmConfig();
+ if(!cfg.mapsBrowserKey||!$('gmapWrap'))return; // manual entry fallback stays visible
+ try{
+  await gmLoadScript(cfg.mapsBrowserKey);
+  if(!$('gmap'))return;
+  $('gmapWrap').classList.remove('hidden');
+  gmMap=new google.maps.Map($('gmap'),{center:{lat:-0.5390,lng:37.4575},zoom:14,mapTypeControl:false,streetViewControl:false,fullscreenControl:false}); // Embu town
+  gmGeocoder=new google.maps.Geocoder();
+  gmMap.addListener('click',e=>gmSetPoint(gmState.mode,e.latLng.lat(),e.latLng.lng()));
+  const ac=new google.maps.places.Autocomplete($('gmSearch'),{fields:['geometry','formatted_address','name'],componentRestrictions:{country:'ke'}});
+  ac.addListener('place_changed',()=>{
+   const pl=ac.getPlace();if(!pl.geometry||!pl.geometry.location)return;
+   gmSetPoint(gmState.mode,pl.geometry.location.lat(),pl.geometry.location.lng(),pl.formatted_address||pl.name||'');
+   gmMap.panTo(pl.geometry.location);$('gmSearch').value='';
+  });
+  gmSetMode('pickup');
+ }catch(e){/* map unavailable — manual entry keeps working */}
+}
+function gmSetMode(m){
+ gmState.mode=m;
+ if($('gmapModePickup'))$('gmapModePickup').className='btn'+(m==='pickup'?' primary':'');
+ if($('gmapModeDest'))$('gmapModeDest').className='btn'+(m==='destination'?' primary':'');
+}
+function gmUseMyLocation(){
+ const info=$('gmInfo');
+ if(!navigator.geolocation){if(info)info.textContent='Location is not available on this device — search or tap the map instead.';return;}
+ if(info)info.textContent='Getting your location…';
+ navigator.geolocation.getCurrentPosition(
+  pos=>{gmSetPoint('pickup',pos.coords.latitude,pos.coords.longitude);if(gmMap)gmMap.panTo({lat:pos.coords.latitude,lng:pos.coords.longitude});},
+  ()=>{if(info)info.textContent='Location permission denied — search a place or tap the map to set your pickup manually.';},
+  {enableHighAccuracy:true,timeout:10000});
+}
+function gmSetPoint(kind,lat,lng,address){
+ if(!gmMap)return;
+ gmState[kind]={lat,lng,address:address||null};
+ if(gmMarkers[kind])gmMarkers[kind].setMap(null);
+ gmMarkers[kind]=new google.maps.Marker({position:{lat,lng},map:gmMap,draggable:true,
+  label:kind==='pickup'?'P':'D',title:kind==='pickup'?'Pickup (drag to adjust)':'Destination (drag to adjust)'});
+ gmMarkers[kind].addListener('dragend',e=>gmSetPoint(kind,e.latLng.lat(),e.latLng.lng()));
+ if(!address&&gmGeocoder)gmGeocoder.geocode({location:{lat,lng}},(res,st)=>{
+  if(st==='OK'&&res&&res[0]){gmState[kind].address=res[0].formatted_address;gmApplyAddress(kind);}
+ });else gmApplyAddress(kind);
+ if(kind==='pickup'&&!gmState.destination)gmSetMode('destination');
+ gmRoute();
+}
+function gmApplyAddress(kind){
+ const el=kind==='pickup'?$('svPickup'):$('svDest');
+ const p=gmState[kind];
+ if(el&&p)el.value=p.address||(p.lat.toFixed(5)+', '+p.lng.toFixed(5));
+ gmUpdateInfo();
+}
+function gmRoute(){
+ if(!gmState.pickup||!gmState.destination||!window.google)return gmUpdateInfo();
+ if(!gmDirRenderer)gmDirRenderer=new google.maps.DirectionsRenderer({map:gmMap,suppressMarkers:true,preserveViewport:false});
+ new google.maps.DirectionsService().route(
+  {origin:gmState.pickup,destination:gmState.destination,travelMode:google.maps.TravelMode.DRIVING},
+  (res,st)=>{
+   if(st==='OK'&&res.routes[0]&&res.routes[0].legs[0]){
+    const leg=res.routes[0].legs[0];
+    gmDirRenderer.setDirections(res);
+    gmState.distance=leg.distance?leg.distance.value:null;
+    gmState.duration=leg.duration?leg.duration.value:null;
+   }else{gmState.distance=null;gmState.duration=null;}
+   gmUpdateInfo();
+  });
+}
+function gmUpdateInfo(){
+ const info=$('gmInfo');if(!info)return;
+ const bits=[];
+ if(gmState.pickup)bits.push('📍 Pickup set');
+ if(gmState.destination)bits.push('🏁 Destination set');
+ if(gmState.distance!=null)bits.push('~'+(gmState.distance/1000).toFixed(1)+' km');
+ if(gmState.duration!=null)bits.push('~'+Math.round(gmState.duration/60)+' min drive');
+ info.textContent=bits.length?bits.join(' · '):'Tap the map or search to set your pickup point, then your destination.';
 }
 function svReport(){
  if(!requireActive('report'))return;
@@ -2463,11 +2616,17 @@ async function rqOpen(id,fromInbox){
     <div class="row"><span class="muted">${isProv?'Customer':'Provider'}</span><b>${esc(isProv?r.customer_name:r.provider_name)}</b></div>
     ${r.customer_phone?`<div class="row"><span class="muted">Customer phone</span><a href="tel:${esc(r.customer_phone)}" style="color:var(--a);font-weight:700">${esc(r.customer_phone)}</a></div>`:''}
     ${r.provider_phone?`<div class="row"><span class="muted">Provider phone</span><a href="tel:${esc(r.provider_phone)}" style="color:var(--a);font-weight:700">${esc(r.provider_phone)}</a></div>`:''}
-    ${r.pickup_text?`<div class="row"><span class="muted">Pickup</span><span>${esc(r.pickup_text)}</span></div><div class="row"><span class="muted">Destination</span><span>${esc(r.destination_text)}</span></div>`:''}
+    ${r.pickup_text?`<div class="row"><span class="muted">Pickup</span><span>${esc(r.pickup_address||r.pickup_text)}</span></div><div class="row"><span class="muted">Destination</span><span>${esc(r.destination_address||r.destination_text)}</span></div>`:''}
+    ${r.landmark?`<div class="row"><span class="muted">Landmark</span><span>${esc(r.landmark)}</span></div>`:''}
+    ${r.pickup_note?`<div class="row"><span class="muted">Pickup note</span><span>${esc(r.pickup_note)}</span></div>`:''}
+    ${r.route_distance_m!=null?`<div class="row"><span class="muted">Route</span><span>~${(r.route_distance_m/1000).toFixed(1)} km${r.route_duration_s!=null?' · ~'+Math.round(r.route_duration_s/60)+' min':''}</span></div>`:''}
     ${r.requested_for?`<div class="row"><span class="muted">Requested for</span><span>${esc(r.requested_for)}</span></div>`:''}
     <div class="row"><span class="muted">Created</span><span>${new Date(r.created_at).toLocaleString()}</span></div></div>
    ${r.note?`<div style="background:var(--p2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere">${esc(r.note)}</div>`:''}
    ${isProv&&r.status==='pending'?'<p class="muted" style="font-size:12px;margin:0 0 10px">The customer\'s phone number is shared once you accept.</p>':''}
+   ${isProv&&r.pickup_lat!=null&&r.status==='accepted'?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <a class="btn" style="flex:1;text-align:center;min-height:44px;line-height:24px" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${r.pickup_lat},${r.pickup_lng}">🧭 Navigate to pickup</a>
+    ${r.destination_lat!=null?`<a class="btn" style="flex:1;text-align:center;min-height:44px;line-height:24px" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=${r.pickup_lat},${r.pickup_lng}&destination=${r.destination_lat},${r.destination_lng}">🗺 Full route</a>`:''}</div>`:''}
    ${acts.length?`<div style="display:flex;gap:8px;flex-wrap:wrap">${acts.join('')}</div>`:''}
    ${isCust&&r.status==='completed'&&!r.reviewed?`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
     <h4 style="margin:0 0 8px">Rate this provider</h4>
@@ -2528,7 +2687,7 @@ async function acChangePassword(){
  const m=$('acPwMsg');m.textContent='Working…';m.style.color='';
  try{
   const d=await api('/api/me/password',{method:'POST',body:JSON.stringify({currentPassword:$('acCurPw').value,newPassword:$('acNewPw').value})});
-  token=d.token;localStorage.setItem('hapa_token',token);
+  saveToken(d.token);
   $('acCurPw').value='';$('acNewPw').value='';
   m.textContent='✓ Password changed. Other devices were logged out.';m.style.color='var(--ok)';
  }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
@@ -2539,11 +2698,19 @@ async function acDeactivate(){
  try{await api('/api/me/deactivate',{method:'POST',body:JSON.stringify({password:$('acDeactPw').value})});logout();}
  catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
 }
+async function acDelete(){
+ const m=$('acDelMsg');
+ if(!confirm('Permanently delete your account? This cannot be undone.'))return;
+ try{
+  await api('/api/me/delete',{method:'POST',body:JSON.stringify({password:$('acDelPw').value,confirm:$('acDelConfirm').value})});
+  alert('Your account was deleted.');logout();
+ }catch(e){m.textContent=e.message;m.style.color='var(--bad)';}
+}
 
 // ═══════════════════════════ HELP & LEGAL ═══════════════════════════
 let hpSiteInfo=null;
 async function hpView(v){
- ['support','safety','rules','terms','privacy'].forEach(x=>{const b=$('hpTab-'+x);if(b)b.className='mp-tab'+(x===v?' active':'');});
+ ['support','safety','rules','data','terms','privacy'].forEach(x=>{const b=$('hpTab-'+x);if(b)b.className='mp-tab'+(x===v?' active':'');});
  const el=$('hpBody');
  if(v==='support'){
   el.innerHTML='<p class="muted">Loading…</p>';
@@ -2574,6 +2741,13 @@ async function hpView(v){
   <div class="row" style="flex-direction:column;align-items:flex-start"><b>Respect other members</b><span class="muted" style="font-size:13px">No harassment, hate speech, threats or spam — in listings, profiles, messages or reviews.</span></div>
   <div class="row" style="flex-direction:column;align-items:flex-start"><b>One person, one account</b><span class="muted" style="font-size:13px">Accounts are personally verified. Do not impersonate others or share your account.</span></div>
   <div class="row" style="flex-direction:column;align-items:flex-start"><b>Breaking the rules has consequences</b><span class="muted" style="font-size:13px">HAPA may hide content, suspend roles or block accounts that violate these rules.</span></div></div>`;
+ if(v==='data')el.innerHTML=`<h3 style="margin:0 0 10px">Your data &amp; permissions</h3><div style="font-size:14px;line-height:1.7" class="muted">
+  <p><b style="color:var(--text)">📍 Location.</b> HAPA asks for your location only when you choose "Use my current location" while booking transport. The exact pickup and destination points are visible only to you, the driver you contacted, and HAPA support — never on public profiles or in public search. HAPA does not track your location in the background and keeps no location history beyond your requests.</p>
+  <p><b style="color:var(--text)">📷 Camera &amp; photos.</b> The camera and photo library are used only when you tap an upload button — for profile photos, shop and portfolio images, or verification documents. Location metadata (EXIF/GPS) is automatically removed from every image before it is stored.</p>
+  <p><b style="color:var(--text)">🔔 Notifications.</b> If you enable notifications in the mobile app, HAPA sends updates about your applications, requests and support messages. Notification previews never include exact locations or private message content. You can turn them off any time in your device settings.</p>
+  <p><b style="color:var(--text)">🗂 Data retention.</b> Active account data is kept while your account exists. When you deactivate, your content is hidden but kept so the account can be restored. When you delete your account, your name and contact details are erased permanently; only records required for safety and legal reasons (moderation and audit history) are retained, without your personal details.</p>
+  <p><b style="color:var(--text)">🗑 Account deletion.</b> Delete your account any time from Account → "Delete account permanently", from inside the mobile apps, or via the request page at <b>/delete-account</b>. Deletion is immediate and cannot be undone.</p>
+  <p><b style="color:var(--text)">🤝 Provider independence.</b> Professionals, merchants and drivers on HAPA are independent local providers — they are not employees, agents or partners of HAPA. HAPA verifies identity documents at application time but does not supervise their work, set their prices or process payments between you.</p></div>`;
  if(v==='terms')el.innerHTML=`<h3 style="margin:0 0 10px">Terms of use</h3><div style="font-size:14px;line-height:1.7" class="muted">
   <p><b style="color:var(--text)">1. The service.</b> HAPA is a local marketplace for Embu, Kenya that connects buyers with sellers, professionals, merchants and transport providers. HAPA is a venue only — it is not a party to any transaction between members.</p>
   <p><b style="color:var(--text)">2. Accounts.</b> You must provide accurate details when registering. Every account is reviewed before activation and roles require verified documents. You are responsible for activity on your account.</p>

@@ -26,6 +26,16 @@
 ### Site info (shown on the Help & Support page; all optional, hidden when unset)
 - `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `LEGAL_ENTITY_NAME`, `LEGAL_ADDRESS`.
 
+### Google Maps (optional — map booking UI activates when set)
+- `GOOGLE_MAPS_BROWSER_KEY` — referrer-restricted Maps JavaScript API + Places key,
+  one per environment. Without it, transport booking uses manual location entry.
+  See docs/mobile/GOOGLE_MAPS.md.
+
+### Mobile deep links (optional — association files 404 until set)
+- `ANDROID_PACKAGE_NAME`, `ANDROID_CERT_SHA256` — enables `/.well-known/assetlinks.json`.
+- `IOS_APP_ID` (`TEAMID.bundle.id`) — enables `/.well-known/apple-app-site-association`.
+  See docs/mobile/DEEPLINKS.md.
+
 ## v1.6 notes
 - Migrations in `sql/schema.sql` are additive and idempotent; they run automatically at boot.
 - New modules: merchant shops + products, driver profiles, unified customer↔provider requests with reviews, account settings (profile edit / password change / deactivation), generic reports, owner audit log.

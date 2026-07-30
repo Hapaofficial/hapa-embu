@@ -38,11 +38,13 @@ app.use((req,res,next)=>{
  res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
  res.setHeader('Permissions-Policy','geolocation=(), microphone=(), payment=()');
- res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
+ res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
  if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
  next();
 });
 app.use(express.static(path.join(__dirname,'public')));
+// Externally accessible account-deletion instructions (store-listing requirement)
+app.get('/delete-account',(req,res)=>res.sendFile(path.join(__dirname,'public','delete-account.html')));
 
 // ── Rate limiters ─────────────────────────────────────────────────────────────
 // Demo/dev mode relaxes limits so automated test suites can run; production
@@ -65,7 +67,7 @@ const tok=u=>jwt.sign({sub:u.id,tv:+u.token_version||0},secret,{expiresIn:'7d',i
 const isVerifiedExpr=(t='u')=>
  `(${t}.status='active' AND (${t}.email_verified=true OR ${t}.phone_verified=true) AND ${t}.profile_photo_url IS NOT NULL AND ${t}.profile_photo_url<>'')`;
 
-async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||['blocked','deactivated'].includes(r.rows[0].status))throw 0;if((+r.rows[0].token_version||0)!==(+d.tv||0))throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
+async function auth(req,res,next){try{let h=req.headers.authorization||'';let d=jwt.verify(h.slice(7),secret,{issuer:'hapa'});let r=await q('SELECT * FROM users WHERE id=$1',[d.sub]);if(!r.rowCount||['blocked','deactivated','deleted'].includes(r.rows[0].status))throw 0;if((+r.rows[0].token_version||0)!==(+d.tv||0))throw 0;req.user=r.rows[0];next()}catch{res.status(401).json({error:'Login required'})}}
 const owner=(req,res,next)=>req.user.role==='owner'?next():res.status(403).json({error:'Owner only'});
 const active=(req,res,next)=>(req.user.role==='owner'||req.user.status==='active')?next():res.status(403).json({error:'Account not active'});
 async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.random()*900000));await q(`INSERT INTO verification_codes(user_id,channel,purpose,code,expires_at) VALUES($1,$2,$3,$4,NOW()+interval '10 min')`,[userId,channel,purpose,c]);return c}
@@ -102,7 +104,7 @@ async function audit(actorId,action,targetType,targetId,note){
 }
 
 // ── Core ──────────────────────────────────────────────────────────────────────
-app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.6.0'})});
+app.get('/api/health',async(req,res)=>{await q('SELECT 1');res.json({ok:true,version:'1.7.0'})});
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 app.post('/api/auth/register',authLimiter,async(req,res)=>{
@@ -122,6 +124,7 @@ app.post('/api/auth/login',authLimiter,async(req,res)=>{
  if(!u||!await bcrypt.compare(String(req.body.password||''),u.password_hash))return res.status(401).json({error:'Wrong login or password'});
  if(u.status==='blocked')return res.status(403).json({error:'Account blocked'});
  if(u.status==='deactivated')return res.status(403).json({error:'This account was deactivated. Contact HAPA support to restore it.'});
+ if(u.status==='deleted')return res.status(403).json({error:'This account was deleted.'});
  res.json({token:tok(u),user:safe(u)});
 });
 

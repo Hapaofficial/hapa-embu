@@ -20,7 +20,7 @@ WHERE role='partner';
 -- Owner/customer assignment is enforced transactionally in server.js at startup.
 ALTER TABLE users ADD CONSTRAINT users_role_check CHECK(role IN('owner','customer'));
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
-ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked','deactivated'));
+ALTER TABLE users ADD CONSTRAINT users_status_check CHECK(status IN('active','pending','rejected','blocked','deactivated','deleted'));
 UPDATE users SET capabilities=jsonb_set(capabilities,'{driver}','true',true),role='customer' WHERE role='driver';
 UPDATE users SET capabilities=jsonb_set(capabilities,'{merchant}','true',true),role='customer' WHERE role='merchant';
 UPDATE users SET role='customer',status=CASE WHEN status='blocked' THEN 'rejected' ELSE status END WHERE role='partner';
@@ -362,3 +362,35 @@ CREATE TABLE IF NOT EXISTS owner_audit_log(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_owneraudit_created ON owner_audit_log(created_at DESC);
+
+-- ── v1.7 launch candidate: precise trip locations, account deletion, push tokens ──
+
+-- Precise GPS pickup/destination for driver requests (visible only to the
+-- customer, the addressed provider, and the Owner — never in public APIs).
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS pickup_lat DOUBLE PRECISION;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS pickup_lng DOUBLE PRECISION;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS destination_lat DOUBLE PRECISION;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS destination_lng DOUBLE PRECISION;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS pickup_address TEXT;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS destination_address TEXT;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS pickup_note TEXT;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS landmark TEXT;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS route_distance_m INTEGER;
+ALTER TABLE service_requests ADD COLUMN IF NOT EXISTS route_duration_s INTEGER;
+
+-- Account deletion (anonymized tombstone; audit records retained)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Push notification device tokens (native apps / web push)
+CREATE TABLE IF NOT EXISTS device_tokens(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ platform TEXT NOT NULL CHECK(platform IN('android','ios','web')),
+ token TEXT NOT NULL UNIQUE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
+
+-- Notification preferences (privacy-safe defaults)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_prefs JSONB NOT NULL DEFAULT '{}';

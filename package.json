@@ -1,6 +1,6 @@
 {
   "name": "hapa-embu",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "main": "server.js",
   "scripts": {
@@ -14,7 +14,18 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",
     "@aws-sdk/s3-request-presigner": "^3.1095.0",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/camera": "^8.2.1",
+    "@capacitor/cli": "^7.6.8",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/ios": "^8.4.2",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "bcryptjs": "^2.4.3",
+    "capacitor-secure-storage-plugin": "^0.13.0",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "jsonwebtoken": "^9.0.2",
