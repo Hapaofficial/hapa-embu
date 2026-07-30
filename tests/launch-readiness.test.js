@@ -164,6 +164,11 @@ async function makeUser(ownerTok, label, capType, details) {
 
   // ══ 5. ACCOUNT DELETION ══
   await j('POST', '/api/me/device-tokens', deluser.tok, { platform: 'ios', token: 'lr-del-token-' + RUN });
+  // deleted user's marketplace listings must disappear from public discovery
+  const lst = await j('POST', '/api/marketplace', deluser.tok, { title: 'LR Delete Chair ' + RUN, description: 'Sturdy wooden chair for testing.', category: 'Furniture', condition: 'Used', price: 500, location: 'Embu Town', images: ['/public-media/test/lr-chair.jpg'] });
+  ok('listing created for deletion test', lst.s === 201, lst);
+  const lstId = lst.d.id;
+  ok('listing publicly visible pre-delete', (await j('GET', '/api/public/marketplace/' + lstId)).s === 200);
   ok('deletion requires correct password', (await j('POST', '/api/me/delete', deluser.tok, { password: 'wrong', confirm: 'DELETE' })).s === 403);
   ok('deletion requires DELETE confirmation', (await j('POST', '/api/me/delete', deluser.tok, { password: PW, confirm: 'no' })).s === 400);
   ok('owner account cannot self-delete', (await j('POST', '/api/me/delete', ownerTok, { password: OWNER_PASSWORD, confirm: 'DELETE' })).s === 403);
@@ -175,6 +180,9 @@ async function makeUser(ownerTok, label, capType, details) {
   const du = (await j('GET', '/api/owner/users?q=' + RUN, ownerTok)).d;
   const drow = (Array.isArray(du) ? du : du.users || []).find(u => u.id === deluser.uid);
   ok('deleted user anonymized (name wiped)', !drow || (drow.name === 'Deleted user' && !(drow.email || '').includes('@example.com')), drow);
+  ok('deleted user listing gone from public detail', (await j('GET', '/api/public/marketplace/' + lstId)).s === 404);
+  const pubList = await j('GET', '/api/public/marketplace?q=' + encodeURIComponent('LR Delete Chair ' + RUN));
+  ok('deleted user listing gone from public search', (pubList.d.data || []).length === 0, pubList.d.total);
   // external deletion page
   const dp = await fetch(B + '/delete-account');
   ok('external deletion page reachable', dp.status === 200 && /Delete your HAPA account/.test(await dp.text()));

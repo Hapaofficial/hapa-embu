@@ -67,6 +67,11 @@ const noPrivateLeak = (o) => !/private_document|sensitive_details|upgrade_docume
   // --- images ---
   const jpg = await sharp({ create: { width: 300, height: 200, channels: 3, background: { r: 40, g: 90, b: 160 } } })
     .jpeg().withMetadata({ exif: { IFD0: { Copyright: 'strip-me' } } }).toBuffer();
+  // idempotency: clear leftover portfolio images from prior runs (fixture user is reused)
+  const preMe = await j('GET', '/api/me/professional-profile', pro);
+  for (const im of ((preMe.d && preMe.d.portfolio) || [])) {
+    await j('DELETE', '/api/me/professional-profile/portfolio/' + im.id, pro);
+  }
   ok('SVG rejected', (await upload('/api/me/professional-profile/portfolio', pro, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), 'image/svg+xml', 'x.svg')).s === 400);
   ok('malformed bytes rejected', (await upload('/api/me/professional-profile/portfolio', pro, Buffer.from('not-an-image'), 'image/jpeg')).s === 400);
   const up1 = await upload('/api/me/professional-profile/portfolio', pro, jpg);

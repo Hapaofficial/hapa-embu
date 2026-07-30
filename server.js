@@ -466,7 +466,7 @@ app.get('/api/public/marketplace',async(req,res)=>{
  try{
   const{q:sq,category,condition,location,min_price,max_price,sort='newest',page=1,limit=20}=req.query;
   const lim=Math.min(+limit||20,100),off=(Math.max(+page||1,1)-1)*lim;
-  const wp=[],w=[`ml.status='active'`];
+  const wp=[],w=[`ml.status='active'`,`u.status='active'`]; // hide listings of deactivated/deleted/blocked sellers
   if(sq){wp.push(`%${sq}%`);const n=wp.length;w.push(`(ml.title ILIKE $${n} OR ml.description ILIKE $${n} OR ml.category ILIKE $${n} OR ml.location ILIKE $${n})`)}
   if(category){wp.push(category);w.push(`ml.category=$${wp.length}`)}
   if(condition){wp.push(condition);w.push(`ml.condition=$${wp.length}`)}
@@ -475,7 +475,7 @@ app.get('/api/public/marketplace',async(req,res)=>{
   if(max_price&&+max_price>0){wp.push(+max_price);w.push(`ml.price<=$${wp.length}`)}
   const ws=w.join(' AND ');
   const ob={newest:'ml.created_at DESC',oldest:'ml.created_at ASC',price_asc:'ml.price ASC',price_desc:'ml.price DESC',most_viewed:'ml.views_count DESC'}[sort]||'ml.created_at DESC';
-  const tot=+(await q(`SELECT count(*)::int n FROM marketplace_listings ml WHERE ${ws}`,wp)).rows[0].n;
+  const tot=+(await q(`SELECT count(*)::int n FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ${ws}`,wp)).rows[0].n;
   const dp=[...wp,lim,off];const lN=dp.length-1,oN=dp.length;
   const rows=(await q(`SELECT ml.id,ml.title,ml.price,ml.category,ml.condition,ml.location,ml.status,ml.created_at,ml.views_count,ml.negotiable,ml.images->0 AS main_image,jsonb_array_length(ml.images)::int AS image_count,u.id AS seller_id,u.name AS seller_name,u.profile_photo_url AS seller_photo,${isVerifiedExpr()} AS is_verified FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ${ws} ORDER BY ${ob} LIMIT $${lN} OFFSET $${oN}`,dp)).rows;
   res.json({data:rows,total:tot,page:+page,limit:lim,pages:Math.ceil(tot/lim)});
@@ -484,7 +484,7 @@ app.get('/api/public/marketplace',async(req,res)=>{
 
 app.get('/api/public/marketplace/:id',async(req,res)=>{
  try{
-  const r=await q(`SELECT ml.id,ml.title,ml.price,ml.category,ml.condition,ml.location,ml.status,ml.created_at,ml.updated_at,ml.views_count,ml.negotiable,ml.description,ml.images,jsonb_array_length(ml.images)::int AS image_count,u.id AS seller_id,u.name AS seller_name,u.profile_photo_url AS seller_photo,u.created_at AS seller_joined,(SELECT count(*)::int FROM marketplace_listings WHERE seller_id=u.id AND status='active') AS seller_listing_count,${isVerifiedExpr()} AS is_verified FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ml.id=$1 AND ml.status NOT IN ('removed','hidden')`,[req.params.id]);
+  const r=await q(`SELECT ml.id,ml.title,ml.price,ml.category,ml.condition,ml.location,ml.status,ml.created_at,ml.updated_at,ml.views_count,ml.negotiable,ml.description,ml.images,jsonb_array_length(ml.images)::int AS image_count,u.id AS seller_id,u.name AS seller_name,u.profile_photo_url AS seller_photo,u.created_at AS seller_joined,(SELECT count(*)::int FROM marketplace_listings WHERE seller_id=u.id AND status='active') AS seller_listing_count,${isVerifiedExpr()} AS is_verified FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ml.id=$1 AND ml.status NOT IN ('removed','hidden') AND u.status='active'`,[req.params.id]);
   if(!r.rowCount)return res.status(404).json({error:'Listing not found'});
   const l=r.rows[0];
   // Increment views for public visitors (no seller exclusion — no user context)
@@ -517,7 +517,7 @@ app.get('/api/marketplace',auth,active,async(req,res)=>{
  try{
   const{q:sq,category,condition,location,min_price,max_price,sort='newest',page=1,limit=20}=req.query;
   const lim=Math.min(+limit||20,100),off=(Math.max(+page||1,1)-1)*lim;
-  const wp=[],w=[`ml.status='active'`];
+  const wp=[],w=[`ml.status='active'`,`u.status='active'`]; // hide listings of deactivated/deleted/blocked sellers
   if(sq){wp.push(`%${sq}%`);const n=wp.length;w.push(`(ml.title ILIKE $${n} OR ml.description ILIKE $${n} OR ml.category ILIKE $${n} OR ml.location ILIKE $${n})`)}
   if(category){wp.push(category);w.push(`ml.category=$${wp.length}`)}
   if(condition){wp.push(condition);w.push(`ml.condition=$${wp.length}`)}
@@ -526,7 +526,7 @@ app.get('/api/marketplace',auth,active,async(req,res)=>{
   if(max_price&&+max_price>0){wp.push(+max_price);w.push(`ml.price<=$${wp.length}`)}
   const ws=w.join(' AND ');
   const ob={newest:'ml.created_at DESC',oldest:'ml.created_at ASC',price_asc:'ml.price ASC',price_desc:'ml.price DESC',most_viewed:'ml.views_count DESC'}[sort]||'ml.created_at DESC';
-  const tot=+(await q(`SELECT count(*)::int n FROM marketplace_listings ml WHERE ${ws}`,wp)).rows[0].n;
+  const tot=+(await q(`SELECT count(*)::int n FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ${ws}`,wp)).rows[0].n;
   const dp=[...wp,req.user.id,lim,off];const uN=dp.length-2,lN=dp.length-1,oN=dp.length;
   const rows=(await q(`SELECT ml.id,ml.title,ml.price,ml.category,ml.condition,ml.location,ml.status,ml.created_at,ml.updated_at,ml.views_count,ml.negotiable,ml.seller_phone_visible,ml.images->0 AS main_image,jsonb_array_length(ml.images)::int AS image_count,u.id AS seller_id,u.name AS seller_name,u.profile_photo_url AS seller_photo,EXISTS(SELECT 1 FROM listing_favorites lf WHERE lf.listing_id=ml.id AND lf.user_id=$${uN}) AS is_favorited,${isVerifiedExpr()} AS is_verified FROM marketplace_listings ml JOIN users u ON u.id=ml.seller_id WHERE ${ws} ORDER BY ${ob} LIMIT $${lN} OFFSET $${oN}`,dp)).rows;
   res.json({data:rows,total:tot,page:+page,limit:lim,pages:Math.ceil(tot/lim)});
