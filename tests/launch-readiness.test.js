@@ -214,7 +214,8 @@ async function makeUser(ownerTok, label, capType, details) {
   ok('ios plist: no background location', !plist.includes('NSLocationAlwaysUsageDescription') && !plist.includes('NSLocationAlwaysAndWhenInUseUsageDescription'));
   ok('ios privacy manifest exists', fs.existsSync(path.join(__dirname, '..', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy')));
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-  ok('capacitor + secure storage installed', !!pkg.dependencies['@capacitor/core'] && !!pkg.dependencies['capacitor-secure-storage-plugin']);
+  const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }; // mobile toolchain lives in devDependencies (web build skips it)
+  ok('capacitor + secure storage installed', !!allDeps['@capacitor/core'] && !!allDeps['capacitor-secure-storage-plugin']);
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   ok('frontend uses secure storage bridge', html.includes('SecureStoragePlugin') && html.includes('secureLoadToken'));
   ok('frontend never puts token in URL', !/[?&]token=/.test(html));
