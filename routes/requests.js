@@ -35,8 +35,11 @@ module.exports=function(app,deps){
    const rt=String(b.request_type||'');
    if(!REQ_TYPES[pt].includes(rt))return res.status(400).json({error:'Invalid request type for this provider'});
    // Provider profile must be publicly visible
-   const p=(await q(`SELECT p.id,p.user_id FROM ${PROFILE_TABLE[pt]} p JOIN users u ON u.id=p.user_id WHERE p.id::text=$1 AND p.status='active' AND u.status='active' AND (u.capabilities->>'${CAP_KEY[pt]}')='true'`,[String(b.profile_id||'')])).rows[0];
+   const p=(await q(`SELECT p.id,p.user_id,p.county FROM ${PROFILE_TABLE[pt]} p JOIN users u ON u.id=p.user_id WHERE p.id::text=$1 AND p.status='active' AND u.status='active' AND (u.capabilities->>'${CAP_KEY[pt]}')='true'`,[String(b.profile_id||'')])).rows[0];
    if(!p)return res.status(404).json({error:'Provider not found'});
+   // Service-area gate: no requests may be sent into a paused/inactive market —
+   // providers in areas the Owner has not activated cannot receive offers.
+   if(!(await deps.geo.countyActive(p.county)))return res.status(403).json({error:'This provider\u2019s service area is not currently active on HAPA'});
    if(p.user_id===req.user.id)return res.status(400).json({error:'You cannot send a request to yourself'});
    let itemId=null;
    if(b.item_id){

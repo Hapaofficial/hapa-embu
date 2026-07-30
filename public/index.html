@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA — Buy &amp; Sell in Embu</title><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#101C2C"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icon.svg">
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAPA — Buy &amp; Sell in Kenya · Launching first in Embu</title><link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#101C2C"><link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="/icon.svg">
 <style>
 :root{
  /* HAPA design system */
@@ -225,7 +225,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 <section id="authView" class="auth card">
 <div class="brand">HA<span>PA</span></div>
 <div class="value-prop">
- <div class="value-prop-item"><span class="value-prop-icon">🛒</span><span>Buy and sell locally in Embu.</span></div>
+ <div class="value-prop-item"><span class="value-prop-icon">🛒</span><span>Buy and sell locally across Kenya — launching first in Embu.</span></div>
  <div class="value-prop-item"><span class="value-prop-icon">✓</span><span>Verified local accounts — every seller is reviewed.</span></div>
  <div class="value-prop-item"><span class="value-prop-icon">📍</span><span>Marketplace, transport and services in one app.</span></div>
 </div>
@@ -317,7 +317,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 <div class="grid">
 <div class="card">
  <h2 style="margin:0 0 8px">Welcome to HAPA</h2>
- <p class="muted" style="margin:0 0 16px;font-size:14px">Buy and sell anything in Embu. Every account is personally reviewed before accessing the marketplace.</p>
+ <p class="muted" style="margin:0 0 16px;font-size:14px">Buy and sell across Kenya — launching first in Embu. Every account is personally reviewed before accessing the marketplace.</p>
  <div class="stats">
   <div class="stat"><span>Status</span><b id="homeStatus" style="font-size:16px"></b></div>
   <div class="stat"><span>Phone</span><b id="phoneVerified" style="font-size:14px"></b></div>
@@ -373,7 +373,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 <!-- Browse -->
 <div id="mp-browse">
  <div class="mp-search-row">
-  <input id="mpQ" placeholder="Search in Embu…" oninput="mpDebounceBrowse()">
+  <input id="mpQ" placeholder="Search listings…" oninput="mpDebounceBrowse()">
   <select id="mpSort" class="mp-sort-select" onchange="mpBrowse(1)">
    <option value="newest">Newest</option><option value="oldest">Oldest</option>
    <option value="price_asc">Price ↑</option><option value="price_desc">Price ↓</option>
@@ -434,7 +434,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
     <div class="field-err" id="cCondErr"></div>
    </div>
    <div class="field"><label>Location *</label>
-    <input id="cLoc" value="Embu" list="locationList" oninput="mpFieldClear('cLoc')">
+    <input id="cLoc" list="locationList" oninput="mpFieldClear('cLoc')">
     <datalist id="locationList"><option>Embu</option><option>Runyenjes</option><option>Siakago</option><option>Mwea</option><option>Ishiara</option><option>Kiritiri</option><option>Kerugoya</option><option>Kagumo</option></datalist>
     <div class="field-err" id="cLocErr"></div>
    </div>
@@ -624,7 +624,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 
 <!-- Owner -->
 <section id="owner" class="hidden">
-<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Owner Dashboard</h2><div class="tabs"><button id="oTabStats" class="btn primary" onclick="ownerSubTab('stats')">Stats</button><button id="oTabUsers" class="btn" onclick="ownerSubTab('users')">All Users</button></div></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2 style="margin:0">Owner Dashboard</h2><div class="tabs"><button id="oTabStats" class="btn primary" onclick="ownerSubTab('stats')">Stats</button><button id="oTabUsers" class="btn" onclick="ownerSubTab('users')">All Users</button><button id="oTabAreas" class="btn" onclick="ownerSubTab('areas')">Areas &amp; pricing</button></div></div></div>
 
 <div id="ownerStatsPanel" style="margin-top:14px">
  <div class="card"><div id="ownerStats" class="stats"></div></div>
@@ -714,6 +714,35 @@ h1,h2,h3,h4{color:var(--hapa-text)}
    </select>
   </div>
   <div id="listingReportsEl" class="list"></div>
+ </div>
+</div>
+
+<div id="ownerAreasPanel" class="hidden" style="margin-top:14px">
+ <div class="grid">
+  <div class="card">
+   <h3 style="margin:0 0 6px">Service areas</h3>
+   <p class="muted" style="margin:0 0 14px;font-size:13px">Kenya-wide hierarchy. Activate a county to open that market — no code deployment needed. Providers in inactive areas cannot go online or receive requests.</p>
+   <div id="oAreasList" class="list"><p class="muted">Loading…</p></div>
+  </div>
+  <div class="card">
+   <h3 style="margin:0 0 6px">Fare rate cards</h3>
+   <p class="muted" style="margin:0 0 14px;font-size:13px">Separate rates per area, vehicle category and effective date. Embu pricing never becomes the nationwide default.</p>
+   <div id="oFareList" class="list" style="margin-bottom:14px"><p class="muted">Loading…</p></div>
+   <div style="border-top:1px solid var(--line);padding-top:12px">
+    <h4 style="margin:0 0 8px;font-size:14px">Add rate card</h4>
+    <div class="grid" style="gap:10px">
+     <div class="field" style="margin:0"><label for="fcArea">Area</label><select id="fcArea"></select></div>
+     <div class="field" style="margin:0"><label for="fcCat">Vehicle category</label><input id="fcCat" maxlength="60" placeholder="e.g. Boda Boda"></div>
+     <div class="field" style="margin:0"><label for="fcBase">Base fare (KES)</label><input id="fcBase" type="number" min="0" step="1"></div>
+     <div class="field" style="margin:0"><label for="fcKm">Per km (KES)</label><input id="fcKm" type="number" min="0" step="0.5" value="0"></div>
+     <div class="field" style="margin:0"><label for="fcMin">Per minute (KES)</label><input id="fcMin" type="number" min="0" step="0.5" value="0"></div>
+     <div class="field" style="margin:0"><label for="fcFloor">Minimum fare (KES)</label><input id="fcFloor" type="number" min="0" step="1" value="0"></div>
+     <div class="field" style="margin:0"><label for="fcEff">Effective from</label><input id="fcEff" type="date"></div>
+    </div>
+    <button class="btn primary" style="margin-top:10px" onclick="oFareCreate()">Add rate card</button>
+    <div id="fcMsg" class="muted" style="font-size:12px;margin-top:6px"></div>
+   </div>
+  </div>
  </div>
 </div>
 
@@ -809,7 +838,22 @@ $('eCat').innerHTML=catOpts;
 $('mpCat').innerHTML=`<option value="">All categories</option>${catOpts}`;
 
 // ── App startup ───────────────────────────────────────────────────────────────
+// ── Geographic hierarchy (Kenya-wide; Embu first active market). Active areas
+// come from configuration — newly activated counties/towns appear automatically.
+let hapaAreas=[];
+function hapaDefaultLoc(){const c=hapaAreas.filter(a=>a.level==='county');return c.length?c[0].name:'Embu';}
+async function loadAreas(){
+ try{
+  const d=await api('/api/public/areas');
+  hapaAreas=d.areas||[];
+  const counties=hapaAreas.filter(a=>a.level==='county').map(a=>a.name);
+  const towns=hapaAreas.filter(a=>a.level==='town').map(a=>a.name);
+  const dl=$('locationList');
+  if(dl&&counties.length)dl.innerHTML=[...counties,...towns].map(n=>`<option>${esc(n)}</option>`).join('');
+ }catch(e){}
+}
 (async function init(){
+ loadAreas();
  const lid=new URLSearchParams(location.search).get('listing');
  if(lid) pendingListingId=lid;
  // Native apps: restore the session from Keystore/Keychain-backed storage
@@ -1732,7 +1776,7 @@ function mpRestoreDraft(d){
  if($('cPrice'))$('cPrice').value=d.price||'';
  if($('cCat'))$('cCat').value=d.cat||'';
  if($('cCond'))$('cCond').value=d.cond||'';
- if($('cLoc'))$('cLoc').value=d.loc||'Embu';
+ if($('cLoc'))$('cLoc').value=d.loc||hapaDefaultLoc();
  if($('cDesc')){$('cDesc').value=d.desc||'';updateCharCount('cDesc','cDescCount',2000);}
  if($('cNeg'))$('cNeg').checked=d.neg||false;
  if($('cPhone'))$('cPhone').checked=d.phone||false;
@@ -1745,7 +1789,7 @@ function mpDiscardDraft(){
  mpImages=[];mpRenderPreviews('cPreviews');
  ['cTitle','cDesc'].forEach(id=>{if($(id))$(id).value='';});
  if($('cPrice'))$('cPrice').value='';if($('cCat'))$('cCat').selectedIndex=0;
- if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value='Embu';
+ if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value=hapaDefaultLoc();
  if($('cNeg'))$('cNeg').checked=false;if($('cPhone'))$('cPhone').checked=false;
  updateCharCount('cTitle','cTitleCount',100);updateCharCount('cDesc','cDescCount',2000);
  if(draftAutoTimer)clearInterval(draftAutoTimer);draftAutoTimer=setInterval(mpSaveDraft,10000);
@@ -1852,7 +1896,7 @@ function mpView(view){
    mpImages=[];mpRenderPreviews('cPreviews');
    ['cTitle','cDesc'].forEach(id=>{if($(id))$(id).value='';});
    if($('cPrice'))$('cPrice').value='';if($('cCat'))$('cCat').selectedIndex=0;
-   if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value='Embu';
+   if($('cCond'))$('cCond').selectedIndex=0;if($('cLoc'))$('cLoc').value=hapaDefaultLoc();
    if($('cNeg'))$('cNeg').checked=false;if($('cPhone'))$('cPhone').checked=false;
    updateCharCount('cTitle','cTitleCount',100);updateCharCount('cDesc','cDescCount',2000);
    $('draftBanner').classList.add('hidden');
@@ -2062,7 +2106,7 @@ async function mpCreate(){
   const r=await api('/api/marketplace',{method:'POST',body:JSON.stringify({title,price,category:cat,condition:cond,location:loc,description:desc,negotiable:$('cNeg').checked,seller_phone_visible:$('cPhone').checked,images:mpImages})});
   localStorage.removeItem(DRAFT_KEY());if(draftAutoTimer)clearInterval(draftAutoTimer);
   $('mpCreateForm').classList.add('hidden');$('mpCreateSuccess').classList.remove('hidden');
-  $('mpSuccessMsg').textContent=`"${title}" is now visible to buyers in Embu.`;
+  $('mpSuccessMsg').textContent=`"${title}" is now visible to buyers on HAPA.`;
   const ph=me?.phone?mpNormalizePhone(me.phone):null;
   const waShare=ph?`<button class="btn wa" onclick="window.open('https://wa.me/?text='+encodeURIComponent('Check out my listing: '+location.protocol+'//'+location.host+'?listing=${esc(r.id)}'),'_blank')">📲 Share on WhatsApp</button>`:'';
   $('mpSuccessActions').innerHTML=`<button class="btn primary" onclick="mpOpenListing('${esc(r.id)}');mpPrevView='mylistings'">👁 View listing</button>${waShare}<button class="btn" onclick="mpView('create')">✏️ Post another</button><button class="btn" onclick="mpView('mylistings')">📋 My Listings</button>`;
@@ -2208,11 +2252,50 @@ function ownerSubTab(tab){
  setActiveMainNav('owner');
  $('oTabStats').className='btn'+(tab==='stats'?' primary':'');
  $('oTabUsers').className='btn'+(tab==='users'?' primary':'');
+ $('oTabAreas').className='btn'+(tab==='areas'?' primary':'');
  $('ownerStatsPanel').classList.toggle('hidden',tab!=='stats');
  $('ownerUsersPanel').classList.toggle('hidden',tab!=='users');
+ $('ownerAreasPanel').classList.toggle('hidden',tab!=='areas');
  $('ownerUserDetail').classList.add('hidden');$('ownerListingDetail').classList.add('hidden');
  if(tab==='stats')loadOwnerStats();
  if(tab==='users')loadOwnerUsers();
+ if(tab==='areas')loadOwnerAreas();
+}
+
+// ── Owner: service areas & fare rate cards (market expansion by configuration)
+async function loadOwnerAreas(){
+ try{
+  const[areas,stats,cards]=await Promise.all([api('/api/owner/areas'),api('/api/owner/areas/stats'),api('/api/owner/fare-cards')]);
+  const statFor=id=>stats.find(x=>x.id===id)||{};
+  const counties=areas.filter(a=>a.level==='county');
+  const zones=areas.filter(a=>a.level==='zone'||a.level==='town');
+  $('oAreasList').innerHTML=[...counties.filter(c=>c.active),...zones.filter(z=>z.active),...zones.filter(z=>!z.active),...counties.filter(c=>!c.active)].map(a=>{
+   const st=a.level==='county'?statFor(a.id):{};
+   const counts=a.level==='county'?`<small class="muted" style="display:block;font-size:11px">${st.professionals||0} pros · ${st.merchants||0} shops · ${st.drivers||0} drivers · ${st.rides||0} rides</small>`:`<small class="muted" style="display:block;font-size:11px">${esc(a.parent_name||'')} · ${a.level}</small>`;
+   return`<div class="row"><span><b>${esc(a.name)}</b> <span class="badge-pill" style="font-size:10px;color:${a.active?'var(--ok)':'var(--muted)'};background:${a.active?'#EAF6EF':'var(--p2)'}">${a.active?'Active':'Inactive'}</span>${counts}</span>
+    <button class="btn ${a.active?'':'ok'}" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="oAreaToggle('${a.id}',${!a.active})">${a.active?'Pause':'Activate'}</button></div>`;
+  }).join('')||'<p class="muted">No areas configured.</p>';
+  $('fcArea').innerHTML=[...counties,...zones].map(a=>`<option value="${a.id}" ${a.slug==='zone-embu-pilot'?'selected':''}>${esc(a.name)} (${a.level})</option>`).join('');
+  $('oFareList').innerHTML=cards.length?cards.map(c=>`<div class="row"><span><b>${esc(c.area_name)}</b> · ${esc(c.vehicle_category)}<small class="muted" style="display:block;font-size:11px">KES ${(+c.base_fare).toFixed(0)} base + ${(+c.per_km).toFixed(0)}/km + ${(+c.per_min).toFixed(0)}/min · min KES ${(+c.minimum_fare).toFixed(0)} · from ${new Date(c.effective_from).toLocaleDateString('en-GB')}</small></span>
+   <span style="display:flex;gap:6px;align-items:center"><span class="badge-pill" style="font-size:10px;color:${c.active?'var(--ok)':'var(--muted)'};background:${c.active?'#EAF6EF':'var(--p2)'}">${c.active?'Active':'Off'}</span><button class="btn" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="oFareToggle('${c.id}',${!c.active})">${c.active?'Deactivate':'Reactivate'}</button></span></div>`).join(''):'<p class="muted">No rate cards yet. Add the first one below.</p>';
+ }catch(e){$('oAreasList').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
+}
+async function oAreaToggle(id,on){
+ if(!on&&!await hapaConfirm({title:'Pause service area',body:'<p>Providers in this area will no longer be able to go online or receive new requests until you reactivate it.</p>',confirmLabel:'Pause area',danger:true}))return;
+ try{await api('/api/owner/areas/'+id,{method:'PATCH',body:JSON.stringify({active:on})});loadOwnerAreas();}catch(e){mpInlineAlert(e.message);}
+}
+async function oFareToggle(id,on){
+ try{await api('/api/owner/fare-cards/'+id,{method:'PATCH',body:JSON.stringify({active:on})});loadOwnerAreas();}catch(e){mpInlineAlert(e.message);}
+}
+async function oFareCreate(){
+ const m=$('fcMsg');m.textContent='';
+ try{
+  const body={area:$('fcArea').value,vehicle_category:$('fcCat').value,base_fare:$('fcBase').value,per_km:$('fcKm').value,per_min:$('fcMin').value,minimum_fare:$('fcFloor').value};
+  if($('fcEff').value)body.effective_from=$('fcEff').value;
+  await api('/api/owner/fare-cards',{method:'POST',body:JSON.stringify(body)});
+  $('fcCat').value='';$('fcBase').value='';m.textContent='Rate card added.';
+  loadOwnerAreas();
+ }catch(e){m.textContent=e.message;}
 }
 
 async function loadOwnerStats(){
@@ -2902,7 +2985,7 @@ async function hpView(v){
   <p><b style="color:var(--text)">🗑 Account deletion.</b> Delete your account any time from Account → "Delete account permanently", from inside the mobile apps, or via the request page at <b>/delete-account</b>. Deletion is immediate and cannot be undone.</p>
   <p><b style="color:var(--text)">🤝 Provider independence.</b> Professionals, merchants and drivers on HAPA are independent local providers — they are not employees, agents or partners of HAPA. HAPA verifies identity documents at application time but does not supervise their work, set their prices or process payments between you.</p></div>`;
  if(v==='terms')el.innerHTML=`<h3 style="margin:0 0 10px">Terms of use</h3><div style="font-size:14px;line-height:1.7" class="muted">
-  <p><b style="color:var(--text)">1. The service.</b> HAPA is a local marketplace for Embu, Kenya that connects buyers with sellers, professionals, merchants and transport providers. HAPA is a venue only — it is not a party to any transaction between members.</p>
+  <p><b style="color:var(--text)">1. The service.</b> HAPA is a Kenyan local marketplace — launching first in Embu — that connects buyers with sellers, professionals, merchants and transport providers. HAPA is a venue only — it is not a party to any transaction between members.</p>
   <p><b style="color:var(--text)">2. Accounts.</b> You must provide accurate details when registering. Every account is reviewed before activation and roles require verified documents. You are responsible for activity on your account.</p>
   <p><b style="color:var(--text)">3. Payments.</b> HAPA does not process payments and never asks for money on behalf of a seller. All payments happen directly between members at their own risk.</p>
   <p><b style="color:var(--text)">4. Content.</b> You keep ownership of what you post but grant HAPA permission to display it in the app. HAPA may hide or remove content that breaks the community rules or the law.</p>

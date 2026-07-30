@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS verification_codes(
 CREATE TABLE IF NOT EXISTS marketplace_listings(
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), seller_id UUID REFERENCES users(id) ON DELETE CASCADE,
  title TEXT NOT NULL, price NUMERIC(14,2) NOT NULL, category TEXT NOT NULL DEFAULT 'Other',
- condition TEXT NOT NULL DEFAULT 'Used', description TEXT DEFAULT '', location TEXT DEFAULT 'Embu',
+ condition TEXT NOT NULL DEFAULT 'Used', description TEXT DEFAULT '', location TEXT DEFAULT '',
  images JSONB NOT NULL DEFAULT '[]'::jsonb, status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -394,3 +394,38 @@ CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id);
 
 -- Notification preferences (privacy-safe defaults)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_prefs JSONB NOT NULL DEFAULT '{}';
+
+-- ── Geographic hierarchy (Kenya-wide from day one; Embu is the first ACTIVE market, not the only supported one).
+-- Levels: country > county > sub_county > town > zone. Stable IDs; names stay readable.
+CREATE TABLE IF NOT EXISTS geo_areas(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ slug TEXT UNIQUE NOT NULL,
+ name TEXT NOT NULL,
+ level TEXT NOT NULL CHECK(level IN('country','county','sub_county','town','zone')),
+ parent_id UUID REFERENCES geo_areas(id) ON DELETE CASCADE,
+ active BOOLEAN NOT NULL DEFAULT FALSE,
+ -- zone-level config: search radius, expansion rules, cross-county flags, geofence, etc.
+ config JSONB NOT NULL DEFAULT '{}'::jsonb,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS geo_areas_parent_idx ON geo_areas(parent_id);
+CREATE INDEX IF NOT EXISTS geo_areas_level_active_idx ON geo_areas(level,active);
+
+-- ── Fare rate cards: per area (county/town/zone) + vehicle category + effective date.
+-- Embu pricing never becomes the nationwide default; new markets get their own cards via config.
+CREATE TABLE IF NOT EXISTS fare_rate_cards(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ area_id UUID NOT NULL REFERENCES geo_areas(id) ON DELETE CASCADE,
+ vehicle_category TEXT NOT NULL,
+ currency TEXT NOT NULL DEFAULT 'KES',
+ base_fare NUMERIC(10,2) NOT NULL CHECK(base_fare>=0),
+ per_km NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK(per_km>=0),
+ per_min NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK(per_min>=0),
+ minimum_fare NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK(minimum_fare>=0),
+ effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+ active BOOLEAN NOT NULL DEFAULT TRUE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS fare_cards_area_idx ON fare_rate_cards(area_id,vehicle_category,effective_from DESC);

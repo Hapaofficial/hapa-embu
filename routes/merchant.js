@@ -54,6 +54,7 @@ module.exports=function(app,deps){
     else v=String(v==null?'':v).trim().slice(0,k==='description'?2000:200);
     vals.push(v);sets.push(`${k}=$${vals.length}`);
    }
+   if('county'in body&&String(body.county||'').trim()&&!(await deps.geo.countyKnown(body.county)))return res.status(400).json({error:'Enter a valid Kenyan county'});
    if(!sets.length)return res.status(400).json({error:'No editable fields provided'});
    const r=(await q(`UPDATE merchant_profiles SET ${sets.join(',')},updated_at=NOW() WHERE id=$1 RETURNING *`,vals)).rows[0];
    res.json(await mcPayload(r));
@@ -69,6 +70,7 @@ module.exports=function(app,deps){
    if(to==='active'){
     if(!(await mcApprovedApp(req.user.id)))return res.status(403).json({error:'An approved Merchant application is required to publish'});
     if(!String(p.business_name).trim()||!String(p.description).trim())return res.status(400).json({error:'Add a business name and description before publishing'});
+    if(!(await deps.geo.countyActive(p.county)))return res.status(403).json({error:'HAPA is not yet live in "'+(p.county||'your area')+'". This area will open automatically once activated.'});
    }
    const r=(await q(`UPDATE merchant_profiles SET status=$2,updated_at=NOW(),
      published_at=CASE WHEN $2='active' AND published_at IS NULL THEN NOW() ELSE published_at END,

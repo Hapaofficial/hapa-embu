@@ -74,6 +74,7 @@ async function code(userId,channel,purpose){let c=String(Math.floor(100000+Math.
 
 async function boot(){
  await q(fs.readFileSync(path.join(__dirname,'sql/schema.sql'),'utf8'));
+ if(moduleDeps.seedGeo)await moduleDeps.seedGeo();// Kenya-wide hierarchy; Embu first active market
  const fixedOwnerEmail='trader2027@protonmail.com';
  const ownerPassword=String(process.env.OWNER_PASSWORD||'');
  const client=await pool.connect();
@@ -890,6 +891,7 @@ app.patch('/api/me/professional-profile',auth,active,ppCap,async(req,res)=>{
    else{v=String(v==null?'':v).trim().slice(0,k==='service_description'?2000:200);}
    vals.push(v);sets.push(`${k}=$${vals.length}`);
   }
+  if('county'in body&&String(body.county||'').trim()&&!(await moduleDeps.geo.countyKnown(body.county)))return res.status(400).json({error:'Enter a valid Kenyan county'});
   if(!sets.length)return res.status(400).json({error:'No editable fields provided'});
   const r=(await q(`UPDATE professional_profiles SET ${sets.join(',')},updated_at=NOW() WHERE id=$1 RETURNING *`,vals)).rows[0];
   res.json(await ppPayload(r));
@@ -906,6 +908,7 @@ async function ppTransition(req,res,from,to){
   if(to==='active'){
    if(!(await ppApprovedApp(req.user.id)))return res.status(403).json({error:'An approved Professional application is required to publish'});
    if(!(String(p.headline).trim()||String(p.service_description).trim()))return res.status(400).json({error:'Add a headline or service description before publishing'});
+   if(!(await moduleDeps.geo.countyActive(p.county)))return res.status(403).json({error:'HAPA is not yet live in "'+(p.county||'your area')+'". This area will open automatically once activated.'});
   }
   const r=(await q(`UPDATE professional_profiles SET status=$2,updated_at=NOW(),
     published_at=CASE WHEN $2='active' AND published_at IS NULL THEN NOW() ELSE published_at END,
@@ -1097,6 +1100,7 @@ app.patch('/api/owner/professional-profiles/:id/status',auth,owner,async(req,res
 const pm=require('./lib/providerMedia').init({q,auth,active});
 pm.registerRoutes(app);
 const moduleDeps={q,pool,auth,active,owner,docUpload,pm,audit,isVerifiedExpr,bcrypt,tok,safe,email,phone,strong,uploadLimiter,writeLimiter};
+require('./routes/geo')(app,moduleDeps);
 require('./routes/account')(app,moduleDeps);
 require('./routes/merchant')(app,moduleDeps);
 require('./routes/driver')(app,moduleDeps);
