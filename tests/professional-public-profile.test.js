@@ -107,6 +107,20 @@ const noPrivateLeak = (o) => !/private_document|sensitive_details|upgrade_docume
     }
   }
 
+  // --- owner media route (editor works regardless of profile status) ---
+  const ownerImg = g.d.portfolio[0] || g.d.profile_photo;
+  ok('authenticated payload uses owner media route', ownerImg && ownerImg.url.startsWith('/api/me/professional-profile/media/'), ownerImg && ownerImg.url);
+  const ownerFetch = async (t) => (await fetch(B + ownerImg.url, { headers: t ? { Authorization: 'Bearer ' + t } : {}, redirect: 'manual' })).status;
+  const ownerOkStatus = async (t) => [200, 302].includes(await ownerFetch(t));
+  ok('owner can view own media (active)', await ownerOkStatus(pro));
+  ok('unauthenticated owner-media rejected (401)', await ownerFetch(null) === 401);
+  ok('another customer cannot access owner media', [403, 404].includes(await ownerFetch(other)));
+  await j('POST', '/api/me/professional-profile/pause', pro);
+  ok('owner can view own media while paused', await ownerOkStatus(pro));
+  ok('paused media unavailable via public route', (await fetch(B + '/api/public/professional-media/' + ownerImg.id, { redirect: 'manual' })).status === 404);
+  await j('POST', '/api/me/professional-profile/reactivate', pro);
+  ok('active media available via public route', [200, 302].includes((await fetch(B + '/api/public/professional-media/' + ownerImg.id, { redirect: 'manual' })).status));
+
   ok('pause works', (await j('POST', '/api/me/professional-profile/pause', pro)).s === 200);
   ok('paused profile not public', await pubWhileHiddenState() === 404);
   ok('reactivate works', (await j('POST', '/api/me/professional-profile/reactivate', pro)).s === 200);
@@ -119,6 +133,13 @@ const noPrivateLeak = (o) => !/private_document|sensitive_details|upgrade_docume
     ok('owner hide works', hide.s === 200 && hide.d.status === 'owner_hidden', hide);
     ok('hidden profile not public', await pubWhileHiddenState() === 404);
     ok('professional cannot self-restore while hidden', (await j('POST', '/api/me/professional-profile/publish', pro)).s === 403);
+    {
+      const gg = await j('GET', '/api/me/professional-profile', pro);
+      const im = gg.d.portfolio[0] || gg.d.profile_photo;
+      const st = (await fetch(B + im.url, { headers: { Authorization: 'Bearer ' + pro }, redirect: 'manual' })).status;
+      ok('owner can view own media while owner_hidden', [200, 302].includes(st), st);
+      ok('owner_hidden media unavailable via public route', (await fetch(B + '/api/public/professional-media/' + im.id, { redirect: 'manual' })).status === 404);
+    }
     const catTry = await j('PATCH', '/api/owner/professional-profiles/' + pid + '/status', owner, { status: 'active', verified_category: 'plumber' });
     const restore = catTry.s === 200 ? catTry : await j('PATCH', '/api/owner/professional-profiles/' + pid + '/status', owner, { status: 'active' });
     ok('owner restore returns prior status (active)', restore.s === 200 && restore.d.status === 'active', restore);

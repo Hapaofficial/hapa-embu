@@ -804,13 +804,17 @@ async function ppApprovedApp(userId){
  return (await q(`SELECT id,details FROM upgrade_applications WHERE user_id=$1 AND type='professional' AND status='approved' ORDER BY created_at DESC LIMIT 1`,[userId])).rows[0]||null;
 }
 const ppSafe=p=>({id:p.id,status:p.status,verified_category:p.verified_category,display_name:p.display_name,headline:p.headline,service_description:p.service_description,skills:p.skills,county:p.county,town:p.town,service_area:p.service_area,availability:p.availability,starting_price:p.starting_price,pricing_unit:p.pricing_unit,phone_visible:p.phone_visible,whatsapp_visible:p.whatsapp_visible,profile_photo_id:p.profile_photo_id,moderation_note:p.status==='owner_hidden'?p.moderation_note:null,created_at:p.created_at,updated_at:p.updated_at,published_at:p.published_at,paused_at:p.paused_at});
-const ppImgSafe=i=>({id:i.id,url:'/api/public/professional-media/'+i.id,width:i.width,height:i.height,sort_order:i.sort_order});
-async function ppImages(profileId){
+const PP_PUBLIC_MEDIA_BASE='/api/public/professional-media/';
+const PP_OWNER_MEDIA_BASE='/api/me/professional-profile/media/';
+const ppImgSafe=(i,base=PP_PUBLIC_MEDIA_BASE)=>({id:i.id,url:base+i.id,width:i.width,height:i.height,sort_order:i.sort_order});
+async function ppImages(profileId,base=PP_PUBLIC_MEDIA_BASE){
  const r=await q(`SELECT id,width,height,sort_order,kind FROM professional_portfolio_images WHERE professional_profile_id=$1 AND status='active' ORDER BY sort_order ASC,created_at ASC`,[profileId]);
- return{portfolio:r.rows.filter(x=>x.kind==='portfolio').map(ppImgSafe),profilePhoto:r.rows.filter(x=>x.kind==='profile_photo').map(ppImgSafe)[0]||null};
+ return{portfolio:r.rows.filter(x=>x.kind==='portfolio').map(i=>ppImgSafe(i,base)),profilePhoto:r.rows.filter(x=>x.kind==='profile_photo').map(i=>ppImgSafe(i,base))[0]||null};
 }
 async function ppMine(userId){return(await q(`SELECT * FROM professional_profiles WHERE user_id=$1`,[userId])).rows[0]||null;}
-async function ppPayload(p){const im=await ppImages(p.id);return{profile:ppSafe(p),profile_photo:im.profilePhoto,portfolio:im.portfolio};}
+// Authenticated owner payloads point image URLs at the owner-only media route,
+// so the editor works while the profile is draft/paused/owner_hidden.
+async function ppPayload(p){const im=await ppImages(p.id,PP_OWNER_MEDIA_BASE);return{profile:ppSafe(p),profile_photo:im.profilePhoto,portfolio:im.portfolio};}
 
 app.get('/api/me/professional-profile',auth,active,ppCap,async(req,res)=>{
  try{const p=await ppMine(req.user.id);if(!p)return res.json({profile:null});res.json(await ppPayload(p));}
@@ -914,7 +918,7 @@ app.post('/api/me/professional-profile/profile-photo',auth,active,ppCap,ppUpload
  const row=await ppStoreImage(req,'profile_photo',p);
  await q(`UPDATE professional_portfolio_images SET status='removed',removed_at=NOW() WHERE professional_profile_id=$1 AND kind='profile_photo' AND status='active' AND id<>$2`,[p.id,row.id]);
  await q(`UPDATE professional_profiles SET profile_photo_id=$2,updated_at=NOW() WHERE id=$1`,[p.id,row.id]);
- res.status(201).json(ppImgSafe(row));
+ res.status(201).json(ppImgSafe(row,PP_OWNER_MEDIA_BASE));
 }));
 app.delete('/api/me/professional-profile/profile-photo',auth,active,ppCap,async(req,res)=>{
  try{
@@ -930,7 +934,7 @@ app.delete('/api/me/professional-profile/profile-photo',auth,active,ppCap,async(
 app.post('/api/me/professional-profile/portfolio',auth,active,ppCap,ppUploadRoute(async(req,res,p)=>{
  const n=+(await q(`SELECT count(*)::int n FROM professional_portfolio_images WHERE professional_profile_id=$1 AND kind='portfolio' AND status='active'`,[p.id])).rows[0].n;
  if(n>=PP_MAX_PORTFOLIO)return res.status(409).json({error:`Maximum ${PP_MAX_PORTFOLIO} portfolio photos`});
- res.status(201).json(ppImgSafe(await ppStoreImage(req,'portfolio',p)));
+ res.status(201).json(ppImgSafe(await ppStoreImage(req,'portfolio',p),PP_OWNER_MEDIA_BASE));
 }));
 app.patch('/api/me/professional-profile/portfolio/order',auth,active,ppCap,async(req,res)=>{
  try{
@@ -939,7 +943,7 @@ app.patch('/api/me/professional-profile/portfolio/order',auth,active,ppCap,async
   const p=await ppMine(req.user.id);
   if(!p)return res.status(404).json({error:'Profile not found'});
   for(let i=0;i<ids.length;i++)await q(`UPDATE professional_portfolio_images SET sort_order=$3 WHERE id=$1 AND professional_profile_id=$2 AND kind='portfolio' AND status='active'`,[ids[i],p.id,i]);
-  res.json({portfolio:(await ppImages(p.id)).portfolio});
+  res.json({portfolio:(await ppImages(p.id,PP_OWNER_MEDIA_BASE)).portfolio});
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
 app.delete('/api/me/professional-profile/portfolio/:imageId',auth,active,ppCap,async(req,res)=>{
@@ -979,6 +983,25 @@ app.get('/api/public/professionals/:id',async(req,res)=>{
   res.json(ppPublicView(p,await ppImages(p.id)));
  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
 });
+// Owner media bytes — the authenticated professional can always view their own
+// images (draft/active/paused/owner_hidden). Never serves another user's media.
+app.get('/api/me/professional-profile/media/:imageId',auth,active,ppCap,async(req,res)=>{
+ try{
+  const im=(await q(`SELECT i.storage_key,i.mime_type,i.sha256 FROM professional_portfolio_images i JOIN professional_profiles p ON p.id=i.professional_profile_id WHERE i.id::text=$1 AND i.status='active' AND p.user_id=$2`,[req.params.imageId,req.user.id])).rows[0];
+  if(!im)return res.status(404).json({error:'Image not found'});
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('Cache-Control','private, max-age=300');
+  const etag='"'+im.sha256.slice(0,32)+'"';
+  res.setHeader('ETag',etag);
+  if(req.headers['if-none-match']===etag)return res.status(304).end();
+  const access=await pubMedia.getObjectAccess(im.storage_key,im.mime_type);
+  if(access.kind==='signedUrl')return res.redirect(302,access.url);
+  res.setHeader('Content-Type',im.mime_type);
+  access.stream.on('error',()=>{if(!res.headersSent)res.status(404).json({error:'Image file missing'});});
+  access.stream.pipe(res);
+ }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+});
+
 // Public media bytes — only while the owning profile is publicly visible
 app.get('/api/public/professional-media/:imageId',async(req,res)=>{
  try{
