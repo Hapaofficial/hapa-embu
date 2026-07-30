@@ -1,0 +1,83 @@
+Implement the confirmed frontend fix for authenticated Professional profile media.
+
+Current branch:
+feature/professional-public-profile
+
+Confirmed root cause:
+Authenticated editor media URLs use:
+/api/me/professional-profile/media/:imageId
+
+The endpoint requires Authorization: Bearer <JWT>, but a normal:
+<img src="...">
+cannot attach the Authorization header, so the request returns 401.
+
+Implement only the minimal frontend fix in public/index.html:
+
+1. For image URLs beginning with:
+   /api/me/professional-profile/media/
+
+   load the image using:
+   fetch(url, {
+     headers: {
+       Authorization: `Bearer ${token}`
+     }
+   })
+
+2. Verify response.ok before reading the body.
+
+3. Convert the response to a Blob and display it using:
+   URL.createObjectURL(blob)
+
+4. Revoke old object URLs with:
+   URL.revokeObjectURL(...)
+   when:
+   - an image is replaced
+   - an image is removed
+   - the profile editor is rerendered
+   - the user leaves the editor or logs out
+
+5. Do not place the JWT in:
+   - the image URL
+   - query parameters
+   - HTML attributes
+   - logs
+
+6. Keep public profile and marketplace images unchanged.
+   URLs beginning with:
+   /api/public/professional-media/
+   must continue loading normally without authentication.
+
+7. Reuse the existing authenticated private-document fetch pattern where appropriate, but do not modify private-document behavior.
+
+8. Handle fetch failures safely:
+   - show the existing fallback/placeholder
+   - do not expose backend error details
+   - do not create repeated retry loops
+
+9. Add or update tests proving:
+   - editor owner media is fetched with the Authorization header
+   - returned Blob is assigned through an object URL
+   - public image URLs are not fetched with private authentication logic
+   - failed authenticated image request shows the fallback
+   - object URLs are revoked during replacement or rerender
+   - no token is inserted into any URL
+
+10. Run the complete test suite.
+
+If all tests pass:
+- commit with:
+  fix: load authenticated professional media in editor
+- push only:
+  feature/professional-public-profile
+
+Do not merge into main.
+Do not manually deploy.
+Do not modify server.js, database schema, migrations, Cloudflare, secrets, or Render configuration unless absolutely required; stop and report before doing so.
+
+Return:
+- exact files changed
+- test results
+- commit SHA
+- push result
+- confirmation that JWT never appears in image URLs
+- whether Render staging auto-deployment started

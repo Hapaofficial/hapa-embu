@@ -1,0 +1,335 @@
+Correct the remaining architecture gaps in HAPA Public Professional Profile.
+
+STOP BEFORE COMMIT.
+
+Do not push.
+Do not merge.
+Do not deploy.
+Do not work on main.
+Remain on the current isolated branch:
+
+feature/professional-profile
+
+Do not use or modify feature/verification-support.
+Do not access the production database.
+Do not access hapa-private-documents.
+Do not change the verified Professional application or private-document architecture.
+
+CURRENT FINDINGS
+
+The editable Professional profile works, but two mandatory requirements are not yet proven or correctly implemented:
+
+1. Portfolio images were stored under public/portfolio/ in the staging PRIVATE-DOCUMENT bucket.
+2. Owner profile moderation with owner_hidden / hide / restore / moderation note was not demonstrated.
+
+These must be corrected before approval.
+
+==================================================
+A. SEPARATE PUBLIC-MEDIA STORAGE
+==================================================
+
+Public profile and portfolio images must never use:
+
+- hapa-private-documents
+- hapa-staging-private-documents
+- private_documents
+- upgrade_documents
+- the DOCUMENT_S3_* credentials
+
+Create a separate public-media storage abstraction.
+
+Environment variables:
+
+PUBLIC_MEDIA_STORAGE_MODE=local|s3
+PUBLIC_MEDIA_S3_BUCKET
+PUBLIC_MEDIA_S3_ENDPOINT
+PUBLIC_MEDIA_S3_REGION
+PUBLIC_MEDIA_S3_ACCESS_KEY_ID
+PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY
+PUBLIC_MEDIA_S3_FORCE_PATH_STYLE
+
+LOCAL MODE
+
+For local development:
+
+- store sanitized files in var/public-media/
+- keep the directory outside public/
+- add it to .gitignore
+- never expose local filesystem paths
+- serve images only through the public-media API route
+
+S3 MODE
+
+Prepare support for a completely separate bucket.
+
+Future staging bucket:
+
+hapa-staging-public-media
+
+Future production bucket:
+
+hapa-public-media
+
+Both buckets may remain private. Public images should be delivered through a controlled HAPA public-media route or short-lived URLs.
+
+Add a hard safety check:
+
+- PUBLIC_MEDIA_S3_BUCKET must not equal DOCUMENT_S3_BUCKET
+- if they are equal, public-media uploads must fail with controlled 503
+- do not allow public portfolio uploads to fall back to the private-document bucket
+
+Use a separate adapter, for example:
+
+lib/publicMediaStorage.js
+
+Do not reuse private-document object keys.
+
+Public-media object keys must be PII-free, equivalent to:
+
+professional-profiles/{profileId}/{imageId}.jpg
+
+Do not include email, phone, legal name, ID number or original filename.
+
+==================================================
+B. CLEAN THE ACCIDENTAL STAGING OBJECTS
+==================================================
+
+The previous tests created two fixture portfolio images under:
+
+public/portfolio/
+
+inside hapa-staging-private-documents.
+
+Use only the staging R2 credentials.
+
+1. List only objects under public/portfolio/.
+2. Confirm they are synthetic fixture images created by this branch.
+3. Delete only those exact fixture objects.
+4. Do not delete or modify anything under upgrades/.
+5. Confirm zero public/portfolio/ objects remain in hapa-staging-private-documents.
+6. Confirm hapa-private-documents was never accessed.
+
+Do not print signed URLs or credentials.
+
+==================================================
+C. PUBLIC IMAGE SANITIZATION
+==================================================
+
+Public profile and portfolio images must still use:
+
+- multipart/form-data
+- actual magic-byte validation
+- JPEG / PNG / WebP only
+- sharp decode and re-encode
+- auto-orientation
+- EXIF/GPS stripping
+- maximum dimensions
+- safe generated keys
+- SHA-256
+- no original file retention
+
+Limits:
+
+- one public profile photo
+- maximum 12 portfolio images
+
+Public image endpoints must return:
+
+- correct sanitized Content-Type
+- X-Content-Type-Options: nosniff
+- ETag or equivalent cache validator
+- safe cache policy
+- no storage credentials
+- no permanent raw bucket URL
+
+==================================================
+D. OWNER MODERATION
+==================================================
+
+Confirm whether Owner moderation already exists.
+
+If it does not, implement:
+
+professional_profiles.status:
+
+- draft
+- active
+- paused
+- owner_hidden
+
+Add fields where missing:
+
+- hidden_at
+- hidden_by
+- moderation_note
+
+Owner-only endpoints equivalent to:
+
+GET   /api/owner/professional-profiles
+GET   /api/owner/professional-profiles/:id
+PATCH /api/owner/professional-profiles/:id/status
+
+Allowed Owner actions:
+
+- hide public profile
+- restore public profile
+- add/update moderation note
+
+Rules:
+
+- hiding the public profile must not change role
+- must not disable capabilities.professional
+- must not modify the verified application
+- must not modify private documents
+- only profile visibility changes
+- owner_hidden profiles must not appear in public APIs
+- restoring returns the previous publishable profile to active
+
+Owner must not be able to change the verified profession category through this route.
+
+==================================================
+E. PROFESSIONAL PROFILE USER FLOW
+==================================================
+
+Approved Professional customer must see:
+
+- Manage professional profile
+- View public profile
+- Pause profile / Reactivate profile
+- View verified application
+
+Editable:
+
+- display name
+- headline
+- description
+- skills
+- pricing
+- availability
+- service area
+- public profile photo
+- portfolio photos
+- phone visibility
+- WhatsApp visibility
+
+Locked:
+
+- legal name
+- private identity details
+- verified documents
+- verified profession category
+- application status
+- role
+- capabilities
+- Owner review notes
+
+The verified application must remain read-only.
+
+==================================================
+F. PUBLIC API PRIVACY
+==================================================
+
+Public Professional endpoints must never expose:
+
+- private-document IDs
+- private-document URLs
+- upgrade application details
+- sensitive_details
+- encrypted values
+- Owner notes from verification
+- private R2 keys
+- storage credentials
+
+Public APIs may expose only active Professional profiles and their separately stored sanitized public-media images.
+
+==================================================
+G. TESTS
+==================================================
+
+Run local tests confirming:
+
+- approved Professional can create and edit a profile
+- non-approved Professional cannot publish
+- role remains customer
+- capabilities.professional remains true
+- verified application remains read-only
+- verified category remains locked
+- profile draft is not public
+- active profile is public
+- paused profile is not public
+- owner_hidden profile is not public
+- Owner can hide and restore a profile
+- Owner hiding does not disable the Professional capability
+- Owner hiding does not alter the verified application
+- profile owner alone can edit
+- another customer receives 403
+- unauthenticated writes receive 401
+- portfolio add/reorder/remove works
+- maximum 12 images works
+- invalid image bytes are rejected
+- EXIF/GPS is removed
+- public-media bucket and private-document bucket cannot be the same
+- private-document bucket is never used for new portfolio images
+- public APIs contain no private-document information
+- Marketplace, Upgrade System, secure documents and Owner Dashboard have no regressions
+- no route can assign role='owner'
+- mobile layout works at 390 × 844
+- no horizontal overflow
+
+==================================================
+H. LOCAL MANUAL REVIEW
+==================================================
+
+Keep the local Preview running.
+
+Prepare one local approved Professional fixture with:
+
+- active capability
+- profile draft
+- several skills
+- starting price
+- two synthetic portfolio images
+- no real personal documents
+
+Provide:
+
+- Preview URL
+- local fixture credentials
+- exact navigation steps
+
+I need to review:
+
+1. Approved Professional screen
+2. Manage professional profile
+3. Add work photos
+4. Reorder and remove photos
+5. Publish profile
+6. Public profile
+7. Pause / Reactivate
+8. Owner hide / restore
+9. Mobile 390 × 844
+
+==================================================
+FINAL DELIVERY
+==================================================
+
+Return:
+
+1. Whether the two gaps existed
+2. Exact files changed
+3. Schema changes
+4. Public-media storage architecture
+5. Proof private-document storage is not used
+6. Owner moderation endpoints
+7. Complete test matrix
+8. Secret scan
+9. Staging cleanup result
+10. Preview URL and fixture credentials
+11. Remaining configuration needed for:
+    - hapa-staging-public-media
+    - hapa-public-media
+
+Do not commit.
+Do not push.
+Do not deploy.
+Wait for approval.

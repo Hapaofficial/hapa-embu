@@ -1,0 +1,1277 @@
+FINAL MASTER EXECUTION ORDER — COMPLETE HAPA FOR WEB, PWA, ANDROID, iOS, GOOGLE MAPS AND STORE READINESS
+
+This instruction supersedes every previous HAPA task, continuation message, scope addition and partial completion order.
+
+Continue from the CURRENT HEAD of the existing branch:
+
+feature/professional-public-profile
+
+Repository:
+
+github.com/Hapaofficial/hapa-embu
+
+Staging:
+
+https://hapa-embu-staging.onrender.com
+
+Production:
+
+https://hapa-embu.onrender.com
+
+Do not restart the application from scratch.
+Preserve all valid work already completed.
+Preserve the existing clean commits and all currently passing tests.
+
+The latest completed milestone includes a substantial website MVP with approximately 154 passing backend/frontend tests, merchant, driver, requests, reviews, reports, account tools, Owner moderation, public/private media separation and staging deployment.
+
+That milestone is not the final product.
+
+You are now responsible for autonomously completing the entire HAPA launch candidate as:
+
+1. A professional responsive website.
+2. A secure installable PWA.
+3. A professional Android application prepared for Google Play.
+4. A professional iPhone application prepared for the Apple App Store.
+5. A complete Embu-first marketplace for Customers, Professionals, Merchants and Drivers.
+6. An Uber-style Driver booking flow with precise GPS pickup and destination selection integrated with Google Maps.
+
+Do not return only a plan.
+Create an internal plan and execute it.
+Do not stop after partial milestones.
+Do not repeatedly ask for approval.
+Do not return another “MVP complete” report until every completion condition in this order has been satisfied.
+
+==================================================
+1. NON-NEGOTIABLE SAFETY RULES
+==================================================
+
+- Work only on feature/professional-public-profile.
+- Never merge into main.
+- Never deploy production.
+- Never access or modify the production database.
+- Never access or modify production R2 buckets.
+- Never print, reveal, log or commit secret values.
+- Never commit JWTs, API keys, signed URLs, credentials, .env files, uploaded media, database dumps, signing certificates, keystores or Apple provisioning files.
+- Do not alter or delete real user data.
+- Use additive, non-destructive and repeatable database migrations.
+- Preserve API compatibility where practical.
+- Do not rebuild working modules without a demonstrated reason.
+- Do not create fake Google Maps, push notification, email or payment integrations.
+- Do not claim a service works unless it was genuinely configured and tested.
+- Do not invent company names, legal addresses, support emails or regulatory details.
+- Do not leave TODO, FIXME, Lorem ipsum, debug controls, broken links, dead buttons or fake production information.
+- Use synthetic test users and images only.
+- Clean temporary test records and R2 objects.
+- Verify current store requirements using official Apple and Google documentation at execution time.
+- Do not claim guaranteed legal compliance or guaranteed store approval.
+- Prepare a Kenya-first legal/privacy baseline and clearly identify final matters requiring Owner information or professional legal review.
+
+Do not push incomplete work that would trigger an incomplete staging deployment.
+
+Local checkpoint commits are allowed.
+Push only when a complete candidate passes all feasible local tests.
+
+==================================================
+2. PRESERVE AND AUDIT THE EXISTING WEBSITE MVP
+==================================================
+
+Audit the current implementation and preserve all working functionality, including:
+
+- customer registration, login and logout
+- JWT authentication
+- owner/customer role separation
+- Professional, Merchant and Driver capabilities
+- secure capability applications
+- private verification documents
+- Owner approval and rejection
+- editable public Professional profiles
+- Professional photos and portfolio
+- Merchant shops and listings
+- Driver profiles
+- unified requests
+- reviews
+- reports
+- Owner moderation
+- account settings
+- account deactivation
+- legal/help pages
+- public marketplace
+- public/private storage separation
+- authenticated editor media
+- public media visibility rules
+- EXIF/GPS metadata removal
+- rate limits
+- security headers
+- existing regression tests
+
+Fix any remaining launch-critical defects.
+
+Verified application data must remain separate from editable public profiles.
+
+Normal profile moderation must not silently change:
+
+- verified categories
+- verification history
+- account role
+- approved capabilities
+
+==================================================
+3. COMPLETE WEBSITE CUSTOMER EXPERIENCE
+==================================================
+
+Ensure a customer can professionally complete these journeys:
+
+- register
+- log in
+- remain logged in securely
+- recover from expired or invalid sessions
+- edit customer profile
+- edit name, phone and location
+- use Kenyan +254 phone-number format
+- change password
+- request password recovery through a genuine configured provider or receive a truthful unavailable-service message
+- apply as Professional, Merchant or Driver
+- see application status
+- view submitted verification information read-only
+- browse public marketplace
+- search and filter providers
+- create provider requests
+- read request history
+- message inside requests
+- cancel eligible requests
+- report users, profiles, listings, reviews and problems
+- leave one review after a completed request
+- request account deletion
+
+Provide clear:
+
+- loading states
+- empty states
+- success states
+- validation messages
+- safe error messages
+- mobile navigation
+- desktop navigation
+- session-expired handling
+
+Do not expose sensitive user data through public APIs.
+
+==================================================
+4. PROFESSIONAL MODULE
+==================================================
+
+Preserve and finish:
+
+- secure Professional application
+- private verification documents
+- Owner approval/rejection
+- read-only verified application
+- locked verified profession/category
+- editable public profile
+- display name
+- headline
+- service description
+- skills
+- location and service area
+- availability
+- price in KES
+- price unit
+- profile photo
+- portfolio images
+- phone visibility
+- WhatsApp visibility
+- live preview
+- save draft
+- publish
+- pause
+- reactivate
+- public profile
+- public discovery
+- ratings
+- reviews
+- customer requests
+- Owner hide/restore
+- moderation notes
+- moderation audit trail
+
+Statuses:
+
+- draft
+- active
+- paused
+- owner_hidden
+
+Owners must see their own media in every status.
+
+Only active eligible profiles may be publicly visible.
+
+==================================================
+5. MERCHANT MODULE
+==================================================
+
+Complete and verify:
+
+- secure Merchant application
+- private verification documents
+- Owner approval/rejection
+- read-only verified application
+- editable business profile
+- business name
+- category
+- description
+- location
+- service area
+- opening hours
+- logo/profile image
+- gallery
+- phone visibility
+- WhatsApp visibility
+- verified badge
+- reviews and ratings
+
+Statuses:
+
+- draft
+- active
+- paused
+- owner_hidden
+
+Listings must support:
+
+- title
+- description
+- category
+- KES price
+- price unit
+- availability
+- stock state where applicable
+- images
+- publish
+- pause
+- archive
+- Owner hide/restore
+- public listing page
+- search and filtering
+
+Customer flows may include:
+
+- enquiry
+- reservation
+- pickup request
+- delivery request
+- order request without online payment
+
+Do not simulate M-Pesa or card payments.
+
+==================================================
+6. DRIVER AND UBER-STYLE BOOKING
+==================================================
+
+Complete and verify:
+
+Driver application:
+
+- identity verification
+- licence information
+- vehicle information
+- private documents
+- Owner approval/rejection
+- read-only verification record
+
+Driver public profile:
+
+- display name
+- profile photo
+- vehicle type
+- vehicle description
+- service area
+- availability
+- pricing information
+- “price agreed with driver” option
+- phone visibility
+- WhatsApp visibility
+- verified badge
+- ratings and reviews
+
+Statuses:
+
+- draft
+- active
+- paused
+- owner_hidden
+
+Request types:
+
+- passenger ride
+- package delivery
+- goods transport
+- other supported local transport
+
+Request statuses:
+
+- pending
+- accepted
+- declined
+- cancelled
+- completed
+
+Enforce valid transitions server-side.
+
+Customer must be able to create, view and cancel eligible requests.
+
+Driver must be able to view only addressed requests and accept, decline or complete them.
+
+Owner may inspect requests for support but must not silently rewrite trip history.
+
+==================================================
+7. GOOGLE MAPS AND PRECISE GPS
+==================================================
+
+Implement the complete Google Maps architecture for the Driver/Uber flow.
+
+Use current official Google Maps Platform APIs or SDKs appropriate to:
+
+- website
+- Android
+- iOS
+
+Never commit API keys.
+
+Maintain separate environment/configuration boundaries for:
+
+- website staging
+- website production
+- Android staging
+- Android production
+- iOS staging
+- iOS production
+
+Pickup must support:
+
+- “Use my current location”
+- device/browser geolocation permission
+- exact latitude and longitude
+- readable address
+- Google Places search/autocomplete
+- reverse geocoding
+- tapping the map
+- dragging the pickup marker
+- manual selection when GPS is denied
+- pickup note
+- landmark, building, gate or roadside description
+
+Destination must support:
+
+- Google Places search/autocomplete
+- exact latitude and longitude
+- readable address
+- reverse geocoding
+- tapping the map
+- draggable marker
+
+Route must support:
+
+- pickup marker
+- destination marker
+- route polyline
+- estimated distance
+- estimated duration
+- display of route information
+- safe failure handling
+
+Do not calculate an automatic fare unless a real pricing model is explicitly configured.
+
+Persist:
+
+- pickup_address
+- pickup_latitude
+- pickup_longitude
+- destination_address
+- destination_latitude
+- destination_longitude
+- pickup_note
+- landmark
+- route_distance
+- route_duration
+
+Validate coordinates server-side.
+
+Prevent submission until valid pickup and destination coordinates exist.
+
+Driver must be able to open navigation through Google Maps or another safe installed maps application.
+
+Exact locations must be visible only to:
+
+- requesting customer
+- assigned driver
+- HAPA Owner for legitimate support
+
+Precise coordinates must never appear in:
+
+- public provider APIs
+- public marketplace APIs
+- public profile responses
+- logs
+- analytics
+- deep links
+
+Do not implement:
+
+- continuous background tracking
+- unnecessary location history
+- background location permission
+- automatic dispatch
+- surge pricing
+- live driver tracking
+
+Complete database, backend, frontend, mocked tests and documentation even when credentials are missing.
+
+A missing Maps key or billing account is an external blocker, not a reason to leave the integration unfinished.
+
+==================================================
+8. UNIFIED REQUESTS, MESSAGES, REVIEWS AND REPORTS
+==================================================
+
+Professional, Merchant and Driver requests must use consistent authorization and status handling.
+
+Requirements:
+
+- authenticated request creation
+- customer ownership protection
+- provider ownership protection
+- Owner support access
+- no IDOR
+- timestamps
+- status history
+- optional customer/provider messages
+- safe contact visibility
+- mobile-friendly request timeline
+- clear permitted actions
+
+Reviews:
+
+- only after a completed request
+- one review per completed request
+- 1–5 stars
+- short text
+- no self-review
+- average rating and count
+- Owner hide/restore
+- audit history
+
+Reports:
+
+- report user
+- report provider profile
+- report listing
+- report review
+- report media
+- report request/problem
+- Owner moderation queue
+- moderation notes
+- resolved status
+- audit trail
+
+Suspended, deactivated or hidden entities must disappear from public discovery.
+
+==================================================
+9. OWNER DASHBOARD
+==================================================
+
+Ensure the Owner dashboard includes:
+
+- useful counts
+- user search
+- user details
+- Professional applications
+- Merchant applications
+- Driver applications
+- public profiles
+- Merchant listings
+- requests/bookings
+- reviews
+- reports
+- moderation queue
+- account suspension/reactivation
+- content hide/restore
+- moderation notes
+- Owner audit history
+
+Every Owner route must enforce Owner authorization.
+
+Destructive actions require confirmation.
+
+Verification history must be preserved.
+
+==================================================
+10. LEGAL, PRIVACY, SUPPORT AND ACCOUNT DELETION
+==================================================
+
+Complete professional pages and flows for:
+
+- Help
+- Contact HAPA
+- Report a problem
+- Terms of Use
+- Privacy Policy
+- Community Rules
+- Marketplace Rules
+- Provider Safety
+- Location Data explanation
+- Camera/Photo explanation
+- Notification explanation
+- Data retention
+- Account deletion
+- user reporting and blocking
+- provider independence explanation
+
+Do not invent legal information.
+
+Centralize missing values such as:
+
+- legal entity name
+- official address
+- support email
+- privacy contact
+- registration details
+- production URLs
+
+Account deletion must exist:
+
+- inside website
+- inside Android
+- inside iOS
+- through an externally accessible deletion-request page
+
+Deletion flow must include:
+
+- authentication
+- confirmation
+- impact explanation
+- processing status
+- removal from public discovery
+- native credential deletion
+- push-token deletion
+- safe retention of legally/security-required audit records
+
+Deactivation alone is not sufficient.
+
+Prepare a final Kenya legal-review checklist for a qualified local lawyer.
+
+==================================================
+11. PWA
+==================================================
+
+Complete and validate a secure installable PWA:
+
+- valid manifest
+- correct application name
+- icons
+- start URL
+- display mode
+- theme configuration
+- service-worker registration
+- safe app-shell caching
+- offline page
+- update strategy
+- Android Chrome installability
+- iPhone Safari behavior where supported
+- no horizontal overflow
+
+Never cache:
+
+- authenticated API responses
+- JWTs
+- private documents
+- signed URLs
+- exact trip locations
+- personal account data
+- verification data
+
+Service-worker registration alone is not sufficient.
+Perform installability and cache-safety tests.
+
+==================================================
+12. NATIVE ANDROID AND iOS USING CAPACITOR
+==================================================
+
+Use a current maintained Capacitor architecture compatible with the existing application.
+
+Do not rewrite the working backend.
+
+Create:
+
+- Android native project
+- iOS native project
+- Capacitor configuration
+- staging configuration
+- production configuration
+- configurable API base URL
+- staging and production identifiers that are easy to change before final registration
+
+Do not permanently register the final production package or bundle identifier without Owner confirmation.
+
+The apps must not feel like low-quality browser wrappers.
+
+Implement genuine native integration for:
+
+- secure credentials
+- camera
+- gallery
+- geolocation
+- permissions
+- safe areas
+- status bar
+- splash screen
+- application icons
+- keyboard avoidance
+- Android back button
+- mobile navigation
+- offline/network errors
+- session expiration
+- telephone actions
+- WhatsApp actions
+- share actions
+- safe external links
+- account deletion
+- deep links
+- notification architecture
+
+No browser chrome or development URL may be visible in release builds.
+
+==================================================
+13. SECURE NATIVE AUTHENTICATION
+==================================================
+
+On Android use Keystore-backed secure storage.
+
+On iOS use Keychain-backed secure storage.
+
+Do not rely only on browser localStorage.
+
+Clear credentials on:
+
+- logout
+- invalid token
+- expired token
+- account suspension
+- account deactivation
+- account deletion
+
+Never place JWTs in:
+
+- URLs
+- query parameters
+- deep links
+- HTML attributes
+- logs
+- analytics
+
+Maintain secure authenticated media handling.
+
+==================================================
+14. CAMERA, GALLERY AND FILE SECURITY
+==================================================
+
+Support native camera/gallery use for:
+
+- account/profile photos
+- Professional portfolio
+- Merchant profile and gallery
+- Merchant products
+- Driver profile
+- vehicle photos
+- verification documents where permitted
+
+Provide:
+
+- Take photo
+- Choose from gallery
+- preview
+- replace
+- remove
+- orientation correction
+- compression
+- file-size validation
+- MIME validation
+- malformed-image rejection
+- SVG/polyglot rejection where required
+- EXIF/GPS removal
+- permission requested only after user action
+- safe denied-permission fallback
+
+==================================================
+15. DEEP LINKS
+==================================================
+
+Prepare:
+
+- Android App Links
+- iOS Universal Links
+- Professional profile links
+- Merchant profile links
+- Driver profile links
+- listing links
+- authorized request links
+- assetlinks.json
+- apple-app-site-association
+- domain/signing documentation
+
+Never expose JWTs, signed URLs, private document identifiers or exact trip coordinates through deep links.
+
+==================================================
+16. PUSH NOTIFICATION ARCHITECTURE
+==================================================
+
+Prepare notification architecture for:
+
+- application approved/rejected
+- new request
+- request accepted
+- request declined
+- request cancelled
+- request completed
+- moderation update
+- support update
+
+Prepare:
+
+- Firebase Cloud Messaging integration
+- APNs integration
+- secure device-token registration
+- device/user association
+- token replacement
+- token deletion
+- logout cleanup
+- account-deletion cleanup
+- notification preferences
+- privacy-safe notification payloads
+
+Do not place exact locations or private messages on lock screens by default.
+
+Do not claim notifications work before APNs/FCM credentials are configured.
+
+==================================================
+17. ANDROID / GOOGLE PLAY READINESS
+==================================================
+
+Verify current official Google Play requirements during implementation.
+
+Prepare:
+
+- Android staging build
+- Android production build configuration
+- target SDK required by current Google policy
+- release Gradle configuration
+- Android App Bundle configuration
+- versionCode/versionName strategy
+- R8/ProGuard where appropriate
+- no debug flags in release
+- Play App Signing checklist
+- secure upload-key creation and backup instructions
+- package-name registration checklist
+- internal testing instructions
+- closed-testing checklist where applicable
+- Google Play Data Safety worksheet
+- content-rating worksheet
+- app-access instructions
+- ads declaration
+- target audience worksheet
+- account-deletion compliance
+- user-generated-content compliance
+- release and rollback checklist
+
+Prepare listing materials:
+
+- app name
+- short description
+- full description
+- feature graphic specification
+- icon specification
+- screenshot plan
+- support field
+- privacy-policy field
+- account-deletion field
+- release notes
+- Kenya/Embu market description
+
+Attempt an Android build and release AAB when the available environment permits.
+
+Do not create or commit the final production signing key.
+
+Report toolchain or Owner-controlled signing limitations honestly.
+
+==================================================
+18. iOS / APP STORE READINESS
+==================================================
+
+Verify current official Apple submission requirements during implementation.
+
+Prepare:
+
+- complete iOS project
+- staging scheme/configuration
+- production scheme/configuration
+- Info.plist
+- location permission descriptions
+- camera permission descriptions
+- photo-library permission descriptions
+- notification permission configuration
+- PrivacyInfo.xcprivacy
+- third-party SDK privacy-manifest audit
+- no private API usage
+- no unnecessary permissions
+- no background location permission
+- account deletion inside app
+- support and privacy pages
+- reporting/blocking/moderation flows
+- version/build-number strategy
+- TestFlight checklist
+- archive/export instructions
+- App Store Connect checklist
+
+Prepare metadata:
+
+- app-name proposal
+- subtitle
+- promotional text
+- full description
+- keywords
+- category
+- support URL field
+- privacy URL field
+- deletion URL field
+- reviewer notes
+- demo-account instructions
+- age-rating worksheet
+- App Privacy worksheet
+- export compliance worksheet
+- screenshot specifications
+- screenshot content plan
+- app-icon specification
+- Kenya/Embu launch description
+
+Do not submit to Apple.
+
+Do not create or commit Apple certificates or provisioning profiles.
+
+When Xcode is unavailable, finish the complete project and report the required Mac/Xcode archive test honestly.
+
+==================================================
+19. SECURITY AND PRIVACY HARDENING
+==================================================
+
+Audit and fix:
+
+- authentication
+- authorization
+- ownership
+- Owner routes
+- capability routes
+- IDOR
+- SQL injection
+- XSS
+- unsafe innerHTML
+- CSRF risks where applicable
+- brute-force protection
+- request spam
+- upload abuse
+- report abuse
+- MIME validation
+- malformed uploads
+- file limits
+- EXIF/GPS removal
+- secure headers
+- CSP where appropriate
+- production error responses
+- stack traces
+- secret leakage
+- log hygiene
+- JWT leakage
+- signed URL lifetime
+- public/private cache headers
+- database status constraints
+- public/private storage separation
+- PII-free object keys
+- public API minimization
+- exact-location privacy
+
+Preserve all existing private-document and public-media regression tests.
+
+==================================================
+20. REQUIRED TESTING
+==================================================
+
+Run and expand all existing automated tests.
+
+Add coverage for:
+
+- accounts and authorization
+- Professional lifecycle
+- Merchant lifecycle
+- Driver lifecycle
+- request transitions
+- reviews
+- reports
+- Owner moderation
+- account deletion
+- precise-location authorization
+- public API location privacy
+- Google Maps mocked integration
+- GPS-denied fallback
+- public/private media
+- authenticated media
+- Merchant image deletion
+- Merchant gallery deletion
+- listing image deletion
+- Driver profile image deletion
+- vehicle image deletion
+- unrelated-user media deletion attempts
+- EXIF/GPS removal
+- malformed uploads
+- rate limits
+- PWA cache safety
+- deep-link safety
+- secure native storage behavior
+- Android configuration
+- iOS configuration
+
+Required media-delete tests must prove:
+
+- only the owning provider may delete media
+- unrelated users are blocked
+- deleted media disappears safely
+- public visibility updates correctly
+- private documents remain unaffected
+- production buckets remain untouched
+
+==================================================
+21. STAGING END-TO-END ACCEPTANCE
+==================================================
+
+Run staging E2E for:
+
+1. Customer registration/login.
+2. Professional application.
+3. Owner approval.
+4. Professional profile publication.
+5. Marketplace discovery.
+6. Customer request.
+7. Provider acceptance.
+8. Completion.
+9. Customer review.
+10. Owner hide and restore.
+
+Repeat equivalent journeys for Merchant and Driver.
+
+Driver journey must include:
+
+- pickup coordinates
+- destination coordinates
+- route information
+- customer access
+- assigned-driver access
+- unrelated-user denial
+- completion
+- review
+
+Verify:
+
+- draft content is not public
+- paused content is not public
+- owner_hidden content is not public
+- suspended users are not public
+- private documents are not public
+- exact locations are not public
+- public-media upload/retrieval works
+- media deletion works
+- account deletion request works
+
+Use staging Owner credentials only if securely available through environment configuration.
+
+Never print them.
+
+If unavailable, finish everything else and report exactly one remaining staging credential blocker instead of stopping early.
+
+==================================================
+22. MOBILE VALIDATION
+==================================================
+
+Validate:
+
+- common Android viewport
+- common iPhone viewport
+- tablet viewport
+- no horizontal overflow
+- navigation
+- forms
+- keyboard behavior
+- safe areas
+- camera/gallery controls
+- GPS/map controls
+- requests
+- Professional editor
+- Merchant editor
+- Driver editor
+- account deletion
+- offline/error states
+- Owner screens where applicable
+
+Use automated browser/mobile testing where possible and document any required final device test.
+
+==================================================
+23. DOCUMENTATION
+==================================================
+
+Create or update:
+
+docs/mobile/ARCHITECTURE.md
+docs/mobile/ANDROID_BUILD.md
+docs/mobile/IOS_BUILD.md
+docs/mobile/SECURITY.md
+docs/mobile/GOOGLE_MAPS.md
+docs/mobile/NOTIFICATIONS.md
+docs/mobile/DEEPLINKS.md
+
+docs/store/APPLE_APP_STORE_CHECKLIST.md
+docs/store/GOOGLE_PLAY_CHECKLIST.md
+docs/store/STORE_METADATA.md
+docs/store/PRIVACY_DATA_WORKSHEET.md
+docs/store/ACCOUNT_AND_CREDENTIAL_BLOCKERS.md
+docs/store/RELEASE_AND_ROLLBACK.md
+
+Also document:
+
+- local setup
+- staging deployment
+- production checklist
+- environment-variable names
+- migrations
+- R2 public media
+- R2 private documents
+- CORS
+- backups
+- rollback
+- Owner account setup
+- test users
+- external email provider
+- Google Maps
+- Firebase/APNs
+- store accounts
+- legal review
+- intentionally excluded advanced features
+
+Never include secret values.
+
+==================================================
+24. EXECUTION PROCESS
+==================================================
+
+Phase A — audit the current HEAD and gap list.
+
+Phase B — implement all missing website, PWA, Google Maps, Android, iOS and store-readiness work.
+
+Phase C — run all local tests, security tests, builds and browser smoke tests.
+
+Phase D — review the complete git diff and remove debug or temporary files.
+
+Phase E — create clean logical commits.
+
+Phase F — push the complete branch once ready.
+
+Phase G — allow Render staging to auto-deploy.
+
+Phase H — verify deployed SHA, health and migrations.
+
+Phase I — run staging E2E and mobile checks.
+
+Phase J — fix staging defects autonomously and repeat until accepted.
+
+Do not stop to report normal progress.
+
+If an execution/time limit interrupts the job, resume from the latest clean checkpoint and continue without requesting a new scope explanation.
+
+==================================================
+25. VALID FINAL STOP CONDITION
+==================================================
+
+Do not return READY FOR OWNER REVIEW until:
+
+- complete website MVP works on staging
+- Professional works
+- Merchant works
+- Driver/Uber works
+- exact pickup/destination data is implemented
+- Google Maps integration code is complete
+- request system works
+- reviews and reports work
+- Owner dashboard works
+- account deletion works
+- PWA installability and cache safety are verified
+- Android project exists
+- Android build status is verified
+- Android AAB status is honestly reported
+- iOS project exists
+- iOS configuration is verified
+- secure native storage exists
+- native camera/gallery/location integrations exist
+- deep links are prepared
+- notification architecture is prepared
+- Apple materials are prepared
+- Google Play materials are prepared
+- mobile validation is completed
+- media-delete tests exist
+- all feasible tests pass
+- staging E2E passes or exactly one genuine credential blocker remains
+- staging test artifacts are cleaned
+- production remains untouched
+- main remains untouched
+- no secret or signing key is committed
+
+Only these final statuses are allowed:
+
+READY FOR OWNER REVIEW
+
+or
+
+BLOCKED BY EXTERNAL OWNER CREDENTIALS / ACCOUNTS
+
+==================================================
+26. FINAL REPORT FORMAT
+==================================================
+
+Return one final report only after the valid stop condition is reached.
+
+STATUS:
+READY FOR OWNER REVIEW
+or
+BLOCKED BY EXTERNAL OWNER CREDENTIALS / ACCOUNTS
+
+STAGING:
+- deployed SHA
+- URL
+- health
+- migration result
+- E2E result
+
+WEBSITE:
+- customer flows
+- Professional
+- Merchant
+- Driver
+- requests
+- reviews
+- reports
+- Owner dashboard
+- account deletion
+- legal/support
+- mobile responsiveness
+
+GOOGLE MAPS:
+- current location
+- pickup selection
+- destination selection
+- markers
+- reverse geocoding
+- route
+- distance/duration
+- authorization/privacy
+- credential status
+
+PWA:
+- manifest
+- installability
+- service worker
+- offline behavior
+- private-cache safety
+
+ANDROID:
+- project status
+- build result
+- AAB result
+- secure storage
+- GPS/maps
+- camera/gallery
+- deep links
+- notifications
+- remaining signing/account steps
+
+IOS:
+- project status
+- validation/build result
+- archive status
+- secure storage
+- GPS/maps
+- camera/gallery
+- Universal Links
+- notifications
+- remaining Xcode/signing/account steps
+
+STORE READINESS:
+- Apple checklist
+- Google Play checklist
+- metadata
+- screenshots/assets plan
+- privacy worksheets
+- account deletion
+- legal and account blockers
+
+TESTS:
+- backend
+- frontend
+- security
+- E2E
+- media deletion
+- PWA
+- mobile
+- Android
+- iOS
+- total passed/failed
+
+DATABASE:
+- migrations
+- constraints
+- staging result
+
+STORAGE:
+- public media
+- private documents
+- cleanup
+- confirmation production storage was untouched
+
+GIT:
+- branch
+- clean commit SHAs
+- push result
+- confirmation main was untouched
+- confirmation production was untouched
+
+EXTERNAL BLOCKERS:
+- Google Maps credentials/billing
+- Firebase/APNs credentials
+- email provider
+- Apple Developer account
+- Google Play Console account
+- package/bundle identifiers
+- signing credentials
+- legal/company information
+- staging Owner credential
+- only include items genuinely still required
+
+PRODUCTION AND STORE LAUNCH CHECKLIST:
+- exact Owner-controlled manual steps
+- environment-variable names only
+- migration command
+- bucket configuration
+- Google Maps configuration
+- Android signing and Play Console steps
+- Apple signing and App Store Connect steps
+- legal review steps
+- production deploy steps
+- rollback steps
+
+Do not merge main.
+Do not deploy production.
+Do not submit to either store.
+
+Begin immediately and continue autonomously until the valid final stop condition is reached.

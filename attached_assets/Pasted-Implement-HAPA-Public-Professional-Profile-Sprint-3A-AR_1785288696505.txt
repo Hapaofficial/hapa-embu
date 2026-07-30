@@ -1,0 +1,355 @@
+Implement HAPA Public Professional Profile — Sprint 3A.
+
+ARCHITECTURE RULE
+
+The verified Professional application and the editable public Professional profile are two completely separate entities.
+
+Verified application:
+- identity and document verification,
+- private,
+- locked after approval,
+- controlled by Owner.
+
+Public Professional profile:
+- public service offering,
+- editable continuously by the approved user,
+- contains no private identity data or private documents.
+
+IMPORTANT
+
+- Create a new branch from current origin/main:
+
+feature/professional-public-profile
+
+- Do not use feature/verification-support.
+- Do not modify or merge feature/verification-support.
+- Do not work directly on main.
+- Do not access or modify production data.
+- Do not use the production R2 bucket.
+- Use only local development and staging resources.
+- Do not commit, push or deploy until local review is approved.
+- Preserve Marketplace, Upgrade System, Secure Documents and Owner Dashboard.
+- Every normal account remains role='customer'.
+- No HTTP route may assign role='owner'.
+
+GOAL
+
+An approved Professional user must be able to create, publish and continuously update a public service profile without reopening or changing the verified identity application.
+
+1. ELIGIBILITY
+
+Only a user satisfying all conditions may create or publish a Professional profile:
+
+- role='customer'
+- status='active'
+- capabilities.professional=true
+- Professional application status='approved'
+
+Pending, rejected, corrections_requested and suspended users may not publish a public Professional profile.
+
+2. APPROVED PROFESSIONAL SCREEN
+
+Replace the current approved-only screen with:
+
+Professional role active
+
+Primary actions:
+- Manage professional profile
+- View public profile
+- Pause profile / Reactivate profile
+
+Secondary action:
+- View verified application
+
+The verified application remains read-only.
+
+3. DATABASE MODEL
+
+Create an idempotent professional_profiles table equivalent to:
+
+- id UUID primary key
+- user_id UUID unique references users(id)
+- verified_category
+- display_name
+- headline
+- service_description
+- skills JSONB
+- county
+- town
+- service_area
+- availability
+- starting_price
+- pricing_unit
+- phone_visible boolean
+- whatsapp_visible boolean
+- profile_photo_id nullable
+- status: draft | active | paused | owner_hidden
+- created_at
+- updated_at
+- published_at
+- paused_at
+- hidden_at
+- hidden_by nullable
+- moderation_note nullable
+
+Create professional_portfolio_images:
+
+- id UUID primary key
+- professional_profile_id UUID
+- storage_provider
+- storage_key
+- mime_type
+- size_bytes
+- width
+- height
+- sha256
+- sort_order
+- status: active | removed
+- created_at
+- removed_at
+
+Use soft deletion only.
+
+4. EDITABLE PUBLIC FIELDS
+
+The approved Professional may edit at any time:
+
+- public display name
+- headline
+- service description
+- skills
+- county
+- town
+- service area
+- availability
+- starting price
+- pricing unit
+- phone visibility
+- WhatsApp visibility
+- public profile photo
+- portfolio/work photos
+
+5. LOCKED VERIFIED FIELDS
+
+The public profile must never allow changes to:
+
+- legal name
+- national ID or passport number
+- private verified documents
+- Owner review notes
+- application status
+- capability flags
+- role
+- verified profession category
+
+The profession category must be copied from the approved application and remain locked.
+
+Display:
+
+“Contact HAPA support to request a change to your verified profession category.”
+
+Do not build the category-change workflow in this sprint.
+
+6. PUBLIC IMAGE STORAGE
+
+Public portfolio images must NOT use the private-document bucket or private_documents table.
+
+Create a separate public-media storage abstraction.
+
+Use environment variables equivalent to:
+
+PUBLIC_MEDIA_STORAGE_MODE=local|s3
+PUBLIC_MEDIA_S3_BUCKET
+PUBLIC_MEDIA_S3_ENDPOINT
+PUBLIC_MEDIA_S3_REGION
+PUBLIC_MEDIA_S3_ACCESS_KEY_ID
+PUBLIC_MEDIA_S3_SECRET_ACCESS_KEY
+
+For local development:
+- store outside source files,
+- serve only sanitized public media.
+
+For staging:
+- use a separate staging public-media bucket.
+
+Do not use:
+- hapa-private-documents
+- hapa-staging-private-documents
+
+Do not expose any private-document object as portfolio content.
+
+7. IMAGE SECURITY
+
+All public profile and portfolio images must:
+
+- upload through multipart/form-data,
+- be validated by actual file bytes,
+- accept JPEG, PNG and WebP only,
+- reject SVG and malformed files,
+- be processed with sharp,
+- auto-orient,
+- strip EXIF and GPS,
+- resize to safe dimensions,
+- calculate SHA-256,
+- use generated PII-free object keys.
+
+Allow:
+
+- Take a photo
+- Choose from gallery
+- upload progress
+- preview
+- replace
+- remove
+- reorder
+
+Maximum:
+- 1 public profile photo
+- 12 portfolio/work photos
+
+8. API
+
+Authenticated:
+
+GET    /api/me/professional-profile
+POST   /api/me/professional-profile
+PATCH  /api/me/professional-profile
+POST   /api/me/professional-profile/publish
+POST   /api/me/professional-profile/pause
+POST   /api/me/professional-profile/reactivate
+
+POST   /api/me/professional-profile/profile-photo
+DELETE /api/me/professional-profile/profile-photo
+
+POST   /api/me/professional-profile/portfolio
+PATCH  /api/me/professional-profile/portfolio/order
+DELETE /api/me/professional-profile/portfolio/:imageId
+
+Public:
+
+GET /api/public/professionals
+GET /api/public/professionals/:id
+
+Owner:
+
+GET   /api/owner/professional-profiles
+GET   /api/owner/professional-profiles/:id
+PATCH /api/owner/professional-profiles/:id/status
+
+9. PUBLIC PROFILE PAGE
+
+Display:
+
+- public profile photo
+- HAPA Verified badge
+- display name
+- verified profession
+- headline
+- skills
+- service description
+- county/town
+- service area
+- availability
+- starting price
+- pricing unit
+- portfolio gallery
+- Call button when enabled
+- WhatsApp button when enabled
+
+Never expose:
+
+- private identity documents
+- ID/passport data
+- encrypted values
+- application details
+- Owner review notes
+- storage credentials
+- private bucket URLs
+
+Only status='active' profiles are public.
+
+10. PROFILE EDITOR UX
+
+Create a mobile-first editor with:
+
+- profile completeness indicator
+- grouped sections
+- live preview
+- inline validation
+- Save draft
+- Publish profile
+- Pause profile
+- clear status card
+- camera/gallery upload
+- photo ordering
+- 44 × 44 px controls
+- no horizontal overflow at 390 × 844
+
+11. OWNER MODERATION
+
+Owner can:
+
+- view all public Professional profiles,
+- hide a profile,
+- restore a hidden profile,
+- add a moderation note.
+
+Owner hiding a public profile must:
+- hide only the public profile,
+- not remove capabilities.professional,
+- not change the verified application,
+- not change role.
+
+Capability suspension remains a separate Upgrade System action.
+
+12. TESTS
+
+Verify:
+
+- approved Professional sees Manage professional profile,
+- pending/rejected/corrections/suspended users do not,
+- profile draft saves,
+- draft is not public,
+- active profile is public,
+- paused profile is not public,
+- reactivation restores public access,
+- owner_hidden profile is not public,
+- skills and description update successfully,
+- portfolio photos add/reorder/remove correctly,
+- only profile owner can edit,
+- category remains locked,
+- role remains customer,
+- capability remains professional=true,
+- verified application remains unchanged,
+- private documents never appear in public APIs,
+- private R2 bucket is never referenced,
+- invalid files are rejected,
+- EXIF/GPS is stripped,
+- mobile layout works at 390 × 844,
+- Marketplace, Owner Dashboard and Upgrade System do not regress.
+
+FINAL DELIVERY
+
+Return:
+
+1. Current-state analysis
+2. Exact branch
+3. Files changed
+4. Schema changes
+5. Public-media storage design
+6. Endpoint table
+7. Authorization matrix
+8. Screenshots:
+   - approved Professional screen
+   - profile editor
+   - portfolio manager
+   - public profile
+   - Owner moderation
+   - mobile 390 × 844
+9. Complete test results
+10. Remaining staging configuration required
+
+Do not commit.
+Do not push.
+Do not deploy.
+Wait for approval.

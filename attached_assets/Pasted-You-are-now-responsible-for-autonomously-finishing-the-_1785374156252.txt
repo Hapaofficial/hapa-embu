@@ -1,0 +1,646 @@
+You are now responsible for autonomously finishing the complete launch-ready HAPA MVP.
+
+Do not return only a plan. Inspect the project, create an internal implementation plan, and then execute it from start to finish without asking for confirmation after every step.
+
+PROJECT CONTEXT
+
+Product:
+- HAPA
+- Embu-first marketplace and local-services application for Kenya
+- Mobile-first
+- Intended to connect customers with Professionals, Merchants, and Drivers
+- This is a practical launchable MVP, not a full Uber clone yet
+
+Repository:
+- github.com/Hapaofficial/hapa-embu
+
+Current working branch:
+- feature/professional-public-profile
+
+Current branch head:
+- c45a1f16902cf5ed081fe0906fb58ab6f6acd1d1
+
+Staging:
+- https://hapa-embu-staging.onrender.com
+- Render staging auto-deploys the current branch
+- Staging database and storage are separate from production
+
+Production:
+- main branch
+- https://hapa-embu.onrender.com
+- DO NOT merge into main
+- DO NOT deploy or modify production
+- DO NOT access production storage
+
+CURRENT ARCHITECTURE
+
+Backend:
+- Node.js
+- Express
+- PostgreSQL
+
+Frontend:
+- public/index.html
+- vanilla JavaScript/CSS
+
+Current authorization model:
+- main account roles: owner and customer
+- customer capabilities:
+  - professional
+  - merchant
+  - driver
+
+Storage:
+- private verification documents use a dedicated private-document adapter and private bucket
+- public profile/portfolio media use lib/publicMediaStorage.js
+- public media and private documents must always remain separated
+- public-media object keys must remain PII-free
+- uploaded public images must be sanitized and have EXIF/GPS metadata removed
+
+KNOWN WORKING FEATURES THAT MUST NOT REGRESS
+
+- customer registration and authentication
+- HAPA Owner dashboard
+- customer/owner role separation
+- capability upgrade system
+- Professional, Merchant, and Driver upgrade/application architecture
+- secure private verification documents
+- owner review/approval/rejection flows
+- marketplace/listing moderation
+- public marketplace foundations
+- editable public Professional profile
+- profile photo and portfolio images
+- Professional public profile statuses:
+  - draft
+  - active
+  - paused
+  - owner_hidden
+- authenticated Professional editor media
+- public Professional media
+- owner hide/restore moderation
+- private/public storage safety guard
+- staging R2 public-media integration
+- existing test suites and security regressions
+
+OPERATING RULES
+
+1. Work autonomously until the complete MVP is ready for Owner review on staging.
+2. Do not ask questions unless work is genuinely blocked by:
+   - a missing external credential
+   - an irreversible production decision
+   - a business decision that cannot safely be inferred
+3. Make reasonable product decisions using:
+   - current code
+   - repository documentation
+   - existing tests
+   - existing database structure
+   - the simplest safe Embu-first MVP approach
+4. Do not rebuild working modules from scratch.
+5. Preserve existing data and API compatibility.
+6. Use additive, idempotent, non-destructive migrations.
+7. Do not expose or print secrets, JWTs, signed URLs, document keys, or credentials.
+8. Do not commit:
+   - .env files
+   - Secrets
+   - uploaded media
+   - database dumps
+   - temporary fixtures
+   - signed URLs
+9. Do not use private-document buckets for public media.
+10. Do not access any production bucket or production database.
+11. Do not add fake payment integrations or pretend that M-Pesa is connected.
+12. No unfinished TODO/FIXME items, broken buttons, placeholder pages, Lorem ipsum, or fake production data.
+13. Use synthetic test data only and clean it up after testing.
+14. Keep communication efficient. Do not repeatedly stop to summarize minor progress.
+15. You may create local checkpoint commits, but do not push incomplete work.
+16. At completion, consolidate work into clean logical commits and push only the current feature branch.
+17. If staging exposes a bug after deployment, diagnose and fix it autonomously until the staging acceptance tests pass.
+18. Never merge into main and never deploy production.
+
+COMPLETE MVP SCOPE
+
+A. ACCOUNT AND CUSTOMER EXPERIENCE
+
+Audit and complete:
+
+- registration
+- login
+- logout
+- authentication persistence
+- expired/invalid token handling
+- customer account/profile editing
+- name, phone, email, location and contact settings
+- Kenyan phone-number handling, including +254
+- password change
+- safe password recovery architecture without inventing a fake email provider
+- clear loading, empty, success and error states
+- account deactivation/deletion request
+- no sensitive data exposed in public APIs
+
+A customer must be able to:
+
+- create an account
+- complete their profile
+- browse HAPA without provider capability
+- apply to become a Professional, Merchant, or Driver
+- see application status
+- view their submitted verification application read-only
+- browse public providers and listings
+- contact or submit a request to a provider
+- see their request history
+- report a provider or listing
+- leave a review only after a completed request
+
+B. PROFESSIONAL MODULE
+
+Preserve and finish the existing implementation:
+
+- verified application remains separate from editable public profile
+- verified category remains locked
+- public profile editing
+- profile photo
+- portfolio photos
+- skills
+- service description
+- service area/location
+- availability
+- starting price and pricing unit
+- phone and WhatsApp visibility controls
+- draft/publish/pause/reactivate
+- live preview
+- public profile page
+- public marketplace discovery
+- owner hide/restore
+- owner moderation note
+- no moderation action may silently remove the customer role, capability, or verification record
+- proper mobile layout
+- all media must continue working for draft, active, paused and owner_hidden owners while remaining correctly gated publicly
+
+C. MERCHANT MODULE
+
+Complete a launchable Merchant capability using the same secure architecture and design quality as Professional.
+
+Merchant must have:
+
+- verification/application flow
+- owner review and approval/rejection
+- read-only verified application after approval
+- editable public business profile
+- business name
+- business category
+- description
+- location/service area
+- opening hours
+- phone and WhatsApp controls
+- logo/profile image
+- business/gallery images
+- public status:
+  - draft
+  - active
+  - paused
+  - owner_hidden
+- product or service listings
+- listing title
+- description
+- category
+- price in KES
+- price unit when applicable
+- availability/in-stock state
+- listing images
+- publish/pause/archive
+- public merchant page
+- owner moderation
+- safe public-media storage
+- marketplace search and filters
+
+Do not add a shopping-cart payment system unless one already exists in the repository specification. The MVP may use enquiries, reservations, pickup/delivery requests, phone and WhatsApp contact.
+
+D. DRIVER MODULE
+
+Complete a launchable Driver capability.
+
+Driver must have:
+
+- secure Driver application and verification flow
+- private identity/licence/vehicle documents
+- owner approval/rejection
+- read-only verified application
+- editable public Driver profile
+- driver display name
+- profile photo
+- vehicle type
+- vehicle description
+- service area
+- availability
+- phone and WhatsApp visibility
+- pricing information or “price agreed with driver”
+- public status:
+  - draft
+  - active
+  - paused
+  - owner_hidden
+- public driver page
+- owner moderation
+- request/booking flow
+
+Driver MVP request flow must support:
+
+- customer pickup description
+- destination description
+- requested date/time
+- ride, delivery, or transport request type where appropriate
+- optional customer note
+- driver accept/decline
+- customer cancel before completion
+- statuses such as:
+  - pending
+  - accepted
+  - declined
+  - cancelled
+  - completed
+- request history for customer and driver
+- safe status transitions
+- review eligibility after completion
+
+Do not build expensive real-time dispatch, live GPS tracking, automatic fare calculation, external maps APIs, or payment processing unless this functionality already exists and is configured. Use the simplest reliable Embu-first booking/request MVP.
+
+E. UNIFIED REQUEST SYSTEM
+
+Implement or complete a consistent request/enquiry system for:
+
+- Professional services
+- Merchant enquiries/orders/reservations
+- Driver bookings
+
+Requirements:
+
+- authenticated customer creates request
+- provider can view only requests addressed to them
+- customer can view only their own requests
+- owner can inspect requests for support/moderation
+- secure authorization on every route
+- no IDOR access
+- provider can accept, decline or complete where applicable
+- customer can cancel when allowed
+- timestamps and status history
+- optional messages/notes inside a request
+- no private phone/email leakage unless visibility/contact rules allow it
+- clear mobile-friendly status display
+- empty states and error handling
+
+F. REVIEWS AND TRUST
+
+Implement or finish:
+
+- customer reviews only after completed requests
+- one review per completed request
+- star rating and short text
+- provider average rating and review count
+- owner hide/unhide review
+- report user
+- report profile
+- report listing
+- report review
+- report request/problem
+- owner moderation queue
+- moderation notes
+- suspended/deactivated users must disappear from public discovery
+- audit trail for important owner actions
+- prevent users from reviewing themselves
+
+G. MARKETPLACE AND DISCOVERY
+
+Complete a coherent public/customer marketplace:
+
+- Professional providers
+- Merchants
+- Merchant listings
+- Drivers
+- search
+- category filters
+- location/service-area filters
+- availability/status filters where useful
+- price display in KES
+- rating display
+- verified badge
+- pagination or safe result limits
+- public details pages
+- clear contact/request actions
+- no draft, paused, owner_hidden, rejected, suspended or deleted records in public results
+- safe empty states
+- responsive mobile cards
+- consistent navigation and active-tab state
+
+Do not return private verification information in marketplace APIs.
+
+H. OWNER DASHBOARD
+
+Complete a practical HAPA Owner control panel:
+
+- users list and search
+- user detail page
+- Professional applications
+- Merchant applications
+- Driver applications
+- public profiles
+- merchant listings
+- requests/bookings
+- reviews
+- reports
+- moderation queue
+- approve/reject with notes
+- hide/restore public content
+- suspend/reactivate customer accounts
+- application and content status filters
+- owner action audit history
+- dashboard totals and useful counts
+- clear confirmation before destructive actions
+- prevent accidental removal of verification history
+- prevent Owner from changing verified categories through general profile moderation
+- Owner-only authorization on every owner route
+
+I. SUPPORT, LEGAL AND SAFETY
+
+Add production-quality MVP pages and flows:
+
+- Help / Support
+- Contact HAPA
+- report-a-problem form
+- Terms of Use
+- Privacy Policy
+- Community and marketplace rules
+- safety guidance
+- account deletion request
+- basic explanation that providers are independent users unless the existing legal model says otherwise
+- no unsupported legal promises
+- no fake support email or fake company address
+
+Where final legal/company contact details are unavailable, centralize them in configuration and clearly mark the deployment requirement in documentation rather than scattering placeholders across the UI.
+
+J. MOBILE UX AND PWA
+
+HAPA must be comfortable on a phone first.
+
+Complete:
+
+- responsive layout at common mobile sizes
+- no horizontal overflow
+- readable forms and buttons
+- correct keyboard/input types
+- image upload from camera and gallery
+- safe image previews
+- accessible labels
+- clear focus states
+- loading indicators
+- empty states
+- success/error messages
+- confirmation dialogs where needed
+- consistent colors, typography and spacing
+- no administrative-looking customer forms
+- no broken back navigation
+- no duplicate navigation
+- proper disabled states
+- HAPA branding consistency
+
+Make the web app installable as a PWA:
+
+- valid manifest
+- icons already available or generate safe non-secret assets
+- mobile viewport
+- installability
+- service worker limited to a safe application shell
+- do not cache authenticated API responses, private documents, signed URLs, or personal data
+- reliable update behavior
+
+Do not attempt App Store or Google Play submission in this task.
+
+Keep English as the launch language. Structure text so Kiswahili can be added later without rewriting the application, but do not delay the MVP for full translation.
+
+K. SECURITY AND PRIVACY HARDENING
+
+Audit and fix:
+
+- authentication and authorization
+- owner-only routes
+- capability checks
+- ownership checks
+- IDOR risks
+- SQL injection
+- XSS
+- unsafe innerHTML usage
+- upload MIME/type validation
+- file-size limits
+- malformed/SVG/polyglot rejection
+- image sanitization
+- EXIF/GPS removal
+- rate limiting for authentication, uploads, reports and request creation
+- secure HTTP headers
+- safe error responses
+- no stack traces in production
+- no secrets in logs
+- no JWTs in URLs or HTML attributes
+- safe signed-URL expiration
+- private cache headers for authenticated media
+- public cache headers only where safe
+- database constraints for statuses and ownership
+- destructive-action confirmation
+- no public exposure of private documents
+- no mixing of public and private buckets
+- no PII in storage keys
+
+Preserve the existing private-document and public-media regression tests.
+
+L. DATABASE AND DATA INTEGRITY
+
+- inspect the existing schema before changing it
+- use safe additive migrations
+- migrations must be idempotent where the current project pattern requires it
+- no destructive table recreation
+- no dropping user data
+- use foreign keys and indexes where appropriate
+- enforce valid status transitions
+- soft-delete public media/content when appropriate
+- preserve historical verification and moderation records
+- ensure new installations can build the complete schema from sql/schema.sql
+- ensure existing staging upgrades safely
+
+M. TESTING REQUIREMENTS
+
+Run and expand the full automated suite.
+
+Tests must include:
+
+- registration/authentication
+- permission matrix
+- Owner authorization
+- Professional lifecycle
+- Merchant lifecycle
+- Driver lifecycle
+- private-document security
+- public-media security
+- profile/listing visibility
+- request ownership and status transitions
+- reviews
+- reports
+- moderation
+- invalid uploads
+- EXIF removal
+- IDOR attempts
+- suspended/deactivated user visibility
+- marketplace regressions
+- frontend authenticated-media behavior
+- PWA manifest/service-worker safety where testable
+
+Add browser-level end-to-end smoke tests for the critical journeys:
+
+1. Customer registers/logs in.
+2. Customer applies for a capability.
+3. Owner approves the application.
+4. Provider completes and publishes their public profile.
+5. Customer finds the provider in the marketplace.
+6. Customer creates a request.
+7. Provider accepts and completes it.
+8. Customer leaves a review.
+9. Owner hides and restores public content.
+10. Draft, paused and hidden content never appears publicly.
+11. Private documents remain inaccessible publicly.
+12. Mobile layouts work without horizontal overflow.
+
+Use synthetic users and images only. Clean temporary staging data and objects after tests.
+
+N. DOCUMENTATION AND OPERATIONS
+
+Update or create concise documentation covering:
+
+- local development
+- required environment-variable names without values
+- staging deployment
+- production deployment checklist
+- database migrations
+- public-media bucket
+- private-document bucket
+- CORS requirements
+- health check
+- backup/restore expectations
+- Owner account setup
+- creating first test users
+- safe rollback procedure
+- known external requirements
+- features intentionally excluded from the MVP
+
+Do not put credentials in documentation.
+
+EXECUTION PROCESS
+
+Phase 1 — Audit
+
+- inspect repository, branch, schema, tests and live staging
+- identify completed, incomplete and broken flows
+- inspect existing specs/tasks/docs
+- create an internal gap list
+- do not stop after the audit
+
+Phase 2 — Implementation
+
+- complete all launch-critical MVP functionality
+- preserve working modules
+- make migrations safe
+- build tests alongside implementation
+- verify mobile UX continuously
+
+Phase 3 — Local verification
+
+- run the entire test suite
+- run security regressions
+- run lint/static checks available in the project
+- start the application locally
+- run browser smoke tests
+- fix all launch-blocking failures
+
+Phase 4 — Clean integration
+
+- inspect the complete git diff
+- remove debug logs, temporary files and test artifacts
+- confirm no secrets or generated uploads are tracked
+- consolidate work into clean logical commits
+- keep the current branch:
+  feature/professional-public-profile
+- do not push until the complete candidate passes local tests
+
+Phase 5 — Staging
+
+- push the completed branch once it is ready
+- allow Render staging to auto-deploy
+- wait for the staging health check
+- verify the deployed commit
+- run staging end-to-end smoke tests
+- verify R2 uploads and deletion
+- verify private buckets remain private
+- verify public media works
+- verify desktop and mobile flows
+- autonomously fix staging defects and redeploy until acceptance tests pass
+- clean synthetic staging data and media after testing
+
+STOP CONDITION
+
+Stop only when one of these is true:
+
+A. READY FOR OWNER REVIEW
+
+The complete HAPA MVP is working on staging, launch-critical flows pass, all tests pass, staging is clean, and production has not been touched.
+
+B. EXTERNAL BLOCKER
+
+A genuinely required external credential or irreversible business decision prevents completion. In that case, complete everything else first and return one concise blocker list.
+
+FINAL RESPONSE FORMAT
+
+Return one final report only after the work is complete:
+
+STATUS:
+- READY FOR OWNER REVIEW
+or
+- BLOCKED
+
+STAGING:
+- deployed commit SHA
+- staging URL
+- health result
+
+COMPLETED:
+- modules and flows completed
+
+TESTS:
+- total passed/failed
+- browser/E2E result
+- security regression result
+- mobile result
+
+DATABASE:
+- migrations added
+- migration result on staging
+
+STORAGE:
+- public-media result
+- private-document result
+- confirmation production storage was untouched
+
+GIT:
+- branch
+- clean commit SHAs
+- push result
+- confirmation main was not modified
+
+REMAINING:
+- only genuine non-launch-blocking items or external blockers
+
+PRODUCTION LAUNCH CHECKLIST:
+- exact manual steps required before production
+- environment-variable names only
+- required production bucket/configuration
+- migration command
+- deployment/rollback steps
+
+Do not merge or deploy production. Stop at a fully tested staging release ready for HAPA Owner approval.
+
+Begin now and continue autonomously until the STOP CONDITION is reached.
