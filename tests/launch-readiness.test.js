@@ -240,6 +240,25 @@ async function makeUser(ownerTok, label, capType, details) {
   ok('help: fallback when no support contact configured', html.includes('Direct support contact details are not configured yet.'));
   ok('theme-color matches header navy', html.includes('<meta name="theme-color" content="#101C2C">'));
 
+  // ══ 10. RESPONSIVE LAYOUT & MOBILE NAVIGATION (static) ══
+  ok('desktop container uses wider approved max-width', html.includes('.wrap{max-width:1360px'));
+  ok('header spans full width with centered content', html.includes('calc(50% - 50vw)') && html.includes('max(18px,calc(50vw - 662px))'));
+  ok('desktop nav hidden below 768px (no wrapped menu)', /@media\(max-width:767px\)\{\s*\.nav\{display:none\}/.test(html));
+  ok('mobile bottom navigation exists with 5 sections', html.includes('id="bottomNav"') && ['bnavHome', 'bnavMarket', 'bnavRequests', 'bnavAccount', 'bnavMore'].every(id => html.includes(`id="${id}"`)));
+  ok('mobile nav items have accessible labels', html.includes('aria-label="Main navigation"') && html.includes('aria-label="Marketplace"') && html.includes('aria-label="More options"'));
+  ok('mobile nav touch targets >= 44px', html.includes('.bottom-nav button{') && html.includes('min-height:52px'));
+  ok('mobile nav respects safe-area insets', html.includes('env(safe-area-inset-bottom') && html.includes('env(safe-area-inset-top'));
+  ok('owner dashboard reachable via More sheet on mobile', html.includes("item('owner','🛡️','Owner dashboard')") && html.includes('moreSheetToggle'));
+  ok('professional roles and help live under More', html.includes("item('upgrade','💼','Professional roles')") && html.includes("item('help','❓','Help & Support')"));
+  ok('logout separated in More sheet, not in bottom nav', html.includes('ms-logout') && !/id="bottomNav"[\s\S]*?<\/nav>/.exec(html)[0].toLowerCase().includes('logout'));
+  ok('marketplace tab strip scrolls without page overflow', /\.mp-subnav\{flex-wrap:nowrap;overflow-x:auto/.test(html) && html.includes('body{overflow-x:clip}'));
+  ok('marketplace tabs keep >=44px height on mobile', /\.mp-tab\{flex:0 0 auto;min-height:44px/.test(html));
+  ok('mobile search input goes full width at small widths', /\.mp-search-row input\{flex:1 1 100%\}/.test(html));
+  ok('mobile inputs use 16px font (no zoom-jump)', html.includes('.mp-sort-select{font-size:16px}'));
+  ok('confirmation modal fits mobile viewport', html.includes('.modal{max-width:calc(100vw - 32px)}'));
+  ok('empty states use wider constrained card', html.includes('.mp-empty{text-align:center;padding:44px 24px;max-width:560px'));
+  ok('bottom nav active state mirrors sections incl. More', html.includes("['upgrade','help','owner']") && html.includes("bnavMore"));
+
   // ══ CLEANUP — deactivate synthetic users ══
   for (const u of [cust, stranger, merch, merch2, drv]) {
     await j('POST', '/api/me/deactivate', u.tok, { password: PW });
