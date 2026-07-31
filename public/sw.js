@@ -1,7 +1,7 @@
 // HAPA service worker — app-shell caching only.
 // NEVER caches /api/ responses (JWT-authenticated data, signed URLs, private
 // documents, trip locations). Navigations fall back to /offline.html.
-const CACHE='hapa-v1.9.4';
+const CACHE='hapa-v1.9.5';
 const SHELL=['/','/manifest.webmanifest','/icon.svg','/offline.html'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)))});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));

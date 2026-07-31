@@ -139,7 +139,7 @@ async function makeDriver(ownerTok, label) {
   ok('transient rdRefresh errors keep polling', html.includes('else if(!rdState.poll)rdState.poll=setInterval(rdRefresh,4000)'));
   ok('driver Recent trips panel renders hub history', html.includes(`id="drvHistory"`) && html.includes(`$('drvHistory').innerHTML=(h.history||[])`));
   ok('driver history shows net + gross − fee breakdown', html.includes('fare ${esc(kesFmt(r.gross))}') && html.includes('fee ${esc(kesFmt(r.commission))}'));
-  ok('history lists rebuilt atomically (no append duplicates)', /\$\('rdHistory'\)\.innerHTML=term\.map/.test(html) && /\$\('drvHistory'\)\.innerHTML=\(h\.history/.test(html));
+  ok('history lists rebuilt atomically (no append duplicates)', /el\.innerHTML=term\.map/.test(html) && /\$\('drvHistory'\)\.innerHTML=\(h\.history/.test(html));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

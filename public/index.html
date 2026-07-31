@@ -655,7 +655,9 @@ h1,h2,h3,h4{color:var(--hapa-text)}
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="dvMake" placeholder="Make" style="width:90px"><input id="dvModel" placeholder="Model" style="width:90px"><input id="dvColour" placeholder="Colour" style="width:80px"><input id="dvReg" placeholder="Reg. e.g. KDA 123A" style="width:130px"><button class="btn" onclick="drvAddVehicle()">Add vehicle</button></div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">My documents</h3><div id="drvDocs" class="muted" style="font-size:13px"></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="ddType"></select><input id="ddRef" placeholder="Reference no." style="width:130px"><input id="ddExp" type="date"><button class="btn" onclick="drvAddDoc()">Submit</button></div></div>
- <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Earnings</h3><div id="drvEarnings" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Earnings</h3><div id="drvEarnings" class="muted" style="font-size:13px">—</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><label style="font-size:12px">From <input id="deFrom" type="date"></label><label style="font-size:12px">To <input id="deTo" type="date"></label><button class="btn" onclick="drvEarnRange()">Totals for range</button></div>
+  <div id="drvEarnRange" class="muted" style="font-size:13px;margin-top:8px"></div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent trips</h3><div id="drvHistory" class="muted" style="font-size:13px">—</div></div>
 </div>
 </section>
@@ -760,7 +762,31 @@ h1,h2,h3,h4{color:var(--hapa-text)}
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Launch gates</h3><div id="otGates" class="muted" style="font-size:13px">—</div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Pending vehicles &amp; documents</h3><div id="otApprovals" class="muted" style="font-size:13px">—</div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Incidents</h3><div id="otIncidents" class="muted" style="font-size:13px">—</div></div>
- <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent rides</h3><div id="otRides" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent rides</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+   <input id="ofRef" placeholder="Ride / receipt ref" style="width:130px"><input id="ofRider" placeholder="Rider name/email" style="width:130px"><input id="ofDriver" placeholder="Driver name/email" style="width:130px"><input id="ofReg" placeholder="Vehicle reg." style="width:100px">
+   <label style="font-size:12px">From <input id="ofFrom" type="date"></label><label style="font-size:12px">To <input id="ofTo" type="date"></label>
+   <select id="ofStatus"><option value="">Any status</option><option value="closed">Completed and closed</option><option value="completed">Completed</option><option value="in_progress">Trip in progress</option><option value="rider_cancelled">Rider cancelled</option><option value="driver_cancelled">Driver cancelled</option><option value="no_driver_available">No driver available</option><option value="payment_pending">Payment pending</option><option value="payment_failed">Payment failed</option><option value="searching">Searching</option></select>
+   <select id="ofPay"><option value="">Any payment</option><option value="cash">Cash</option><option value="mpesa">M-Pesa</option></select>
+   <select id="ofPayStatus"><option value="">Any payment status</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="failed">Failed</option></select>
+   <select id="ofPayout"><option value="">Any payout</option><option value="unsettled">Unsettled</option><option value="processing">Processing</option><option value="paid">Paid out</option></select>
+   <input id="ofZone" placeholder="Zone" style="width:100px"><input id="ofCounty" placeholder="County" style="width:100px">
+   <button class="btn primary" onclick="otSearch(1)">Search</button>
+   <button class="btn" onclick="otExportCsv()">Export CSV</button>
+  </div>
+  <div id="otRides" class="muted" style="font-size:13px">—</div>
+  <div id="otRidesPage" class="muted" style="font-size:13px;margin-top:8px"></div>
+ </div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Driver earnings report</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+   <label style="font-size:12px">From <input id="deRFrom" type="date"></label><label style="font-size:12px">To <input id="deRTo" type="date"></label>
+   <input id="deRDriver" placeholder="Driver name/email" style="width:140px"><input id="deRZone" placeholder="Zone" style="width:100px"><input id="deRCounty" placeholder="County" style="width:100px">
+   <select id="deRPay"><option value="">Any payment</option><option value="cash">Cash</option><option value="mpesa">M-Pesa</option></select>
+   <select id="deRPayout"><option value="">Any payout</option><option value="unsettled">Unsettled</option><option value="processing">Processing</option><option value="paid">Paid out</option></select>
+   <button class="btn primary" onclick="otEarnings()">Load report</button>
+  </div>
+  <div id="otEarningsRep" class="muted" style="font-size:13px;overflow-x:auto">—</div>
+ </div>
 </div>
 
 <div id="ownerAreasPanel" class="hidden" style="margin-top:14px">
@@ -3490,11 +3516,14 @@ function rcptOpen(rideId,rec,btn){
  ov.className='modal-backdrop';ov.id='rcptOverlay';
  ov.innerHTML=`<div class="modal" id="rcptDialog" role="dialog" aria-modal="true" aria-labelledby="rcptTitle" style="max-width:480px;padding:0;overflow:hidden">
   <div style="background:var(--hapa-header);color:#fff;padding:18px 22px;border-bottom:4px solid var(--hapa-primary)">
-   <div class="row" style="align-items:flex-start">
-    <span><span style="font-weight:800;font-size:22px;letter-spacing:1px">HAPA</span><br><span id="rcptTitle" style="font-size:13px;opacity:.85">Official ride receipt</span></span>
+   <!-- Plain flex rows only: the global .row class paints a white surface
+        card, which turned these header lines into blank white blocks. -->
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+    <span><span style="font-weight:800;font-size:22px;letter-spacing:1px">HAPA</span><br><span id="rcptTitle" style="font-size:13px;opacity:.85">Ride receipt</span></span>
     <button class="btn" id="rcptX" aria-label="Close receipt" style="min-width:44px;min-height:44px;background:transparent;color:#fff;border-color:rgba(255,255,255,.35)">✕</button>
    </div>
-   <div class="row" style="margin-top:8px"><b style="font-size:13px">${esc(rec.reference)}</b><small style="opacity:.85">${esc(nrbDate(b.datetime||rec.created_at))}</small></div>
+   <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:8px;font-size:13px"><b>${esc(rec.reference)}</b><span style="opacity:.85">${esc(nrbDate(b.datetime||rec.created_at))}</span></div>
+   <div style="margin-top:4px;font-size:12px;opacity:.9">${esc(pm)} · Paid</div>
   </div>
   <div style="padding:18px 22px;max-height:60vh;overflow:auto">
    <div class="row"><span style="background:var(--ok);color:#fff;font-weight:800;border-radius:6px;padding:4px 12px;font-size:13px">✓ PAID</span><small class="muted">${esc(pm)}${b.payment_ref?' · Ref '+esc(b.payment_ref):''}</small></div>
@@ -3629,10 +3658,34 @@ async function chatSend(areaId,rideId){
 async function rdLoadContacts(){try{const c=await api('/api/me/trusted-contacts');$('rdContacts').innerHTML=c.length?c.map(x=>`${esc(x.name)} (${esc(x.phone)}) <button class="btn" style="padding:2px 8px;font-size:11px" onclick="rdDelContact('${x.id}')">remove</button>`).join('<br>'):'Add a trusted contact — they can follow your trips when you share.';}catch(e){}}
 async function rdAddContact(){try{await api('/api/me/trusted-contacts',{method:'POST',body:JSON.stringify({name:$('rdTcName').value.trim(),phone:$('rdTcPhone').value.trim()})});$('rdTcName').value='';$('rdTcPhone').value='';rdLoadContacts();}catch(e){alert(e.message);}}
 async function rdDelContact(id){try{await api('/api/me/trusted-contacts/'+id,{method:'DELETE'});rdLoadContacts();}catch(e){}}
-async function rdLoadHistory(){try{const rows=await api('/api/rides/mine');const open=rows.find(r=>RD_OPEN.includes(r.status));if(open&&!rdState.rideId){rdState.rideId=open.id;localStorage.setItem('hapa_ride',open.id);rdRefresh();}
- const term=rows.filter(r=>!RD_OPEN.includes(r.status))
+let rdHistLoaded=false; // true once an authenticated request returned OK
+async function rdLoadHistory(){
+ const el=$('rdHistory');if(!el)return;
+ if(!rdHistLoaded)el.innerHTML='Loading your trips…';
+ let rows;
+ try{rows=await api('/api/rides/mine');}
+ catch(e){
+  // Never blank an already-rendered history on a transient failure, and never
+  // show the empty-state copy unless the server successfully said so.
+  if(!rdHistLoaded)el.innerHTML=`Could not load your trips right now. <button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px;margin-left:6px" onclick="rdLoadHistory()">Retry</button>`;
+  return;
+ }
+ rdHistLoaded=true;
+ const open=rows.find(r=>RD_OPEN.includes(r.status));if(open&&!rdState.rideId){rdState.rideId=open.id;localStorage.setItem('hapa_ride',open.id);rdRefresh();}
+ const seen=new Set();
+ const term=rows.filter(r=>!RD_OPEN.includes(r.status)&&!seen.has(r.id)&&seen.add(r.id))
   .sort((a,b)=>new Date(b.completed_at||b.created_at)-new Date(a.completed_at||a.created_at)).slice(0,5);
- $('rdHistory').innerHTML=term.map(r=>`<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(nrbDate(r.completed_at||r.created_at,true))} · ${esc(rdStatusCopy[r.status]||r.status)}</small></span><span style="text-align:right"><b>${r.final_fare!=null?esc(kesFmt(r.final_fare)):''}</b>${r.status==='closed'?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`).join('')||'No rides yet.';}catch(e){}}
+ el.innerHTML=term.map(r=>{
+  const pm=r.payment_method==='mpesa'?'M-Pesa':'Cash';
+  const ps=r.payment_status==='paid'?'Paid':r.payment_status==='pending'?'Payment pending':r.payment_status==='failed'?'Payment failed':'';
+  const veh=r.vehicle?`${r.vehicle.make} ${r.vehicle.model} · ${r.vehicle.colour} · ${r.vehicle.registration_number}`:'';
+  const meta=[nrbDate(r.completed_at||r.created_at),rdStatusCopy[r.status]||r.status].filter(Boolean).join(' · ');
+  const who=r.driver?esc(r.driver.display_name)+(veh?' · '+esc(veh):''):'';
+  const pay=ps?esc(pm)+' · '+esc(ps):'';
+  const rated=r.status==='closed'?(r.i_rated?'Rated ✓':'Not rated yet'):'';
+  return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(meta)}${who?'<br>'+who:''}${pay?'<br>'+pay+(rated?' · '+esc(rated):''):''}</small></span><span style="text-align:right"><b>${r.final_fare!=null?esc(kesFmt(r.final_fare)):''}</b>${r.status==='closed'?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
+ }).join('')||'No rides yet.';
+}
 
 // ── Driver mode ──
 async function drvLoad(){
@@ -3688,7 +3741,12 @@ async function drvLoad(){
   // Driver trip history — persisted server-side, survives relogin/restart.
   $('drvHistory').innerHTML=(h.history||[]).slice(0,5).map(r=>{
    const paid=r.status==='closed', hasEarn=r.net!=null;
-   return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(nrbDate(r.completed_at||r.created_at,true))} · ${esc(rdStatusCopy[r.status]||r.status)}${paid?` · ${esc((r.payment_method||'cash').toUpperCase())} paid`:''}${r.receipt_reference?`<br>Ref: ${esc(r.receipt_reference)}`:''}</small></span><span style="text-align:right">${hasEarn?`<b>${esc(kesFmt(r.net))}</b><br><small class="muted">fare ${esc(kesFmt(r.gross))} − fee ${esc(kesFmt(r.commission))}</small>`:r.final_fare!=null?`<b>${esc(kesFmt(r.final_fare))}</b>`:''}${paid?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
+   const ps=r.payment_status==='paid'?'Paid':r.payment_status==='pending'?'Payment pending':r.payment_status==='failed'?'Payment failed':'';
+   const pm=(r.payment_method||'cash')==='mpesa'?'M-Pesa':'Cash';
+   const bits=[nrbDate(r.completed_at||r.created_at),opsStatusCopy[r.status]||r.status,ps?pm+' · '+ps:''].filter(Boolean).join(' · ');
+   const who=[r.rider_name?'Rider: '+r.rider_name:'',r.vehicle_label||''].filter(Boolean).join(' · ');
+   const payout=r.payout_status?` · payout ${r.payout_status}`:'';
+   return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(bits)}${who?'<br>'+esc(who):''}${r.receipt_reference?`<br>Ref: ${esc(r.receipt_reference)}${esc(payout)}`:''}</small></span><span style="text-align:right">${hasEarn?`<b>${esc(kesFmt(r.net))}</b><br><small class="muted">fare ${esc(kesFmt(r.gross))} − fee ${esc(kesFmt(r.commission))}</small>`:r.final_fare!=null?`<b>${esc(kesFmt(r.final_fare))}</b>`:''}${paid?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
   }).join('')||'No trips yet.';
   // Location heartbeat while online or on a ride
   if((s||h.ride)&&!drvState.locTimer)drvState.locTimer=setInterval(drvSendLoc,8000);
@@ -3738,9 +3796,122 @@ async function loadOwnerTransport(){
   $('otGates').innerHTML=g.gates.map(x=>`<div class="row" style="padding:4px 0"><span>${esc(x.gate)}${x.required?'':' <small class="muted">(optional)</small>'}<br><small class="muted">${esc(x.detail)}</small></span><b style="color:${x.pass?'var(--ok)':x.required?'var(--bad)':'var(--muted)'}">${esc(x.status||(x.pass?'READY':'BLOCKED'))}</b></div>`).join('')+`<p style="margin:8px 0 0"><b>Controlled cash pilot: ${g.production_ready?'<span style="color:var(--ok)">mandatory gates clear</span>':'<span style="color:var(--bad)">blocked by mandatory gates</span>'}</b> <small class="muted">Optional integrations never block the cash pilot.</small></p>`;
   $('otApprovals').innerHTML=(t.pending_vehicles.map(v=>`<div class="row" style="padding:4px 0"><span>🚗 ${esc(v.driver_name)} · ${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</span><span><button class="btn" onclick="otVeh('${v.id}','approved')">Approve</button> <button class="btn" onclick="otVeh('${v.id}','rejected')">Reject</button></span></div>`).join('')+
    t.pending_documents.map(d=>`<div class="row" style="padding:4px 0"><span>📄 ${esc(d.driver_name)} · ${esc(d.doc_type.replace(/_/g,' '))}${d.expires_on?` · exp ${String(d.expires_on).slice(0,10)}`:''}</span><span><button class="btn" onclick="otDoc('${d.id}','approved')">Approve</button> <button class="btn" onclick="otDoc('${d.id}','rejected')">Reject</button></span></div>`).join(''))||'Nothing pending.';
-  $('otIncidents').innerHTML=t.incidents.map(i=>`<div class="row" style="padding:4px 0"><span><b>${esc(i.kind)}</b> · ${esc(i.reporter_name)} · ${esc(i.description||'')}<br><small class="muted">${new Date(i.created_at).toLocaleString()} · ${esc(i.status)}</small></span>${i.status!=='resolved'?`<button class="btn" onclick="otIncident('${i.id}')">Resolve</button>`:''}</div>`).join('')||'No incidents.';
-  $('otRides').innerHTML=t.rides.map(r=>`<div class="row" style="padding:4px 0"><span>${esc(r.rider_name)}${r.driver_name?' → '+esc(r.driver_name):''} · ${esc(r.pickup_address||'')}<br><small class="muted">${new Date(r.created_at).toLocaleString()} · ${esc(r.status)}${r.final_fare?' · KES '+Number(r.final_fare).toLocaleString():''}</small></span></div>`).join('')||'No rides yet.';
+  $('otIncidents').innerHTML=t.incidents.map(i=>`<div class="row" style="padding:4px 0"><span><b>${esc(i.kind)}</b> · ${esc(i.reporter_name)} · ${esc(i.description||'')}<br><small class="muted">${esc(nrbDate(i.created_at))} · ${esc(i.status)}</small></span>${i.status!=='resolved'?`<button class="btn" onclick="otIncident('${i.id}')">Resolve</button>`:''}</div>`).join('')||'No incidents.';
+  otSearch(1);
  }catch(e){$('otStats').innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+// Owner-facing status labels — canonical machine statuses stay in the DB.
+const opsStatusCopy={searching:'Searching for driver',offered:'Offer with driver',driver_assigned:'Driver assigned',driver_en_route:'Driver on the way',driver_arrived:'Driver arrived',pin_verified:'PIN verified',in_progress:'Trip in progress',completed:'Completed',payment_pending:'Payment pending',payment_failed:'Payment failed',closed:'Completed and closed',rider_cancelled:'Rider cancelled',driver_cancelled:'Driver cancelled',declined:'Declined',no_driver_available:'No driver available'};
+const opsEventCopy={quote_created:'Quote created',ride_requested:'Ride requested',requested:'Ride requested',search_started:'Search started',offer_created:'Offer sent to driver',offer_accepted:'Offer accepted',offer_expired:'Offer expired',offer_declined:'Offer declined',driver_assigned:'Driver assigned',en_route:'Driver on the way',driver_en_route:'Driver on the way',arrived:'Driver arrived',driver_arrived:'Driver arrived',pin_verified:'PIN verified',started:'Trip started',trip_started:'Trip started',completed:'Trip completed',cash_collected:'Cash payment confirmed',payment_confirmed:'Payment confirmed',payment_failed:'Payment failed',receipt_created:'Receipt created',closed:'Ride closed',rider_cancelled:'Cancelled by rider',driver_cancelled:'Cancelled by driver',support_cancelled:'Cancelled by HAPA support',incident_reported:'Safety incident reported',unpaid_reported:'Unpaid trip reported'};
+const opsPayStatus=s=>s==='paid'?'Paid':s==='pending'?'Payment pending':s==='failed'?'Payment failed':'—';
+let otFilterState={page:1};
+function otFilters(){
+ return{ref:$('ofRef').value.trim(),rider:$('ofRider').value.trim(),driver:$('ofDriver').value.trim(),reg:$('ofReg').value.trim(),
+  from:$('ofFrom').value,to:$('ofTo').value,status:$('ofStatus').value,payment_method:$('ofPay').value,
+  payment_status:$('ofPayStatus').value,payout_status:$('ofPayout').value,zone:$('ofZone').value.trim(),county:$('ofCounty').value.trim()};
+}
+function otQuery(extra){
+ const f={...otFilters(),...extra};
+ return Object.entries(f).filter(([,v])=>v).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+}
+async function otSearch(page){
+ otFilterState.page=page||1;
+ try{
+  const d=await api('/api/owner/rides?'+otQuery({page:otFilterState.page}));
+  $('otRides').innerHTML=d.rides.map(r=>`<div class="row" style="padding:6px 0;gap:8px;cursor:pointer" onclick="otOpenRide('${esc(r.id)}')" title="Open ride details">
+   <span>${esc(r.rider_name)}${r.driver_name?' → '+esc(r.driver_name):''} · ${esc(r.pickup_address||'')} → ${esc(r.dest_address||'')}<br>
+   <small class="muted">${esc(nrbDate(r.completed_at||r.created_at))} · ${esc(opsStatusCopy[r.status]||r.status)} · ${esc(opsPayStatus(r.payment_status))}${r.receipt_reference?' · '+esc(r.receipt_reference):''}</small></span>
+   <span style="text-align:right">${r.final_fare!=null?`<b>${esc(kesFmt(r.final_fare))}</b>`:''}${r.commission!=null?`<br><small class="muted">fee ${esc(kesFmt(r.commission))}</small>`:''}</span></div>`).join('')||'No rides match these filters.';
+  const pages=Math.max(1,Math.ceil(d.total/d.per));
+  $('otRidesPage').innerHTML=`${d.total} ride${d.total===1?'':'s'} · page ${d.page} of ${pages} ${d.page>1?`<button class="btn" onclick="otSearch(${d.page-1})">‹ Prev</button>`:''} ${d.page<pages?`<button class="btn" onclick="otSearch(${d.page+1})">Next ›</button>`:''}`;
+ }catch(e){$('otRides').innerHTML=`<span>${esc(e.message)}</span> <button class="btn" onclick="otSearch(${otFilterState.page})">Retry</button>`;}
+}
+async function otExportCsv(){
+ try{
+  const r=await fetch('/api/owner/rides-export.csv?'+otQuery({}),{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error('Export failed');
+  const blob=await r.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download='hapa-ride-accounting.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+ }catch(e){alert(e.message);}
+}
+async function otEarnings(){
+ const f={from:$('deRFrom').value,to:$('deRTo').value,driver:$('deRDriver').value.trim(),zone:$('deRZone').value.trim(),county:$('deRCounty').value.trim(),payment_method:$('deRPay').value,payout_status:$('deRPayout').value};
+ const qs=Object.entries(f).filter(([,v])=>v).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+ $('otEarningsRep').textContent='Loading report…';
+ try{
+  const d=await api('/api/owner/driver-earnings'+(qs?'?'+qs:''));
+  const hm=s=>s==null?'Not recorded':`${Math.floor(s/3600)}h ${Math.round((s%3600)/60)}m`;
+  const th='padding:6px 8px;text-align:left;border-bottom:1px solid var(--hapa-border);white-space:nowrap';
+  const td='padding:6px 8px;border-bottom:1px solid var(--hapa-border);white-space:nowrap';
+  $('otEarningsRep').innerHTML=`<table style="border-collapse:collapse;font-size:12px;min-width:100%">
+   <tr>${['Driver','Status','Zone','Vehicle','Trips','Gross','Commission','Net','Cash','M-Pesa','Unpaid','Unsettled','Settled','Online','Driving','Cancels','Rating'].map(h=>`<th style="${th}">${h}</th>`).join('')}</tr>
+   ${d.drivers.map(r=>`<tr><td style="${td}">${esc(r.driver_name)}</td><td style="${td}">${esc(r.account_status||'')}</td><td style="${td}">${esc(r.zone_name||'—')}</td><td style="${td}">${esc(r.vehicle_label||'—')}</td><td style="${td}">${esc(String(r.completed_rides))}</td><td style="${td}">${esc(kesFmt(r.gross))}</td><td style="${td}">${esc(kesFmt(r.commission))}</td><td style="${td}">${esc(kesFmt(r.net))}</td><td style="${td}">${esc(kesFmt(r.cash_collected))}</td><td style="${td}">${esc(kesFmt(r.mpesa_collected))}</td><td style="${td}">${esc(String(r.unpaid_rides))}</td><td style="${td}">${esc(kesFmt(r.unsettled))}</td><td style="${td}">${esc(kesFmt(r.settled))}</td><td style="${td}">${esc(hm(Number(r.online_seconds)))}</td><td style="${td}">${esc(hm(Number(r.driving_seconds)))}</td><td style="${td}">${esc(String(r.cancellations))}</td><td style="${td}">${r.rating!=null?esc(String(r.rating))+' ★':'—'}</td></tr>`).join('')}
+   <tr><td style="${td}"><b>Totals</b></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"><b>${esc(String(d.totals.completed_rides))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.gross))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.commission))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.net))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.cash_collected))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.mpesa_collected))}</b></td><td style="${td}"></td><td style="${td}"><b>${esc(kesFmt(d.totals.unsettled))}</b></td><td style="${td}" colspan="5"></td></tr>
+  </table><small class="muted">All dates use Africa/Nairobi. Figures come from persisted rides, payments and ledgers.</small>`;
+ }catch(e){$('otEarningsRep').textContent=e.message;}
+}
+async function otOpenRide(id){
+ let d;
+ try{d=await api('/api/owner/rides/'+id);}catch(e){alert(e.message);return;}
+ const r=d.ride,led=d.ledger,qte=d.quote;
+ const line=(k,v)=>v!=null&&v!==''?`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><span style="text-align:right;max-width:65%">${v}</span></div>`:'';
+ const sec=(t,body)=>body?`<div style="border-top:1px solid var(--hapa-border);margin-top:10px;padding-top:8px"><b style="font-size:13px">${esc(t)}</b>${body}</div>`:'';
+ const comp=r.final_components||qte?.components||{};
+ const fin=[['Quoted fare',qte?kesFmt(qte.total):null],['Final gross fare',r.final_fare!=null?kesFmt(r.final_fare):null],
+  ['Base fare',comp.base_fare!=null?kesFmt(comp.base_fare):null],['Booking fee',comp.booking_fee!=null?kesFmt(comp.booking_fee):null],
+  ['Distance charge',comp.distance_charge!=null?kesFmt(comp.distance_charge):null],['Time charge',comp.time_charge!=null?kesFmt(comp.time_charge):null],
+  ['Waiting charge',Number(comp.waiting_charge)>0?kesFmt(comp.waiting_charge):null],
+  ['Payment method',r.payment_method==='mpesa'?'M-Pesa':'Cash'],['Payment status',opsPayStatus(r.payment_status)],
+  ['HAPA commission',led?kesFmt(led.commission):null],['Driver net earnings',led?kesFmt(led.net):null],['Payout status',led?led.payout_status:null],
+  ['Receipt reference',d.receipt?d.receipt.reference:null]].map(([k,v])=>line(k,v&&esc(v))).join('');
+ const tl=d.events.map(e=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span>${esc(opsEventCopy[e.event_type]||e.event_type.replace(/_/g,' '))}${e.actor_name?` <small class="muted">· ${esc(e.actor_name)}</small>`:''}</span><small class="muted">${esc(nrbDate(e.created_at))}</small></div>`).join('');
+ const rt=d.ratings.map(x=>line(x.role==='rider'?'Rider → Driver':'Driver → Rider',esc(x.rating+' ★'+(x.comment?' · '+x.comment:''))))
+  .join('')||'<small class="muted">No ratings yet.</small>';
+ const ov=document.createElement('div');ov.className='modal-backdrop';ov.id='otRideOverlay';
+ ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true" style="max-width:560px;max-height:85vh;overflow:auto">
+  <div class="row" style="background:transparent;border:0;padding:0"><h3 style="margin:0">Ride details</h3><button class="btn" onclick="otCloseRide()" aria-label="Close" style="min-width:44px;min-height:44px">✕</button></div>
+  ${line('Reference',esc(d.receipt?d.receipt.reference:r.id.slice(0,8).toUpperCase()))}
+  ${line('Status',esc(opsStatusCopy[r.status]||r.status))}
+  ${line('Zone',esc(d.zone?d.zone.name:''))}
+  ${line('Vehicle category',esc(r.vehicle_category))}
+  ${sec('Rider',line('Name',esc(d.rider?.name||''))+line('Account ref',esc((d.rider?.id||'').slice(0,8)))+line('Rating',d.rider?.rating!=null?esc(d.rider.rating+' ★'):'—'))}
+  ${r.driver?sec('Driver',line('Name',esc(r.driver.display_name))+line('Rating',r.driver.rating!=null?esc(r.driver.rating+' ★'):'—')+line('Completed trips',esc(String(r.driver.trips))))+
+   (r.vehicle?sec('Vehicle',line('Vehicle',esc(`${r.vehicle.make} ${r.vehicle.model} · ${r.vehicle.colour}`))+line('Registration',esc(r.vehicle.registration_number))):''):''}
+  ${sec('Route',line('Pickup',esc(r.pickup_address||''))+line('Destination',esc(r.dest_address||''))+line('Note / landmark',esc([r.pickup_note,r.landmark].filter(Boolean).join(' · ')))+
+   line('Estimated',qte?esc((qte.distance_m/1000).toFixed(1)+' km · '+Math.round(qte.duration_s/60)+' min'):null)+
+   line('Actual duration',d.actual_duration_s!=null?esc(Math.round(d.actual_duration_s/60)+' min'):'Not recorded'))}
+  ${sec('Timeline',tl||'<small class="muted">No events recorded.</small>')}
+  ${sec('Financials',fin)}
+  ${sec('Ratings & safety',rt+(d.incidents.length?d.incidents.map(i=>line('Incident',esc(i.kind+' · '+i.status))).join(''):'')+(r.cancel_reason?line('Cancellation reason',esc(r.cancel_reason)):''))}
+  <div class="modal-actions" style="margin-top:12px">
+   ${d.receipt?`<button class="btn" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}
+   <button class="btn" onclick="otLocations('${esc(r.id)}')">Exact locations (audited)</button>
+   <button class="btn primary" onclick="otCloseRide()">Close</button>
+  </div>
+  <div id="otLocOut" class="muted" style="font-size:12px;margin-top:8px"></div>
+ </div>`;
+ document.body.appendChild(ov);document.body.style.overflow='hidden';
+ ov.addEventListener('click',e=>{if(e.target===ov)otCloseRide();});
+}
+function otCloseRide(){const ov=$('otRideOverlay');if(ov)ov.remove();document.body.style.overflow='';}
+async function otLocations(id){
+ const reason=prompt('Support reason for viewing exact locations (audited):');
+ if(!reason)return;
+ try{
+  const d=await api('/api/owner/rides/'+id+'/locations',{method:'POST',body:JSON.stringify({reason})});
+  const el=$('otLocOut');
+  if(el)el.textContent=`Pickup ${d.pickup.lat.toFixed(5)},${d.pickup.lng.toFixed(5)} → Destination ${d.destination.lat.toFixed(5)},${d.destination.lng.toFixed(5)} · ${d.samples.length} trip samples. This access has been logged.`;
+ }catch(e){alert(e.message);}
+}
+async function drvEarnRange(){
+ const f=$('deFrom').value,t=$('deTo').value;
+ $('drvEarnRange').textContent='Loading…';
+ try{
+  const d=await api('/api/driver/earnings'+((f||t)?'?'+[f?'from='+f:'',t?'to='+t:''].filter(Boolean).join('&'):''));
+  const hm=s=>s==null?'Not recorded':`${Math.floor(s/3600)}h ${Math.round((s%3600)/60)}m`;
+  $('drvEarnRange').innerHTML=[['Completed rides',d.completed_rides],['Gross fares',kesFmt(d.gross)],['HAPA commission',kesFmt(d.commission)],['Your net earnings',kesFmt(d.net)],['Cash collected',kesFmt(d.cash_collected)],['M-Pesa collected',kesFmt(d.mpesa_collected)],['Unsettled payout',kesFmt(d.unsettled)],['Settled payout',kesFmt(d.settled)],['Online time',hm(Number(d.online_seconds))],['Active driving time',hm(Number(d.driving_seconds))]]
+   .map(([k,v])=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><b>${esc(String(v))}</b></div>`).join('')+'<small class="muted">Dates use Africa/Nairobi.</small>';
+ }catch(e){$('drvEarnRange').textContent=e.message;}
 }
 async function otVeh(id,st){try{await api('/api/owner/vehicles/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}
 async function otDoc(id,st){try{await api('/api/owner/driver-documents/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}

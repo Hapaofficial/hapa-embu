@@ -43,6 +43,10 @@ app.use((req,res,next)=>{
  next();
 });
 app.use(express.static(path.join(__dirname,'public')));
+// Authenticated/dynamic API responses must never be cached by browsers,
+// proxies or the service worker (ride history, receipts, tokens, payments).
+// Individual public endpoints may still opt into caching afterwards.
+app.use('/api',(req,res,next)=>{res.set('Cache-Control','private, no-store');next();});
 // Externally accessible account-deletion instructions (store-listing requirement)
 app.get('/delete-account',(req,res)=>res.sendFile(path.join(__dirname,'public','delete-account.html')));
 

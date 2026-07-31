@@ -289,12 +289,16 @@ module.exports=function(app,deps){
    const earnings=(await q(`SELECT COALESCE(SUM(net),0) AS total,COALESCE(SUM(net) FILTER(WHERE created_at::date=CURRENT_DATE),0) AS today,count(*)::int AS trips FROM driver_earnings_ledger WHERE driver_user_id=$1`,[req.user.id])).rows[0];
    const docs=(await q(`SELECT doc_type,status,expires_on FROM driver_document_status WHERE driver_user_id=$1 ORDER BY doc_type`,[req.user.id])).rows;
    const history=(await q(`SELECT r.id,r.status,r.pickup_address,r.dest_address,r.final_fare,r.payment_method,r.completed_at,r.created_at,
-     l.gross,l.commission,l.net,l.payout_status,rc.reference AS receipt_reference
+     l.gross,l.commission,l.net,l.payout_status,rc.reference AS receipt_reference,
+     u.name AS rider_name,v.make||' '||v.model||' · '||v.registration_number AS vehicle_label
     FROM ride_requests r
     LEFT JOIN driver_earnings_ledger l ON l.ride_id=r.id
     LEFT JOIN ride_receipts rc ON rc.ride_id=r.id
+    LEFT JOIN users u ON u.id=r.rider_id
+    LEFT JOIN driver_vehicles v ON v.id=r.vehicle_id
     WHERE r.driver_user_id=$1 AND r.status IN('completed','closed','rider_cancelled','driver_cancelled')
     ORDER BY COALESCE(r.completed_at,r.created_at) DESC LIMIT 20`,[req.user.id])).rows;
+   for(const hr of history)hr.payment_status=paymentStatusOf(hr.status);
    const onlineMin=session?Math.round((Date.now()-new Date(session.started_at))/60000):0;
    res.json({session,offer,ride:ride?await rideView(ride,'driver'):null,earnings,documents:docs,history,
     hours:{online_min:onlineMin,warn_after_min:Number(await cfg('hours_warn_minutes')),max_continuous_min:Number(await cfg('max_continuous_minutes'))},
@@ -575,9 +579,23 @@ module.exports=function(app,deps){
   if(!isRider&&!isDriver&&!(allowOwner&&isOwner)){res.status(403).json({error:'Not authorized for this ride'});return null;}
   return{r,isRider,isDriver,isOwner};
  }
+ // Customer-facing payment status derived from canonical machine status.
+ function paymentStatusOf(st){
+  if(st==='closed')return 'paid';
+  if(st==='payment_failed')return 'failed';
+  if(st==='completed'||st==='payment_pending')return 'pending';
+  return null;
+ }
  app.get('/api/rides/mine',auth,active,async(req,res)=>{
-  const rows=(await q(`SELECT * FROM ride_requests WHERE rider_id=$1 ORDER BY created_at DESC LIMIT 20`,[req.user.id])).rows;
-  res.json(await Promise.all(rows.map(r=>rideView(r,'rider'))));
+  const rows=(await q(`SELECT r.*,(rr.id IS NOT NULL) AS i_rated FROM ride_requests r
+   LEFT JOIN ride_ratings rr ON rr.ride_id=r.id AND rr.rater_id=$1
+   WHERE r.rider_id=$1 ORDER BY r.created_at DESC LIMIT 20`,[req.user.id])).rows;
+  res.json(await Promise.all(rows.map(async r=>{
+   const v=await rideView(r,'rider');
+   v.i_rated=r.i_rated===true;
+   v.payment_status=paymentStatusOf(r.status);
+   return v;
+  })));
  });
  app.get('/api/rides/:id',auth,active,async(req,res)=>{
   try{
@@ -993,20 +1011,199 @@ module.exports=function(app,deps){
    res.json({stats,rides,incidents,payments,commission_total:ledger.commission_total,pending_vehicles:pendingVehicles,pending_documents:pendingDocs,mpesa:mpesa.status()});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
+ // Strip exact coordinates from any value destined for the default Owner
+ // operations view. Exact-location access is a separate audited action.
+ function scrubCoords(o){
+  if(!o||typeof o!=='object')return o;
+  for(const k of Object.keys(o)){
+   if(/(^|_)(lat|lng|latitude|longitude)$/i.test(k))delete o[k];
+   else if(o[k]&&typeof o[k]==='object')scrubCoords(o[k]);
+  }
+  return o;
+ }
+ // Nairobi formatting for operational reports/exports (DB keeps UTC).
+ const NRB_D=new Intl.DateTimeFormat('en-KE',{timeZone:'Africa/Nairobi',year:'numeric',month:'2-digit',day:'2-digit'});
+ const NRB_T=new Intl.DateTimeFormat('en-KE',{timeZone:'Africa/Nairobi',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+ const nrbD=d=>d?NRB_D.format(new Date(d)).split('/').reverse().join('-'):'';
+ const nrbT=d=>d?NRB_T.format(new Date(d)):'';
+
+ // Shared, fully parameterized Owner ride filter (search + CSV export).
+ const OWNER_RIDE_STATUSES=['searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','completed','rider_cancelled','driver_cancelled','declined','no_driver_available','payment_pending','payment_failed','closed'];
+ function ownerRideFilter(qs){
+  const where=[],vals=[];
+  const add=(sql,v)=>{vals.push(v);where.push(sql.replace(/\$X/g,'$'+vals.length));};
+  if(qs.ref)add(`(rc.reference ILIKE $X OR r.id::text ILIKE $X)`, String(qs.ref).slice(0,40)+'%');
+  if(qs.rider)add(`(ru.name ILIKE $X OR ru.email ILIKE $X)`,'%'+String(qs.rider).slice(0,80)+'%');
+  if(qs.driver)add(`(du.name ILIKE $X OR du.email ILIKE $X)`,'%'+String(qs.driver).slice(0,80)+'%');
+  if(qs.reg)add(`v.registration_number ILIKE $X`,'%'+String(qs.reg).slice(0,20)+'%');
+  if(qs.from&&/^\d{4}-\d{2}-\d{2}$/.test(qs.from))add(`(COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date>=$X::date`,qs.from);
+  if(qs.to&&/^\d{4}-\d{2}-\d{2}$/.test(qs.to))add(`(COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date<=$X::date`,qs.to);
+  if(qs.zone)add(`(g.slug=$X OR g.name ILIKE $X)`,String(qs.zone).slice(0,80));
+  if(qs.county)add(`EXISTS(WITH RECURSIVE anc(id,parent_id,name,level) AS(
+    SELECT id,parent_id,name,level FROM geo_areas WHERE id=r.zone_id
+    UNION ALL SELECT p.id,p.parent_id,p.name,p.level FROM geo_areas p JOIN anc ON anc.parent_id=p.id)
+   SELECT 1 FROM anc WHERE level='county' AND name ILIKE $X)`,'%'+String(qs.county).slice(0,60)+'%');
+  if(qs.status&&OWNER_RIDE_STATUSES.includes(qs.status))add(`r.status=$X`,qs.status);
+  if(qs.payment_method&&['cash','mpesa'].includes(qs.payment_method))add(`r.payment_method=$X`,qs.payment_method);
+  if(qs.payment_status==='paid')where.push(`r.status='closed'`);
+  else if(qs.payment_status==='pending')where.push(`r.status IN('completed','payment_pending')`);
+  else if(qs.payment_status==='failed')where.push(`r.status='payment_failed'`);
+  if(qs.payout_status&&['unsettled','processing','paid'].includes(qs.payout_status))add(`l.payout_status=$X`,qs.payout_status);
+  if(qs.vehicle_category)add(`r.vehicle_category=$X`,String(qs.vehicle_category).slice(0,40));
+  return{where:where.length?'WHERE '+where.join(' AND '):'',vals};
+ }
+ const OWNER_RIDE_FROM=`FROM ride_requests r
+   JOIN geo_areas g ON g.id=r.zone_id
+   JOIN users ru ON ru.id=r.rider_id
+   LEFT JOIN users du ON du.id=r.driver_user_id
+   LEFT JOIN driver_vehicles v ON v.id=r.vehicle_id
+   LEFT JOIN driver_earnings_ledger l ON l.ride_id=r.id
+   LEFT JOIN ride_receipts rc ON rc.ride_id=r.id`;
+
+ // Owner ride search: server-side filters + pagination, never coordinates.
+ app.get('/api/owner/rides',auth,owner,async(req,res)=>{
+  try{
+   const{where,vals}=ownerRideFilter(req.query);
+   const page=Math.max(1,Math.min(500,Number(req.query.page)||1));
+   const per=30;
+   vals.push(per,(page-1)*per);
+   const rows=(await q(`SELECT r.id,r.status,r.vehicle_category,r.payment_method,r.pickup_address,r.dest_address,
+     r.final_fare,r.created_at,r.completed_at,g.name AS zone_name,ru.name AS rider_name,du.name AS driver_name,
+     v.registration_number,l.gross,l.commission,l.net,l.payout_status,rc.reference AS receipt_reference
+    ${OWNER_RIDE_FROM} ${where}
+    ORDER BY r.created_at DESC LIMIT $${vals.length-1} OFFSET $${vals.length}`,vals)).rows;
+   const total=+(await q(`SELECT count(*)::int n ${OWNER_RIDE_FROM} ${where}`,vals.slice(0,-2))).rows[0].n;
+   for(const r of rows)r.payment_status=paymentStatusOf(r.status);
+   res.json({rides:rows,total,page,per});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+
+ // Owner-only CSV accounting export (audited, formula-injection safe, UTF-8).
+ app.get('/api/owner/rides-export.csv',auth,owner,async(req,res)=>{
+  try{
+   const{where,vals}=ownerRideFilter(req.query);
+   const rows=(await q(`SELECT r.id,r.status,r.vehicle_category,r.payment_method,r.pickup_address,r.dest_address,
+     r.final_fare,r.created_at,r.assigned_at,r.started_at,r.completed_at,g.name AS zone_name,
+     ru.name AS rider_name,du.name AS driver_name,v.registration_number,
+     l.gross,l.commission,l.net,l.payout_status,rc.reference AS receipt_reference,
+     fq.distance_m
+    ${OWNER_RIDE_FROM} JOIN fare_quotes fq ON fq.id=r.quote_id ${where}
+    ORDER BY r.created_at DESC LIMIT 5000`,vals)).rows;
+   const cell=v=>{
+    let s=v==null?'':String(v);
+    if(/^[=+\-@]/.test(s))s="'"+s;           // neutralize spreadsheet formulas
+    if(/[",\r\n]/.test(s))s='"'+s.replace(/"/g,'""')+'"';
+    return s;
+   };
+   const kes=v=>v==null?'':Number(v).toFixed(2);
+   const head=['Ride reference','Operational date (Africa/Nairobi)','Requested time (Africa/Nairobi)','Accepted time (Africa/Nairobi)','Started time (Africa/Nairobi)','Completed time (Africa/Nairobi)','Ride duration (min)','Rider','Driver','Vehicle registration','Vehicle category','Service zone','Pickup','Destination','Distance (km)','Gross fare (KES)','HAPA commission (KES)','Driver net earnings (KES)','Payment method','Payment status','Payout status','Ride status','Receipt reference'];
+   const lines=[head.map(cell).join(',')];
+   for(const r of rows){
+    const dur=r.started_at&&r.completed_at?((new Date(r.completed_at)-new Date(r.started_at))/60000).toFixed(1):'';
+    lines.push([
+     r.receipt_reference||r.id.slice(0,8).toUpperCase(),
+     nrbD(r.completed_at||r.created_at),nrbT(r.created_at),nrbT(r.assigned_at),nrbT(r.started_at),nrbT(r.completed_at),dur,
+     r.rider_name,r.driver_name||'',r.registration_number||'',r.vehicle_category,r.zone_name,
+     r.pickup_address,r.dest_address,r.distance_m!=null?(r.distance_m/1000).toFixed(1):'',
+     kes(r.gross!=null?r.gross:r.final_fare),kes(r.commission),kes(r.net),
+     r.payment_method,paymentStatusOf(r.status)||'',r.payout_status||'',r.status,r.receipt_reference||''
+    ].map(cell).join(','));
+   }
+   await audit(req.user.id,'accounting_export','rides',null,`rows=${rows.length} filters=${JSON.stringify(req.query).slice(0,300)}`);
+   res.set('Content-Type','text/csv; charset=utf-8');
+   res.set('Content-Disposition','attachment; filename="hapa-ride-accounting.csv"');
+   res.send('\uFEFF'+lines.join('\r\n'));
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+
+ // Owner-only Driver earnings report (persisted rides + ledgers, never cards).
+ app.get('/api/owner/driver-earnings',auth,owner,async(req,res)=>{
+  try{
+   const{where,vals}=ownerRideFilter(req.query);
+   const base=where?where+' AND r.driver_user_id IS NOT NULL':'WHERE r.driver_user_id IS NOT NULL';
+   const rows=(await q(`SELECT du.id AS driver_id,du.name AS driver_name,du.status AS account_status,
+     count(DISTINCT r.id) FILTER (WHERE r.status IN('completed','closed')) AS completed_rides,
+     count(DISTINCT r.id) FILTER (WHERE r.status IN('rider_cancelled','driver_cancelled')) AS cancellations,
+     count(DISTINCT r.id) FILTER (WHERE r.status IN('completed','payment_pending','payment_failed')) AS unpaid_rides,
+     COALESCE(SUM(l.gross),0) AS gross,COALESCE(SUM(l.commission),0) AS commission,COALESCE(SUM(l.net),0) AS net,
+     COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='cash' AND r.status='closed'),0) AS cash_collected,
+     COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='mpesa' AND r.status='closed'),0) AS mpesa_collected,
+     COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='unsettled'),0) AS unsettled,
+     COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='paid'),0) AS settled,
+     COALESCE(SUM(EXTRACT(EPOCH FROM (r.completed_at-r.started_at)) ) FILTER (WHERE r.completed_at IS NOT NULL AND r.started_at IS NOT NULL),0)::bigint AS driving_seconds,
+     (SELECT ROUND(AVG(rating)::numeric,1) FROM ride_ratings rr WHERE rr.ratee_id=du.id AND rr.status='active') AS rating,
+     (SELECT g2.name FROM driver_availability_sessions s JOIN geo_areas g2 ON g2.id=s.zone_id WHERE s.driver_user_id=du.id ORDER BY s.started_at DESC LIMIT 1) AS zone_name,
+     (SELECT v2.make||' '||v2.model||' · '||v2.registration_number FROM driver_vehicles v2 WHERE v2.driver_user_id=du.id ORDER BY v2.created_at DESC LIMIT 1) AS vehicle_label,
+     (SELECT COALESCE(SUM(s.online_seconds+CASE WHEN s.status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-s.started_at))::int ELSE 0 END),0) FROM driver_availability_sessions s WHERE s.driver_user_id=du.id)::bigint AS online_seconds
+    ${OWNER_RIDE_FROM} ${base}
+    GROUP BY du.id,du.name,du.status ORDER BY gross DESC LIMIT 200`,vals)).rows;
+   const totals=rows.reduce((t,r)=>({
+    completed_rides:t.completed_rides+Number(r.completed_rides),gross:t.gross+Number(r.gross),
+    commission:t.commission+Number(r.commission),net:t.net+Number(r.net),
+    cash_collected:t.cash_collected+Number(r.cash_collected),mpesa_collected:t.mpesa_collected+Number(r.mpesa_collected),
+    unsettled:t.unsettled+Number(r.unsettled)
+   }),{completed_rides:0,gross:0,commission:0,net:0,cash_collected:0,mpesa_collected:0,unsettled:0});
+   res.json({drivers:rows,totals});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+
  app.get('/api/owner/rides/:id',auth,owner,async(req,res)=>{
   try{
    const r=(await q(`SELECT * FROM ride_requests WHERE id::text=$1`,[req.params.id])).rows[0];
    if(!r)return res.status(404).json({error:'Ride not found'});
    await audit(req.user.id,'ride_ops_view','ride',r.id,'');
-   const events=(await q(`SELECT id,actor_id,event_type,payload,created_at FROM ride_events WHERE ride_id=$1 ORDER BY id`,[r.id])).rows;
-   const offers=(await q(`SELECT o.*,u.name AS driver_name FROM ride_offers o JOIN users u ON u.id=o.driver_user_id WHERE o.ride_id=$1 ORDER BY o.created_at`,[r.id])).rows;
-   const payments=(await q(`SELECT * FROM ride_payments WHERE ride_id=$1`,[r.id])).rows;
-   const receipt=(await q(`SELECT reference,body FROM ride_receipts WHERE ride_id=$1`,[r.id])).rows[0]||null;
-   const locations=(await q(`SELECT lat,lng,recorded_at FROM ride_location_samples WHERE ride_id=$1 ORDER BY id LIMIT 500`,[r.id])).rows;
-   const incidents=(await q(`SELECT * FROM safety_incidents WHERE ride_id=$1`,[r.id])).rows;
-   const ratings=(await q(`SELECT role,rating,comment,created_at FROM ride_ratings WHERE ride_id=$1`,[r.id])).rows;
-   const quote=(await q(`SELECT * FROM fare_quotes WHERE id=$1`,[r.quote_id])).rows[0];
-   res.json({ride:await rideView(r,'owner'),quote,events,offers,payments,receipt,locations,incidents,ratings});
+   const events=(await q(`SELECT e.id,e.actor_id,u.name AS actor_name,e.event_type,e.payload,e.created_at FROM ride_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.ride_id=$1 ORDER BY e.id`,[r.id])).rows;
+   const offers=(await q(`SELECT o.id,o.status,o.round,o.created_at,o.responded_at,o.expires_at,u.name AS driver_name FROM ride_offers o JOIN users u ON u.id=o.driver_user_id WHERE o.ride_id=$1 ORDER BY o.created_at`,[r.id])).rows;
+   const payments=(await q(`SELECT id,method,mode,amount,currency,status,provider_ref,phone_masked,created_at FROM ride_payments WHERE ride_id=$1`,[r.id])).rows;
+   const receipt=(await q(`SELECT reference,created_at FROM ride_receipts WHERE ride_id=$1`,[r.id])).rows[0]||null;
+   const incidents=(await q(`SELECT id,kind,description,status,resolution_note,created_at FROM safety_incidents WHERE ride_id=$1`,[r.id])).rows;
+   const ratings=(await q(`SELECT role,rating,comment,status,created_at FROM ride_ratings WHERE ride_id=$1`,[r.id])).rows;
+   const quote=(await q(`SELECT total,components,distance_m,duration_s,currency,created_at FROM fare_quotes WHERE id=$1`,[r.quote_id])).rows[0]||null;
+   const ledger=(await q(`SELECT gross,commission,net,payout_status FROM driver_earnings_ledger WHERE ride_id=$1`,[r.id])).rows[0]||null;
+   const zone=(await q(`SELECT name,slug FROM geo_areas WHERE id=$1`,[r.zone_id])).rows[0]||null;
+   const rider=(await q(`SELECT u.id,u.name,u.status,
+     (SELECT ROUND(AVG(rating)::numeric,1) FROM ride_ratings rr WHERE rr.ratee_id=u.id AND rr.status='active') AS rating
+    FROM users u WHERE u.id=$1`,[r.rider_id])).rows[0]||null;
+   const view=await rideView(r,'owner');
+   // Default Owner details view: no raw coordinates. Exact-location access is
+   // a separate, explicitly audited support action (POST …/locations).
+   scrubCoords(view);events.forEach(e=>scrubCoords(e.payload));
+   view.payment_status=paymentStatusOf(r.status);
+   const actual_duration_s=r.started_at&&r.completed_at?Math.round((new Date(r.completed_at)-new Date(r.started_at))/1000):null;
+   res.json({ride:view,zone,rider,ledger,quote,events,offers,payments,receipt,incidents,ratings,actual_duration_s});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ // Explicit, audited exact-location access for support investigations only.
+ app.post('/api/owner/rides/:id/locations',auth,owner,async(req,res)=>{
+  try{
+   const reason=String(req.body?.reason||'').trim();
+   if(reason.length<5)return res.status(400).json({error:'A support reason is required to view exact locations'});
+   const r=(await q(`SELECT id,pickup_lat,pickup_lng,dest_lat,dest_lng FROM ride_requests WHERE id::text=$1`,[req.params.id])).rows[0];
+   if(!r)return res.status(404).json({error:'Ride not found'});
+   await audit(req.user.id,'ride_location_access','ride',r.id,reason.slice(0,300));
+   const samples=(await q(`SELECT lat,lng,recorded_at FROM ride_location_samples WHERE ride_id=$1 ORDER BY id LIMIT 500`,[r.id])).rows;
+   res.json({pickup:{lat:r.pickup_lat,lng:r.pickup_lng},destination:{lat:r.dest_lat,lng:r.dest_lng},samples});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ // Driver earnings totals for a Nairobi-operational date range.
+ app.get('/api/driver/earnings',auth,active,dvCap,async(req,res)=>{
+  try{
+   const vals=[req.user.id];let range='';
+   if(req.query.from&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.from)){vals.push(req.query.from);range+=` AND (COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date>=$${vals.length}::date`;}
+   if(req.query.to&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.to)){vals.push(req.query.to);range+=` AND (COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date<=$${vals.length}::date`;}
+   const t=(await q(`SELECT
+     count(*) FILTER (WHERE r.status IN('completed','closed'))::int AS completed_rides,
+     COALESCE(SUM(l.gross),0) AS gross,COALESCE(SUM(l.commission),0) AS commission,COALESCE(SUM(l.net),0) AS net,
+     COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='cash' AND r.status='closed'),0) AS cash_collected,
+     COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='mpesa' AND r.status='closed'),0) AS mpesa_collected,
+     COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='unsettled'),0) AS unsettled,
+     COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='paid'),0) AS settled,
+     COALESCE(SUM(EXTRACT(EPOCH FROM (r.completed_at-r.started_at))) FILTER (WHERE r.completed_at IS NOT NULL AND r.started_at IS NOT NULL),0)::bigint AS driving_seconds
+    FROM ride_requests r LEFT JOIN driver_earnings_ledger l ON l.ride_id=r.id
+    WHERE r.driver_user_id=$1${range}`,vals)).rows[0];
+   const ses=(await q(`SELECT COALESCE(SUM(online_seconds+CASE WHEN status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-started_at))::int ELSE 0 END),0)::bigint AS online_seconds
+    FROM driver_availability_sessions WHERE driver_user_id=$1${range.replace(/COALESCE\(r\.completed_at,r\.created_at\)/g,'started_at')}`,vals)).rows[0];
+   res.json({...t,online_seconds:ses.online_seconds});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
  app.post('/api/owner/rides/:id/cancel',auth,owner,async(req,res)=>{

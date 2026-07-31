@@ -198,7 +198,7 @@ const RECEIPT = {
   ok('terminal card kept visible (no auto-dismiss)', !/includes\(r\.ride\.status\)\)\{rdClearRide/.test(html));
   ok('history sorts by completed_at fallback created_at', html.includes('new Date(b.completed_at||b.created_at)-new Date(a.completed_at||a.created_at)'));
   ok('history shows Receipt only for closed rides', /r\.status==='closed'\?`<br><button[^`]*rdReceipt\('\$\{esc\(r\.id\)\}',this\)/.test(html));
-  ok('history uses Nairobi dates + 2dp fares', html.includes('nrbDate(r.completed_at||r.created_at,true)') && html.includes('kesFmt(r.final_fare)'));
+  ok('history uses Nairobi dates + 2dp fares', html.includes('nrbDate(r.completed_at||r.created_at)') && html.includes('kesFmt(r.final_fare)'));
   ok('active card Receipt passes explicit ride id + button', html.includes(`rdReceipt(rdState.rideId,this)`));
   ok('no receipt alert remains anywhere', !/alert\(`HAPA Receipt/.test(html));
   ok('chat draft logic untouched by receipt work', html.includes('rideChat.drafts[rideId]=inp.value'));
