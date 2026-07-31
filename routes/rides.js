@@ -288,7 +288,13 @@ module.exports=function(app,deps){
    const ride=(await q(`SELECT * FROM ride_requests WHERE driver_user_id=$1 AND status=ANY($2)`,[req.user.id,[...ACTIVE_RIDE,'payment_pending']])).rows[0]||null;
    const earnings=(await q(`SELECT COALESCE(SUM(net),0) AS total,COALESCE(SUM(net) FILTER(WHERE created_at::date=CURRENT_DATE),0) AS today,count(*)::int AS trips FROM driver_earnings_ledger WHERE driver_user_id=$1`,[req.user.id])).rows[0];
    const docs=(await q(`SELECT doc_type,status,expires_on FROM driver_document_status WHERE driver_user_id=$1 ORDER BY doc_type`,[req.user.id])).rows;
-   const history=(await q(`SELECT id,status,pickup_address,dest_address,final_fare,completed_at,created_at FROM ride_requests WHERE driver_user_id=$1 AND status IN('completed','closed','rider_cancelled','driver_cancelled') ORDER BY created_at DESC LIMIT 20`,[req.user.id])).rows;
+   const history=(await q(`SELECT r.id,r.status,r.pickup_address,r.dest_address,r.final_fare,r.payment_method,r.completed_at,r.created_at,
+     l.gross,l.commission,l.net,l.payout_status,rc.reference AS receipt_reference
+    FROM ride_requests r
+    LEFT JOIN driver_earnings_ledger l ON l.ride_id=r.id
+    LEFT JOIN ride_receipts rc ON rc.ride_id=r.id
+    WHERE r.driver_user_id=$1 AND r.status IN('completed','closed','rider_cancelled','driver_cancelled')
+    ORDER BY COALESCE(r.completed_at,r.created_at) DESC LIMIT 20`,[req.user.id])).rows;
    const onlineMin=session?Math.round((Date.now()-new Date(session.started_at))/60000):0;
    res.json({session,offer,ride:ride?await rideView(ride,'driver'):null,earnings,documents:docs,history,
     hours:{online_min:onlineMin,warn_after_min:Number(await cfg('hours_warn_minutes')),max_continuous_min:Number(await cfg('max_continuous_minutes'))},

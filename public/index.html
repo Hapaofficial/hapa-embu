@@ -629,6 +629,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 <p class="muted" id="rdIntro" style="font-size:13px;margin:8px 0 0">Real-time rides in the Embu pilot area. Fares are fixed upfront — no surprises.</p></div>
 
 <div id="rdRiderPanel" style="margin-top:14px">
+ <div class="card hidden" id="rdGuestNotice"><p style="margin:0" class="muted">Please log in to book rides and see your trip history.</p></div>
  <div class="card" id="rdBookCard">
   <h3 style="margin-top:0">Where to?</h3>
   <div class="field"><label>Pickup</label><input id="rdPickA" maxlength="200" placeholder="e.g. Embu Town CBD, near Tuskys"><button class="btn" style="margin-top:6px" onclick="rdUseGps()">📍 Use my location</button><small class="muted" id="rdGpsNote"></small></div>
@@ -655,6 +656,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">My documents</h3><div id="drvDocs" class="muted" style="font-size:13px"></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="ddType"></select><input id="ddRef" placeholder="Reference no." style="width:130px"><input id="ddExp" type="date"><button class="btn" onclick="drvAddDoc()">Submit</button></div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Earnings</h3><div id="drvEarnings" class="muted" style="font-size:13px">—</div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent trips</h3><div id="drvHistory" class="muted" style="font-size:13px">—</div></div>
 </div>
 </section>
 
@@ -986,12 +988,16 @@ function showAuthPrompt(msg,isPending){
 }
 function hideAuthPrompt(){ $('authPromptPanel').classList.add('hidden'); }
 
-function logout(){try{rideChat.drafts={};rideChat.sending={};}catch{}try{ppRevokeBlobUrls();}catch{}try{if(token)api('/api/me/device-tokens',{method:'DELETE',body:JSON.stringify({})}).catch(()=>{});}catch{}clearToken();location.href=location.pathname;}
+function logout(){try{rideChat.drafts={};rideChat.sending={};}catch{}try{ppRevokeBlobUrls();}catch{}try{if(token)api('/api/me/device-tokens',{method:'DELETE',body:JSON.stringify({})}).catch(()=>{});}catch{}
+ // Clear per-account ride state so the next login (possibly another account
+ // on this device) never inherits a stale ride pointer or PIN.
+ ['hapa_ride','hapa_ride_pin','hapa_drv_seq'].forEach(k=>localStorage.removeItem(k));
+ clearToken();location.href=location.pathname;}
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
 function msg(t,b=false){$('authMsg').innerHTML=`<div class="notice ${b?'bad':''}">${t}</div>`;}
-async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d;}
+async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok){const err=new Error(d.error||'Request failed');err.status=r.status;throw err;}return d;}
 async function publicApi(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json'};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d;}
 function mpApiBase(){return(appMode==='active'||appMode==='owner')?'/api':'/api/public';}
 async function f64(el){let f=el?.files?.[0];if(!f)return'';if(f.size>2*1024*1024)throw new Error('Photo must be under 2 MB');return await new Promise((a,b)=>{let r=new FileReader();r.onload=()=>a(r.result);r.onerror=b;r.readAsDataURL(f);});}
@@ -3308,8 +3314,13 @@ const rdStatusCopy={searching:'Looking for a driver near you…',offered:'Contac
 const RD_OPEN=['searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','payment_pending','payment_failed'];
 
 async function ridesInit(){
- if(appMode==='guest'){$('rdRiderPanel').innerHTML='<div class="card"><p>Please log in to book rides.</p></div>';return;}
- try{rdState.cfg=await api('/api/rides/config');}catch(e){$('rdRiderPanel').innerHTML=`<div class="card"><p class="muted">${esc(e.message)}</p></div>`;return;}
+ // Never replace rdRiderPanel.innerHTML: that would destroy rdBookCard /
+ // rdActiveCard / rdHistory for the whole session (login does not reload the
+ // page), silently breaking booking and ride history after a later login.
+ const rdCards=['rdBookCard','rdActiveCard'];
+ if(appMode==='guest'){$('rdGuestNotice').classList.remove('hidden');rdCards.forEach(id=>$(id).classList.add('hidden'));return;}
+ $('rdGuestNotice').classList.add('hidden');$('rdBookCard').classList.remove('hidden');
+ try{rdState.cfg=await api('/api/rides/config');}catch(e){$('rdIntro').textContent=e.message;return;}
  if(!rdState.cfg.enabled){$('rdIntro').textContent='Ride-hailing is not switched on yet. Check back soon.';return;}
  if(rdState.cfg.mock_routing)$('rdGpsNote').textContent='Map routing runs in estimate mode during the pilot.';
  $('rdTabDriver').classList.toggle('hidden',!(me&&me.capabilities&&me.capabilities.driver===true));
@@ -3401,7 +3412,13 @@ async function rdRefresh(){
     if(rdState.histSyncedFor!==r.ride.id){rdState.histSyncedFor=r.ride.id;rdLoadHistory();}
    }
   }
- }catch(e){rdClearRide();}
+ }catch(e){
+  // Only forget the ride when the server says it is gone or not ours
+  // (403/404). Transient failures (network blip, server restart) must never
+  // erase a completed ride from view — keep the pointer and retry.
+  if(e.status===403||e.status===404)rdClearRide();
+  else if(!rdState.poll)rdState.poll=setInterval(rdRefresh,4000);
+ }
 }
 function rdClearRide(){if(rdState.rideId){delete rideChat.drafts[rdState.rideId];chatUnmount('rdChatArea',rdState.rideId);}rdState.rideId=null;rdState.pin=null;rdState.lastEvent=0;localStorage.removeItem('hapa_ride');localStorage.removeItem('hapa_ride_pin');clearInterval(rdState.poll);rdState.poll=null;$('rdActiveCard').classList.add('hidden');$('rdBookCard').classList.remove('hidden');rdLoadHistory();}
 function rdRenderActive(ride){
@@ -3668,6 +3685,11 @@ async function drvLoad(){
   $('ddType').innerHTML=dd.required.map(t=>`<option value="${t}">${t.replace(/_/g,' ')}</option>`).join('');
   $('drvDocs').innerHTML=dd.required.map(t=>{const d=dd.documents.find(x=>x.doc_type===t);const expSoon=d&&d.expires_on&&new Date(d.expires_on)<new Date(Date.now()+30*86400000);return`<div class="row" style="padding:4px 0"><span>${t.replace(/_/g,' ')}${d&&d.expires_on?`<small class="muted"> · expires ${d.expires_on.slice(0,10)}</small>`:''}</span><b style="color:${!d?'var(--muted)':d.status==='approved'?(expSoon?'var(--hapa-warning)':'var(--ok)'):d.status==='rejected'?'var(--bad)':'var(--a)'}">${d?esc(d.status)+(expSoon?' ⚠':''):'missing'}</b></div>`;}).join('');
   $('drvEarnings').innerHTML=`<div class="row"><span>Today</span><b>KES ${Number(h.earnings.today).toLocaleString()}</b></div><div class="row"><span>Total (${h.earnings.trips} trips)</span><b>KES ${Number(h.earnings.total).toLocaleString()}</b></div><small class="muted">Earnings are shown net of the platform commission.</small>`;
+  // Driver trip history — persisted server-side, survives relogin/restart.
+  $('drvHistory').innerHTML=(h.history||[]).slice(0,5).map(r=>{
+   const paid=r.status==='closed', hasEarn=r.net!=null;
+   return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(nrbDate(r.completed_at||r.created_at,true))} · ${esc(rdStatusCopy[r.status]||r.status)}${paid?` · ${esc((r.payment_method||'cash').toUpperCase())} paid`:''}${r.receipt_reference?`<br>Ref: ${esc(r.receipt_reference)}`:''}</small></span><span style="text-align:right">${hasEarn?`<b>${esc(kesFmt(r.net))}</b><br><small class="muted">fare ${esc(kesFmt(r.gross))} − fee ${esc(kesFmt(r.commission))}</small>`:r.final_fare!=null?`<b>${esc(kesFmt(r.final_fare))}</b>`:''}${paid?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
+  }).join('')||'No trips yet.';
   // Location heartbeat while online or on a ride
   if((s||h.ride)&&!drvState.locTimer)drvState.locTimer=setInterval(drvSendLoc,8000);
   if(!s&&!h.ride&&drvState.locTimer){clearInterval(drvState.locTimer);drvState.locTimer=null;}
