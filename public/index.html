@@ -783,7 +783,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
      <div class="field" style="margin:0"><label for="fcFloor">Minimum fare (KES)</label><input id="fcFloor" type="number" min="0" step="1" value="0"></div>
      <div class="field" style="margin:0"><label for="fcEff">Effective from</label><input id="fcEff" type="date"></div>
     </div>
-    <button class="btn primary" style="margin-top:10px" onclick="oFareCreate()">Add rate card</button>
+    <button class="btn primary" id="fcAddBtn" style="margin-top:10px" onclick="oFareCreate()">Add rate card</button>
     <div id="fcMsg" class="muted" style="font-size:12px;margin-top:6px"></div>
    </div>
   </div>
@@ -2325,7 +2325,7 @@ async function loadOwnerAreas(){
     <button class="btn ${a.active?'':'ok'}" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="oAreaToggle('${a.id}',${!a.active})">${a.active?'Pause':'Activate'}</button></div>`;
   }).join('')||'<p class="muted">No areas configured.</p>';
   $('fcArea').innerHTML=[...counties,...zones].map(a=>`<option value="${a.id}" ${a.slug==='zone-embu-pilot'?'selected':''}>${esc(a.name)} (${a.level})</option>`).join('');
-  $('oFareList').innerHTML=cards.length?cards.map(c=>`<div class="row"><span><b>${esc(c.area_name)}</b> · ${esc(c.vehicle_category)}<small class="muted" style="display:block;font-size:11px">KES ${(+c.base_fare).toFixed(0)} base + ${(+c.per_km).toFixed(0)}/km + ${(+c.per_min).toFixed(0)}/min · min KES ${(+c.minimum_fare).toFixed(0)} · from ${new Date(c.effective_from).toLocaleDateString('en-GB')}</small></span>
+  $('oFareList').innerHTML=cards.length?cards.map(c=>`<div class="row"><span><b>${esc(c.area_name)}</b> · ${esc(c.vehicle_category)}<small class="muted" style="display:block;font-size:11px">KES ${(+c.base_fare).toFixed(0)} base + ${(+c.per_km).toFixed(0)}/km + ${(+c.per_min).toFixed(0)}/min · min KES ${(+c.minimum_fare).toFixed(0)} · from ${String(c.effective_from).slice(0,10).split('-').reverse().join('/')}</small></span>
    <span style="display:flex;gap:6px;align-items:center"><span class="badge-pill" style="font-size:10px;color:${c.active?'var(--ok)':'var(--muted)'};background:${c.active?'#EAF6EF':'var(--p2)'}">${c.active?'Active':'Off'}</span><button class="btn" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="oFareToggle('${c.id}',${!c.active})">${c.active?'Deactivate':'Reactivate'}</button></span></div>`).join(''):'<p class="muted">No rate cards yet. Add the first one below.</p>';
  }catch(e){$('oAreasList').innerHTML=`<div class="notice bad">${esc(e.message)}</div>`;}
 }
@@ -2336,15 +2336,19 @@ async function oAreaToggle(id,on){
 async function oFareToggle(id,on){
  try{await api('/api/owner/fare-cards/'+id,{method:'PATCH',body:JSON.stringify({active:on})});loadOwnerAreas();}catch(e){mpInlineAlert(e.message);}
 }
+let fcSubmitting=false;
 async function oFareCreate(){
+ if(fcSubmitting)return; // guard against double-click duplicates
  const m=$('fcMsg');m.textContent='';
+ const btn=$('fcAddBtn');fcSubmitting=true;if(btn){btn.disabled=true;btn.textContent='Adding…';}
  try{
   const body={area:$('fcArea').value,vehicle_category:$('fcCat').value,base_fare:$('fcBase').value,per_km:$('fcKm').value,per_min:$('fcMin').value,minimum_fare:$('fcFloor').value};
-  if($('fcEff').value)body.effective_from=$('fcEff').value;
+  if($('fcEff').value)body.effective_from=$('fcEff').value; // date input is already a plain YYYY-MM-DD calendar date
   await api('/api/owner/fare-cards',{method:'POST',body:JSON.stringify(body)});
   $('fcCat').value='';$('fcBase').value='';m.textContent='Rate card added.';
   loadOwnerAreas();
  }catch(e){m.textContent=e.message;}
+ fcSubmitting=false;if(btn){btn.disabled=false;btn.textContent='Add rate card';}
 }
 
 async function loadOwnerStats(){
@@ -3523,7 +3527,7 @@ async function loadOwnerTransport(){
   const[t,g]=await Promise.all([api('/api/owner/transport'),api('/api/owner/ride-gates')]);
   const s=t.stats;
   $('otStats').innerHTML=[['Online drivers',s.online_drivers],['Searching',s.searching],['Active rides',s.active_rides],['Completed today',s.completed_today],['Cancels today',s.cancellations_today],['No-driver today',s.no_driver_today],['Open incidents',s.open_incidents],['Docs expiring 30d',s.docs_expiring_30d],['Commission KES',Number(t.commission_total).toLocaleString()]].map(([k,v])=>`<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
-  $('otGates').innerHTML=g.gates.map(x=>`<div class="row" style="padding:4px 0"><span>${esc(x.gate)}<br><small class="muted">${esc(x.detail)}</small></span><b style="color:${x.pass?'var(--ok)':'var(--bad)'}">${x.pass?'READY':'BLOCKED'}</b></div>`).join('')+`<p style="margin:8px 0 0"><b>Production pilot: ${g.production_ready?'<span style="color:var(--ok)">gates clear</span>':'<span style="color:var(--bad)">blocked by external requirements</span>'}</b></p>`;
+  $('otGates').innerHTML=g.gates.map(x=>`<div class="row" style="padding:4px 0"><span>${esc(x.gate)}${x.required?'':' <small class="muted">(optional)</small>'}<br><small class="muted">${esc(x.detail)}</small></span><b style="color:${x.pass?'var(--ok)':x.required?'var(--bad)':'var(--muted)'}">${esc(x.status||(x.pass?'READY':'BLOCKED'))}</b></div>`).join('')+`<p style="margin:8px 0 0"><b>Controlled cash pilot: ${g.production_ready?'<span style="color:var(--ok)">mandatory gates clear</span>':'<span style="color:var(--bad)">blocked by mandatory gates</span>'}</b> <small class="muted">Optional integrations never block the cash pilot.</small></p>`;
   $('otApprovals').innerHTML=(t.pending_vehicles.map(v=>`<div class="row" style="padding:4px 0"><span>🚗 ${esc(v.driver_name)} · ${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</span><span><button class="btn" onclick="otVeh('${v.id}','approved')">Approve</button> <button class="btn" onclick="otVeh('${v.id}','rejected')">Reject</button></span></div>`).join('')+
    t.pending_documents.map(d=>`<div class="row" style="padding:4px 0"><span>📄 ${esc(d.driver_name)} · ${esc(d.doc_type.replace(/_/g,' '))}${d.expires_on?` · exp ${String(d.expires_on).slice(0,10)}`:''}</span><span><button class="btn" onclick="otDoc('${d.id}','approved')">Approve</button> <button class="btn" onclick="otDoc('${d.id}','rejected')">Reject</button></span></div>`).join(''))||'Nothing pending.';
   $('otIncidents').innerHTML=t.incidents.map(i=>`<div class="row" style="padding:4px 0"><span><b>${esc(i.kind)}</b> · ${esc(i.reporter_name)} · ${esc(i.description||'')}<br><small class="muted">${new Date(i.created_at).toLocaleString()} · ${esc(i.status)}</small></span>${i.status!=='resolved'?`<button class="btn" onclick="otIncident('${i.id}')">Resolve</button>`:''}</div>`).join('')||'No incidents.';

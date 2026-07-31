@@ -105,7 +105,7 @@ module.exports=function(app,deps){
  // ── Owner: fare rate cards ──────────────────────────────────────────────────
  app.get('/api/owner/fare-cards',auth,owner,async(req,res)=>{
   try{
-   const rows=(await q(`SELECT f.*,a.name AS area_name,a.slug AS area_slug,a.level AS area_level FROM fare_rate_cards f JOIN geo_areas a ON a.id=f.area_id ORDER BY a.name,f.vehicle_category,f.effective_from DESC`)).rows;
+   const rows=(await q(`SELECT f.*,to_char(f.effective_from,'YYYY-MM-DD') AS effective_from,a.name AS area_name,a.slug AS area_slug,a.level AS area_level FROM fare_rate_cards f JOIN geo_areas a ON a.id=f.area_id ORDER BY a.name,f.vehicle_category,f.effective_from DESC`)).rows;
    res.json(rows);
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
@@ -121,11 +121,15 @@ module.exports=function(app,deps){
    if(base==null||perKm==null||perMin==null||min==null)return res.status(400).json({error:'Invalid fare values'});
    const eff=b.effective_from?String(b.effective_from).slice(0,10):null;
    if(eff&&!/^\d{4}-\d{2}-\d{2}$/.test(eff))return res.status(400).json({error:'Invalid effective date'});
-   const r=(await q(`INSERT INTO fare_rate_cards(area_id,vehicle_category,base_fare,per_km,per_min,minimum_fare,effective_from) VALUES($1,$2,$3,$4,$5,$6,COALESCE($7::date,CURRENT_DATE)) RETURNING *`,
+   // Date-only value stored as a Nairobi calendar date; duplicates of an
+   // identical active card (area + category + effective date) are rejected.
+   const r=(await q(`INSERT INTO fare_rate_cards(area_id,vehicle_category,base_fare,per_km,per_min,minimum_fare,effective_from) VALUES($1,$2,$3,$4,$5,$6,COALESCE($7::date,(NOW() AT TIME ZONE 'Africa/Nairobi')::date)) RETURNING *,to_char(effective_from,'YYYY-MM-DD') AS effective_from`,
     [area.id,cat,base,perKm,perMin,min,eff])).rows[0];
    await audit(req.user.id,'fare_card_created','fare_card',r.id,String(b.area)+' '+cat);
    res.status(201).json(r);
-  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+  }catch(e){
+   if(e.code==='23505')return res.status(409).json({error:'An identical active rate card already exists for this area, vehicle category and effective date'});
+   console.error(e);res.status(500).json({error:'Server error'})}
  });
  app.patch('/api/owner/fare-cards/:id',auth,owner,async(req,res)=>{
   try{
@@ -158,7 +162,7 @@ module.exports=function(app,deps){
      SELECT id,parent_id,0 AS depth FROM geo_areas WHERE id=$1
      UNION ALL SELECT g.id,g.parent_id,c.depth+1 FROM geo_areas g JOIN chain c ON g.id=c.parent_id
     )SELECT f.* FROM fare_rate_cards f JOIN chain c ON c.id=f.area_id
-     WHERE f.active AND f.effective_from<=CURRENT_DATE AND LOWER(f.vehicle_category)=LOWER($2)
+     WHERE f.active AND f.effective_from<=(NOW() AT TIME ZONE 'Africa/Nairobi')::date AND LOWER(f.vehicle_category)=LOWER($2)
      ORDER BY c.depth,f.effective_from DESC LIMIT 1`,[area.id,cat])).rows[0];
    if(!card)return res.status(404).json({error:'No rate card configured for this area yet'});
    const distKm=Math.max(0,Math.min(2000,Number(req.query.distance_m||0)/1000||0));

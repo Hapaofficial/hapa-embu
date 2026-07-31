@@ -321,13 +321,24 @@ module.exports=function(app,deps){
  });
 
  // ── Fare quotes (immutable snapshots; reuse fare_rate_cards + ancestry) ────
+ // Vehicle categories are normalized so owner-entered labels like "car",
+ // "Saloon" or "bodaboda" resolve against configured pilot categories.
+ function normCat(c){
+  const k=String(c||'').toLowerCase().replace(/[^a-z]/g,'');
+  if(['car','passengercar','saloon','sedan','taxi','cab'].includes(k))return'passenger car';
+  if(['boda','bodaboda','motorbike','motorcycle','bike'].includes(k))return'boda boda';
+  return String(c||'').toLowerCase().trim();
+ }
  async function findCard(zoneId,category){
-  return(await q(`WITH RECURSIVE chain AS(
+  // Effective dates are calendar dates in Africa/Nairobi, never UTC-shifted.
+  const rows=(await q(`WITH RECURSIVE chain AS(
     SELECT id,parent_id,0 AS depth FROM geo_areas WHERE id=$1
     UNION ALL SELECT g.id,g.parent_id,c.depth+1 FROM geo_areas g JOIN chain c ON g.id=c.parent_id
-   )SELECT f.* FROM fare_rate_cards f JOIN chain c ON c.id=f.area_id
-    WHERE f.active AND f.effective_from<=CURRENT_DATE AND LOWER(f.vehicle_category)=LOWER($2)
-    ORDER BY c.depth,f.effective_from DESC LIMIT 1`,[zoneId,category])).rows[0];
+   )SELECT f.*,c.depth FROM fare_rate_cards f JOIN chain c ON c.id=f.area_id
+    WHERE f.active AND f.effective_from<=(NOW() AT TIME ZONE 'Africa/Nairobi')::date
+    ORDER BY c.depth,f.effective_from DESC`,[zoneId])).rows;
+  const want=normCat(category);
+  return rows.find(f=>normCat(f.vehicle_category)===want);
  }
  async function routeEstimate(pLat,pLng,dLat,dLng,given){
   if(process.env.GOOGLE_MAPS_SERVER_KEY){
@@ -1012,18 +1023,32 @@ module.exports=function(app,deps){
    res.json(r.rows[0]);
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
- // Activation gates — what still blocks a real production pilot
+ // Activation gates for a controlled CASH pilot.
+ // Mandatory gates block production readiness; optional integrations never do.
  app.get('/api/owner/ride-gates',auth,owner,async(req,res)=>{
-  const gates=[
-   {gate:'RIDE_HAILING_ENABLED',pass:await rideHailingEnabled(),detail:'Master feature switch'},
-   {gate:'TNC_LICENSE_CONFIRMED',pass:String(process.env.TNC_LICENSE_CONFIRMED||'')==='true',detail:process.env.TNC_LICENSE_REFERENCE?'Reference configured':'NTSA TNC licence confirmation + TNC_LICENSE_REFERENCE required'},
-   {gate:'GOOGLE_MAPS_BROWSER_KEY',pass:!!process.env.GOOGLE_MAPS_BROWSER_KEY,detail:'Browser Maps key for pickup/destination UX'},
-   {gate:'GOOGLE_MAPS_SERVER_KEY',pass:!!process.env.GOOGLE_MAPS_SERVER_KEY,detail:'Server key for real routing (currently '+(process.env.GOOGLE_MAPS_SERVER_KEY?'configured':'mock estimates')+')'},
-   {gate:'MPESA',pass:mpesa.status().ready&&mpesa.status().mode!=='mock',detail:'Mode: '+mpesa.status().mode+' — '+mpesa.status().note},
-   {gate:'SUPPORT_EMERGENCY_PHONE',pass:!!process.env.SUPPORT_EMERGENCY_PHONE,detail:'Emergency/support line for the Safety Centre'},
-   {gate:'RATE_CARD',pass:!!(await findCard((await q(`SELECT id FROM geo_areas WHERE slug='zone-embu-pilot'`)).rows[0]?.id,(await cfg('vehicle_categories'))[0])),detail:'Active rate card for the pilot zone'},
-   {gate:'PHONE_MASKING',pass:String(process.env.PHONE_MASKING_ENABLED||'')==='true',detail:'External provider required; in-app chat is the fallback'},
-  ];
-  res.json({gates,production_ready:gates.filter(g=>['TNC_LICENSE_CONFIRMED','GOOGLE_MAPS_BROWSER_KEY','MPESA','SUPPORT_EMERGENCY_PHONE','RATE_CARD'].includes(g.gate)).every(g=>g.pass)});
+  try{
+   const zone=(await q(`SELECT id FROM geo_areas WHERE slug='zone-embu-pilot' AND active`)).rows[0];
+   const card=zone?await findCard(zone.id,(await cfg('vehicle_categories'))[0]):null;
+   const g=(gate,required,pass,readyDetail,blockedDetail)=>({gate,required,pass:!!pass,
+    status:pass?'READY':(required?'BLOCKED':'OPTIONAL — NOT CONFIGURED'),
+    detail:pass?readyDetail:blockedDetail});
+   const gates=[
+    g('RIDE_HAILING_ENABLED',true,await rideHailingEnabled(),'Master feature switch is on','Master feature switch is off (compliance setting ride_hailing_enabled)'),
+    g('TNC_LICENSE_CONFIRMED',true,String(process.env.TNC_LICENSE_CONFIRMED||'')==='true',
+     process.env.TNC_LICENSE_REFERENCE?'Licence confirmed, reference on file':'Licence confirmed (add TNC_LICENSE_REFERENCE)',
+     'NTSA TNC licence not confirmed — set TNC_LICENSE_CONFIRMED and TNC_LICENSE_REFERENCE'),
+    g('GOOGLE_MAPS_BROWSER_KEY',true,!!process.env.GOOGLE_MAPS_BROWSER_KEY,'Browser Maps key configured','Browser Maps key missing — pickup/destination map UX unavailable'),
+    g('GOOGLE_MAPS_SERVER_KEY',true,!!process.env.GOOGLE_MAPS_SERVER_KEY,'Server routing key configured','Server routing key missing — fares use labelled estimates, not real routes'),
+    g('SUPPORT_EMERGENCY_PHONE',true,!!process.env.SUPPORT_EMERGENCY_PHONE,'Emergency/support line configured','Emergency/support phone not set — Safety Centre has no live line'),
+    g('RATE_CARD',true,!!card,
+     card?`Active card resolved: ${card.vehicle_category} from ${String(card.effective_from).slice(0,10)}`:'',
+     zone?'No active, currently-effective rate card resolves for the pilot zone (zone or ancestor, passenger-car category)':'Pilot zone is missing or inactive'),
+    g('MPESA',false,mpesa.status().ready&&mpesa.status().mode!=='mock',
+     'M-Pesa live: '+mpesa.status().mode,'Cash pilot runs without it — configure Daraja credentials to enable M-Pesa'),
+    g('PHONE_MASKING',false,String(process.env.PHONE_MASKING_ENABLED||'')==='true',
+     'External masking provider enabled','Not required — authenticated in-app chat keeps personal numbers hidden'),
+   ];
+   res.json({gates,production_ready:gates.filter(x=>x.required).every(x=>x.pass)});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
 };

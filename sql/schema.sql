@@ -429,6 +429,11 @@ CREATE TABLE IF NOT EXISTS fare_rate_cards(
  updated_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS fare_cards_area_idx ON fare_rate_cards(area_id,vehicle_category,effective_from DESC);
+-- No two identical ACTIVE cards for the same area/category/effective date (historical/deactivated cards are kept).
+-- Pre-existing exact duplicates are deactivated (newest kept) so the index can build.
+WITH dup AS(SELECT id,ROW_NUMBER() OVER(PARTITION BY area_id,LOWER(vehicle_category),effective_from ORDER BY created_at DESC,id DESC) rn FROM fare_rate_cards WHERE active)
+UPDATE fare_rate_cards SET active=false WHERE id IN(SELECT id FROM dup WHERE rn>1);
+CREATE UNIQUE INDEX IF NOT EXISTS fare_cards_no_dup_active ON fare_rate_cards(area_id,LOWER(vehicle_category),effective_from) WHERE active;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- REAL-TIME RIDE-HAILING (Embu pilot; Kenya-wide via geo_areas). All additive.
