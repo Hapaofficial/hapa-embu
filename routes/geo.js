@@ -116,7 +116,10 @@ module.exports=function(app,deps){
    if(!area)return res.status(400).json({error:'Area not found'});
    const cat=String(b.vehicle_category||'').trim().slice(0,60);
    if(!cat)return res.status(400).json({error:'Vehicle category is required'});
-   const n=x=>{const v=Number(x);return Number.isFinite(v)&&v>=0&&v<1e6?Math.round(v*100)/100:null;};
+   // Blank/absent values must NOT silently coerce to 0 (Number('')===0):
+   // a card saved with an empty base-fare box once went live charging base 0.
+   // An explicit numeric 0 remains a legitimate value.
+   const n=x=>{if(x==null||String(x).trim()==='')return null;const v=Number(x);return Number.isFinite(v)&&v>=0&&v<1e6?Math.round(v*100)/100:null;};
    const base=n(b.base_fare),perKm=n(b.per_km??0),perMin=n(b.per_min??0),min=n(b.minimum_fare??0);
    if(base==null||perKm==null||perMin==null||min==null)return res.status(400).json({error:'Invalid fare values'});
    const eff=b.effective_from?String(b.effective_from).slice(0,10):null;

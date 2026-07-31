@@ -380,9 +380,13 @@ module.exports=function(app,deps){
    const subtotal=comp.base_fare+comp.booking_fee+comp.distance_charge+comp.time_charge;
    const total=money(Math.max(comp.minimum_fare,subtotal));
    const ttl=Number(await cfg('quote_ttl_s'));
+   // Store the validated REQUESTED category (e.g. 'Passenger Car'), not the
+   // card's own label (e.g. 'car'): dispatch matches vehicles against the
+   // quote's category, so an alias card name would strand rides in search.
+   const catCanonical=cats.find(c=>c.toLowerCase()===category.toLowerCase())||category;
    const r=(await q(`INSERT INTO fare_quotes(rider_id,zone_id,rate_card_id,vehicle_category,currency,distance_m,duration_s,components,total,route_source,expires_at)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+make_interval(secs=>$11)) RETURNING *`,
-    [req.user.id,zone.id,card.id,card.vehicle_category,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl])).rows[0];
+    [req.user.id,zone.id,card.id,catCanonical,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl])).rows[0];
    res.status(201).json({quote:r,polyline:route.polyline,zone_name:zone.name,mock_routing:route.source!=='google',
     note:route.source==='google'?null:'Route estimated without Google Maps — development estimate only.'});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}

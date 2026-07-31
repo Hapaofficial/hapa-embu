@@ -2342,6 +2342,7 @@ async function oFareCreate(){
  const m=$('fcMsg');m.textContent='';
  const btn=$('fcAddBtn');fcSubmitting=true;if(btn){btn.disabled=true;btn.textContent='Adding…';}
  try{
+  if($('fcBase').value.trim()===''){m.textContent='Base fare is required (enter 0 for no base fare).';fcSubmitting=false;if(btn){btn.disabled=false;btn.textContent='Add rate card';}return;}
   const body={area:$('fcArea').value,vehicle_category:$('fcCat').value,base_fare:$('fcBase').value,per_km:$('fcKm').value,per_min:$('fcMin').value,minimum_fare:$('fcFloor').value};
   if($('fcEff').value)body.effective_from=$('fcEff').value; // date input is already a plain YYYY-MM-DD calendar date
   await api('/api/owner/fare-cards',{method:'POST',body:JSON.stringify(body)});
@@ -3357,7 +3358,7 @@ async function rdEstimate(){
   const c=r.quote.components;
   $('rdQuoteBox').classList.remove('hidden');
   $('rdQuoteBox').innerHTML=`<div class="row"><span>Estimated fare</span><b style="font-size:20px">KES ${Number(r.quote.total).toLocaleString()}</b></div>
-   <small class="muted">Base ${c.base_fare} · Distance ${c.distance_charge} · Time ${c.time_charge} · ~${(r.quote.distance_m/1000).toFixed(1)} km${r.note?`<br>${esc(r.note)}`:''}</small>
+   <small class="muted">Base: KES ${Number(c.base_fare).toFixed(2)} · Distance: KES ${Number(c.distance_charge).toFixed(2)} · Time: KES ${Number(c.time_charge).toFixed(2)} · Total: KES ${Number(r.quote.total).toFixed(2)} · ~${(r.quote.distance_m/1000).toFixed(1)} km${r.note?`<br>${esc(r.note)}`:''}</small>
    <p class="muted" style="font-size:12px;margin:8px 0 8px">Fixed upfront price. Valid ${Math.round((new Date(r.quote.expires_at)-Date.now())/60000)} min. Cash or M-Pesa on completion.</p>
    <button class="btn primary" onclick="rdRequest()" style="width:100%">Request ride — KES ${Number(r.quote.total).toLocaleString()}</button>`;
  }catch(e){alert(e.message);}
