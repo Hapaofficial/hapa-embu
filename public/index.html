@@ -986,7 +986,7 @@ function showAuthPrompt(msg,isPending){
 }
 function hideAuthPrompt(){ $('authPromptPanel').classList.add('hidden'); }
 
-function logout(){try{ppRevokeBlobUrls();}catch{}try{if(token)api('/api/me/device-tokens',{method:'DELETE',body:JSON.stringify({})}).catch(()=>{});}catch{}clearToken();location.href=location.pathname;}
+function logout(){try{rideChat.drafts={};rideChat.sending={};}catch{}try{ppRevokeBlobUrls();}catch{}try{if(token)api('/api/me/device-tokens',{method:'DELETE',body:JSON.stringify({})}).catch(()=>{});}catch{}clearToken();location.href=location.pathname;}
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
@@ -3398,7 +3398,7 @@ async function rdRefresh(){
   }
  }catch(e){rdClearRide();}
 }
-function rdClearRide(){rdState.rideId=null;rdState.pin=null;rdState.lastEvent=0;localStorage.removeItem('hapa_ride');localStorage.removeItem('hapa_ride_pin');clearInterval(rdState.poll);rdState.poll=null;$('rdActiveCard').classList.add('hidden');$('rdBookCard').classList.remove('hidden');rdLoadHistory();}
+function rdClearRide(){if(rdState.rideId){delete rideChat.drafts[rdState.rideId];chatUnmount('rdChatArea',rdState.rideId);}rdState.rideId=null;rdState.pin=null;rdState.lastEvent=0;localStorage.removeItem('hapa_ride');localStorage.removeItem('hapa_ride_pin');clearInterval(rdState.poll);rdState.poll=null;$('rdActiveCard').classList.add('hidden');$('rdBookCard').classList.remove('hidden');rdLoadHistory();}
 function rdRenderActive(ride){
  $('rdBookCard').classList.add('hidden');$('rdActiveCard').classList.remove('hidden');
  const st=ride.status;
@@ -3419,10 +3419,13 @@ function rdRenderActive(ride){
  if(['closed','rider_cancelled','driver_cancelled'].includes(st))h+=`<button class="btn primary" onclick="rdClearRide()">Done</button>`;
  h+=`</div>`;
  if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt()">Receipt</button></div>`;
- if(['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(st))
-  h+=`<div style="margin-top:10px"><div id="rdMsgs" style="max-height:120px;overflow:auto;font-size:13px"></div><div style="display:flex;gap:6px;margin-top:6px"><input id="rdMsgIn" placeholder="Message driver…" style="flex:1" maxlength="500"><button class="btn" onclick="rdChatSend()">Send</button></div></div>`;
- $('rdActiveBody').innerHTML=h;
- if($('rdMsgs'))rdChatLoad();
+ // Persistent skeleton: only the status area is re-rendered on realtime
+ // refreshes; the chat composer DOM element is never recreated while open,
+ // so drafts, focus and caret survive location/status/poll updates.
+ if(!$('rdStatusArea'))$('rdActiveBody').innerHTML='<div id="rdStatusArea"></div><div id="rdChatArea"></div>';
+ $('rdStatusArea').innerHTML=h;
+ if(CHAT_OPEN.includes(st))chatMount('rdChatArea',ride.id,'Message driver…');
+ else chatUnmount('rdChatArea',RD_OPEN.includes(st)?null:ride.id);
 }
 async function rdCancel(){if(!confirm('Cancel this ride?'))return;try{await api('/api/rides/'+rdState.rideId+'/cancel',{method:'POST',body:JSON.stringify({reason:'Rider cancelled'})});rdRefresh();}catch(e){alert(e.message);}}
 async function rdRetry(){try{await api('/api/rides/'+rdState.rideId+'/retry',{method:'POST'});rdRefresh();}catch(e){alert(e.message);}}
@@ -3431,8 +3434,43 @@ async function rdEmergency(){try{const r=await api('/api/rides/'+rdState.rideId+
 async function rdPayMpesa(){const ph=prompt('M-Pesa phone number (2547XXXXXXXX):');if(!ph)return;try{const r=await api('/api/rides/'+rdState.rideId+'/pay-mpesa',{method:'POST',body:JSON.stringify({phone:ph})});alert(r.note);setTimeout(rdRefresh,2500);}catch(e){alert(e.message);}}
 async function rdRate(n){try{await api('/api/rides/'+rdState.rideId+'/rate',{method:'POST',body:JSON.stringify({rating:n})});$('rdRateBox').innerHTML='<b>Asante! Rating saved.</b> <button class="btn" onclick="rdReceipt()">Receipt</button>';}catch(e){alert(e.message);}}
 async function rdReceipt(){try{const r=await api('/api/rides/'+rdState.rideId+'/receipt');const b=r.body;alert(`HAPA Receipt ${r.reference}\n${b.pickup} → ${b.destination}\nDriver: ${b.driver}\nTotal: KES ${b.total} (${b.payment_method})\n${b.payment_ref?'Ref: '+b.payment_ref:''}`);}catch(e){alert(e.message);}}
-async function rdChatLoad(){try{const m=await api('/api/rides/'+rdState.rideId+'/messages');const el=$('rdMsgs');if(el)el.innerHTML=m.map(x=>`<div style="text-align:${x.mine?'right':'left'}"><span style="background:${x.mine?'var(--hapa-primary)':'var(--hapa-surface)'};border-radius:8px;padding:3px 8px;display:inline-block;margin:2px 0">${esc(x.body)}</span></div>`).join('');el&&(el.scrollTop=el.scrollHeight);}catch(e){}}
-async function rdChatSend(){const v=$('rdMsgIn').value.trim();if(!v)return;try{await api('/api/rides/'+rdState.rideId+'/messages',{method:'POST',body:JSON.stringify({body:v})});$('rdMsgIn').value='';rdChatLoad();}catch(e){alert(e.message);}}
+// ── Ride chat widget (draft-preserving; shared by rider & driver panels) ──
+// Drafts live in memory only, keyed by ride id — never in URLs, storage,
+// logs or HTML attributes. The input element is created once per ride and
+// left untouched by realtime re-renders; only the message list refreshes.
+const CHAT_OPEN=['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'];
+const rideChat={drafts:{},sending:{}};
+function chatMount(areaId,rideId,placeholder){
+ const area=$(areaId);if(!area)return;
+ if(area.getAttribute('data-ride')===String(rideId)&&$(areaId+'In')){chatLoadMsgs(areaId,rideId);return;}
+ area.setAttribute('data-ride',String(rideId));
+ area.innerHTML=`<div style="margin-top:10px"><div id="${areaId}Msgs" style="max-height:120px;overflow:auto;font-size:13px"></div><div style="display:flex;gap:6px;margin-top:6px"><input id="${areaId}In" placeholder="${placeholder}" style="flex:1" maxlength="500" autocomplete="off"><button class="btn" id="${areaId}Btn">Send</button></div><small id="${areaId}Err" style="color:var(--bad)"></small></div>`;
+ const inp=$(areaId+'In');
+ inp.value=rideChat.drafts[rideId]||'';
+ inp.addEventListener('input',()=>{rideChat.drafts[rideId]=inp.value;});
+ inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();chatSend(areaId,rideId);}});
+ $(areaId+'Btn').addEventListener('click',()=>chatSend(areaId,rideId));
+ chatLoadMsgs(areaId,rideId);
+}
+function chatUnmount(areaId,clearDraftRideId){
+ if(clearDraftRideId)delete rideChat.drafts[clearDraftRideId];
+ const area=$(areaId);if(!area)return;
+ if(area.getAttribute('data-ride')){area.innerHTML='';area.removeAttribute('data-ride');}
+}
+async function chatLoadMsgs(areaId,rideId){try{const m=await api('/api/rides/'+rideId+'/messages');const el=$(areaId+'Msgs');if(!el)return;el.innerHTML=m.map(x=>`<div style="text-align:${x.mine?'right':'left'}"><span style="background:${x.mine?'var(--hapa-primary)':'var(--hapa-surface)'};border-radius:8px;padding:3px 8px;display:inline-block;margin:2px 0">${esc(x.body)}</span></div>`).join('');el.scrollTop=el.scrollHeight;}catch(e){}}
+async function chatSend(areaId,rideId){
+ const inp=$(areaId+'In'),btn=$(areaId+'Btn'),err=$(areaId+'Err');
+ if(!inp)return;const v=inp.value.trim();if(!v)return;
+ if(rideChat.sending[areaId])return; // no duplicate sends
+ rideChat.sending[areaId]=true;if(btn)btn.disabled=true;if(err)err.textContent='';
+ try{
+  await api('/api/rides/'+rideId+'/messages',{method:'POST',body:JSON.stringify({body:v})});
+  inp.value='';delete rideChat.drafts[rideId]; // clear the draft exactly once, only after success
+  chatLoadMsgs(areaId,rideId);
+ }catch(e){if(err)err.textContent='Message not sent — check your connection and try again.';rideChat.drafts[rideId]=inp.value;}
+ rideChat.sending[areaId]=false;if(btn)btn.disabled=false;
+}
+// ── end ride chat widget ──
 async function rdLoadContacts(){try{const c=await api('/api/me/trusted-contacts');$('rdContacts').innerHTML=c.length?c.map(x=>`${esc(x.name)} (${esc(x.phone)}) <button class="btn" style="padding:2px 8px;font-size:11px" onclick="rdDelContact('${x.id}')">remove</button>`).join('<br>'):'Add a trusted contact — they can follow your trips when you share.';}catch(e){}}
 async function rdAddContact(){try{await api('/api/me/trusted-contacts',{method:'POST',body:JSON.stringify({name:$('rdTcName').value.trim(),phone:$('rdTcPhone').value.trim()})});$('rdTcName').value='';$('rdTcPhone').value='';rdLoadContacts();}catch(e){alert(e.message);}}
 async function rdDelContact(id){try{await api('/api/me/trusted-contacts/'+id,{method:'DELETE'});rdLoadContacts();}catch(e){}}
@@ -3469,13 +3507,20 @@ async function drvLoad(){
    else if(st==='pin_verified')act=`<button class="btn primary" onclick="drvStep('start')">Start trip</button>`;
    else if(st==='in_progress')act=`<button class="btn primary" onclick="drvStep('complete')">Complete trip</button>`;
    else if(st==='payment_pending')act=r.payment_method==='cash'?`<button class="btn primary" onclick="drvCash()">Cash collected — KES ${Number(r.final_fare).toLocaleString()}</button><button class="btn" onclick="drvUnpaid()">Not paid</button>`:`<span class="muted">Waiting for M-Pesa payment (KES ${Number(r.final_fare).toLocaleString()})…</span>`;
-   $('drvRideBody').innerHTML=`<h3 style="margin-top:0">${esc(rdStatusCopy[st]||st)}</h3>
+   // Persistent skeleton: PIN box + chat composer live outside the
+   // re-rendered status area so realtime refreshes never wipe typing.
+   if(!$('drvRideStatus'))$('drvRideBody').innerHTML='<div id="drvRideStatus"></div><div id="drvPinArea"></div><div id="drvChatArea"></div>';
+   $('drvRideStatus').innerHTML=`<h3 style="margin-top:0">${esc(rdStatusCopy[st]||st)}</h3>
     <p style="margin:6px 0">${esc(r.pickup_address||'')} → ${esc(r.dest_address||'')}${r.pickup_note?`<br><small class="muted">Note: ${esc(r.pickup_note)}</small>`:''}</p>
     <div class="row"><span>Fare (fixed)</span><b>KES ${Number(r.final_fare||r.quote.total).toLocaleString()}</b></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${act}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${st==='driver_arrived'?'':act}
      ${['driver_assigned','driver_en_route','driver_arrived','pin_verified'].includes(st)?`<button class="btn" onclick="drvCancel()">Cancel</button>`:''}</div>`;
+   if(st==='driver_arrived'){if(!$('drvPinIn'))$('drvPinArea').innerHTML=`<div style="display:flex;gap:8px;margin-top:8px"><input id="drvPinIn" placeholder="Rider PIN" maxlength="4" inputmode="numeric" style="width:110px;font-size:20px;text-align:center"><button class="btn primary" onclick="drvVerifyPin()">Verify PIN</button></div>`;}
+   else if($('drvPinArea'))$('drvPinArea').innerHTML='';
+   if(CHAT_OPEN.includes(st))chatMount('drvChatArea',r.id,'Message rider…');
+   else chatUnmount('drvChatArea',r.id);
    drvState.rideId=r.id;
-  }else{$('drvRideCard').classList.add('hidden');drvState.rideId=null;}
+  }else{if(drvState.rideId)chatUnmount('drvChatArea',drvState.rideId);$('drvRideCard').classList.add('hidden');drvState.rideId=null;}
   // Vehicles / docs / earnings
   const vs=await api('/api/me/vehicles');
   $('drvVehicles').innerHTML=vs.map(v=>`<div class="row" style="padding:4px 0"><span>${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</span><b style="color:${v.status==='approved'?'var(--ok)':v.status==='rejected'?'var(--bad)':'var(--a)'}">${esc(v.status)}</b></div>`).join('')||'No vehicles yet — add one below.';
