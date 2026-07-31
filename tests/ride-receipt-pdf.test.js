@@ -132,6 +132,23 @@ const ping = (drv, lat, lng, seq) => j('POST', '/api/driver/location', drv.tok, 
   ok('PDF marked as receipt, not tax invoice', txt.includes('not a tax invoice') && !/VAT|KRA/i.test(txt));
   ok('PDF shows PAID status and route', txt.includes('PAID') && txt.includes('Embu CBD') && txt.includes('Kangaru'));
 
+  // PDF structural integrity with non-ASCII (accented) customer fields:
+  // /Length and xref offsets must both be Latin-1 byte counts.
+  const { buildReceiptPdf } = require('../lib/receipt-pdf');
+  const accented = buildReceiptPdf('HAPA-ACCENT-01', { ...rec.d.body, driver: 'Ngugî wa Thiong\u2019o Ünïté', pickup: 'Caf\u00e9 \u00c9mbu \u2192 R\u00fcta', destination: 'M\u00fcller\u2019s pla\u00e7e' }, rec.d.created_at);
+  ok('non-ASCII PDF keeps valid signature + EOF', accented.slice(0, 5).toString() === '%PDF-' && accented.toString('latin1').trimEnd().endsWith('%%EOF'));
+  {
+    const s = accented.toString('latin1');
+    const lenM = s.match(/\/Length (\d+) >>\nstream\n/);
+    const streamStart = s.indexOf('stream\n', s.indexOf('/Length')) + 'stream\n'.length;
+    const streamEnd = s.indexOf('\nendstream', streamStart);
+    ok('/Length matches actual Latin-1 stream bytes', lenM && Number(lenM[1]) === Buffer.byteLength(s.slice(streamStart, streamEnd), 'latin1'), lenM && lenM[1]);
+    const xrefPos = Number(s.match(/startxref\n(\d+)\n/)[1]);
+    ok('xref offset points at the xref table', s.slice(xrefPos, xrefPos + 4) === 'xref', s.slice(xrefPos, xrefPos + 8));
+    const off3 = Number(s.match(/xref\n0 \d+\n0000000000 65535 f \n(\d{10})/)[1]);
+    ok('first object offset lands on its header', s.slice(off3, off3 + 7) === '1 0 obj', s.slice(off3, off3 + 10));
+  }
+
   // Random ride id cannot bypass authorization
   ok('nonexistent ride -> 404 (no info leak)', (await raw('/api/rides/00000000-0000-4000-8000-000000000000/receipt.pdf', outsider.tok)).s === 404);
 
