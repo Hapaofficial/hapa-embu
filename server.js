@@ -42,7 +42,11 @@ app.use((req,res,next)=>{
  if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
  next();
 });
-app.use(express.static(path.join(__dirname,'public')));
+app.use(express.static(path.join(__dirname,'public'),{
+ // The app shell and service worker must always revalidate: a stale cached
+ // shell (browser, proxy or CDN) is how "fixed" bugs keep reappearing live.
+ setHeaders:(res,fp)=>{if(/index\.html$|sw\.js$/.test(fp))res.set('Cache-Control','no-cache, must-revalidate');}
+}));
 // Authenticated/dynamic API responses must never be cached by browsers,
 // proxies or the service worker (ride history, receipts, tokens, payments).
 // Individual public endpoints may still opt into caching afterwards.

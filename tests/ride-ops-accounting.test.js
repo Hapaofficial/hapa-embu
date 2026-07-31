@@ -192,7 +192,18 @@ async function runRide(riderTok, drvTok, pay = 'cash') {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   ok('rider history shows loading state first', html.includes("el.innerHTML='Loading your trips…'"));
   ok('rider history transient error offers Retry', html.includes('onclick="rdLoadHistory()">Retry</button>'));
-  ok('"No rides yet" only after a successful response', /rdHistLoaded=true;[\s\S]{0,2500}\|\|'No rides yet\.'/.test(html) && !/catch[\s\S]{0,200}No rides yet/.test(html.slice(html.indexOf('async function rdLoadHistory'))));
+  ok('"No rides yet" only after a successful response', /rdHistLoaded=true;[\s\S]{0,3500}No rides yet on this account/.test(html) && !/catch[\s\S]{0,200}No rides yet/.test(html.slice(html.indexOf('async function rdLoadHistory'))));
+  // Regression pack for the "confirmed rider, empty history" live report:
+  ok('api() bypasses every HTTP cache', html.includes("o.cache='no-store'"));
+  ok('empty state names the authenticated account', html.includes("No rides yet on this account (${esc(me?.email"));
+  ok('non-array 200 response treated as error, not empty history', html.includes('if(!Array.isArray(rows))'));
+  ok('shell carries a version marker', /const HAPA_SHELL='[\d.]+'/.test(html));
+  const swjs = fs.readFileSync(path.join(__dirname, '..', 'public', 'sw.js'), 'utf8');
+  ok('service worker never caches /api/', swjs.includes("u.pathname.startsWith('/api/'))return"));
+  const shellHdr = await fetch(B + '/index.html');
+  ok('app shell served no-cache', /no-cache/.test(shellHdr.headers.get('cache-control') || ''), shellHdr.headers.get('cache-control'));
+  const swHdr = await fetch(B + '/sw.js');
+  ok('service worker served no-cache', /no-cache/.test(swHdr.headers.get('cache-control') || ''), swHdr.headers.get('cache-control'));
   ok('populated history never blanked on error', html.includes('if(!rdHistLoaded)el.innerHTML=`Could not load'));
   ok('receipt header uses plain flex rows (no white .row blocks)', !/hapa-header[\s\S]{0,900}class="row"/.test(html.slice(html.indexOf('function rcptOpen'), html.indexOf('function rcptClose'))));
   ok('receipt header shows title, ref, date, payment', html.includes('>Ride receipt</span>') && /rcptTitle/.test(html) && html.includes('${esc(pm)} · Paid'));

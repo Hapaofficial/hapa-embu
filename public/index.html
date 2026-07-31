@@ -870,6 +870,7 @@ function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
 function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s!=='undefined')?s:PH_IMG;}
 
 // ── State ────────────────────────────────────────────────────────────────────
+const HAPA_SHELL='1.9.6';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
 let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
 // ── Native (Capacitor) bridge: Keystore/Keychain-backed token storage when the
 // SecureStoragePlugin is present. On native builds the token is mirrored to
@@ -1023,7 +1024,7 @@ function logout(){try{rideChat.drafts={};rideChat.sending={};}catch{}try{ppRevok
 // ── Auth helpers ──────────────────────────────────────────────────────────────
 function authMode(x){['loginForm','registerForm','verifyForm','forgotForm'].forEach(i=>{$(i)&&$(i).classList.add('hidden')});const t=x==='login'?'loginForm':x==='register'?'registerForm':x==='verify'?'verifyForm':'forgotForm';$(t)&&$(t).classList.remove('hidden');}
 function msg(t,b=false){$('authMsg').innerHTML=`<div class="notice ${b?'bad':''}">${t}</div>`;}
-async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok){const err=new Error(d.error||'Request failed');err.status=r.status;throw err;}return d;}
+async function api(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})};o.cache='no-store';/* authenticated data must never come from any HTTP cache */let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok){const err=new Error(d.error||'Request failed');err.status=r.status;throw err;}return d;}
 async function publicApi(u,o={}){o.headers={...(o.headers||{}),'Content-Type':'application/json'};let r=await fetch(u,o),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Request failed');return d;}
 function mpApiBase(){return(appMode==='active'||appMode==='owner')?'/api':'/api/public';}
 async function f64(el){let f=el?.files?.[0];if(!f)return'';if(f.size>2*1024*1024)throw new Error('Photo must be under 2 MB');return await new Promise((a,b)=>{let r=new FileReader();r.onload=()=>a(r.result);r.onerror=b;r.readAsDataURL(f);});}
@@ -3670,6 +3671,12 @@ async function rdLoadHistory(){
   if(!rdHistLoaded)el.innerHTML=`Could not load your trips right now. <button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px;margin-left:6px" onclick="rdLoadHistory()">Retry</button>`;
   return;
  }
+ if(!Array.isArray(rows)){
+  // A 200 that isn't the ride list (proxy error page, unexpected body) must
+  // never be mistaken for "this rider has no rides".
+  if(!rdHistLoaded)el.innerHTML=`Could not load your trips right now. <button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px;margin-left:6px" onclick="rdLoadHistory()">Retry</button>`;
+  return;
+ }
  rdHistLoaded=true;
  const open=rows.find(r=>RD_OPEN.includes(r.status));if(open&&!rdState.rideId){rdState.rideId=open.id;localStorage.setItem('hapa_ride',open.id);rdRefresh();}
  const seen=new Set();
@@ -3684,7 +3691,7 @@ async function rdLoadHistory(){
   const pay=ps?esc(pm)+' · '+esc(ps):'';
   const rated=r.status==='closed'?(r.i_rated?'Rated ✓':'Not rated yet'):'';
   return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(meta)}${who?'<br>'+who:''}${pay?'<br>'+pay+(rated?' · '+esc(rated):''):''}</small></span><span style="text-align:right"><b>${r.final_fare!=null?esc(kesFmt(r.final_fare)):''}</b>${r.status==='closed'?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
- }).join('')||'No rides yet.';
+ }).join('')||`No rides yet on this account (${esc(me?.email||'signed in')}).`;
 }
 
 // ── Driver mode ──
