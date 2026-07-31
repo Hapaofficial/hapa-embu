@@ -3394,7 +3394,12 @@ async function rdRefresh(){
    if(!rdState.poll)rdState.poll=setInterval(rdRefresh,4000);
   }else{
    clearInterval(rdState.poll);rdState.poll=null;
-   if(['closed','rider_cancelled','driver_cancelled'].includes(r.ride.status)){/* keep card until dismissed */}
+   if(['closed','rider_cancelled','driver_cancelled'].includes(r.ride.status)){
+    // Terminal ride: keep the active card visible (rating + receipt still
+    // available) but surface the trip in Recent rides immediately — no
+    // "Done" needed. Guarded per ride id so refreshes never loop.
+    if(rdState.histSyncedFor!==r.ride.id){rdState.histSyncedFor=r.ride.id;rdLoadHistory();}
+   }
   }
  }catch(e){rdClearRide();}
 }
@@ -3418,7 +3423,7 @@ function rdRenderActive(ride){
  if(st==='payment_failed')h+=`<button class="btn primary" onclick="rdPayMpesa()">Retry M-Pesa</button>`;
  if(['closed','rider_cancelled','driver_cancelled'].includes(st))h+=`<button class="btn primary" onclick="rdClearRide()">Done</button>`;
  h+=`</div>`;
- if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt()">Receipt</button></div>`;
+ if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt(rdState.rideId,this)">Receipt</button></div>`;
  // Persistent skeleton: only the status area is re-rendered on realtime
  // refreshes; the chat composer DOM element is never recreated while open,
  // so drafts, focus and caret survive location/status/poll updates.
@@ -3432,8 +3437,141 @@ async function rdRetry(){try{await api('/api/rides/'+rdState.rideId+'/retry',{me
 async function rdShare(){try{const r=await api('/api/rides/'+rdState.rideId+'/share',{method:'POST'});const url=location.origin+'/api/public/trip/'+r.token;if(navigator.share)navigator.share({title:'Follow my HAPA trip',url}).catch(()=>{});else{navigator.clipboard?.writeText(url);alert('Trip link copied — send it to someone you trust:\n'+url);}}catch(e){alert(e.message);}}
 async function rdEmergency(){try{const r=await api('/api/rides/'+rdState.rideId+'/emergency');alert((r.configured?`Emergency line: ${r.emergency_phone}\n`:'')+r.note+`\nRide ref: ${r.ride_reference}`);}catch(e){alert(e.message);}}
 async function rdPayMpesa(){const ph=prompt('M-Pesa phone number (2547XXXXXXXX):');if(!ph)return;try{const r=await api('/api/rides/'+rdState.rideId+'/pay-mpesa',{method:'POST',body:JSON.stringify({phone:ph})});alert(r.note);setTimeout(rdRefresh,2500);}catch(e){alert(e.message);}}
-async function rdRate(n){try{await api('/api/rides/'+rdState.rideId+'/rate',{method:'POST',body:JSON.stringify({rating:n})});$('rdRateBox').innerHTML='<b>Asante! Rating saved.</b> <button class="btn" onclick="rdReceipt()">Receipt</button>';}catch(e){alert(e.message);}}
-async function rdReceipt(){try{const r=await api('/api/rides/'+rdState.rideId+'/receipt');const b=r.body;alert(`HAPA Receipt ${r.reference}\n${b.pickup} → ${b.destination}\nDriver: ${b.driver}\nTotal: KES ${b.total} (${b.payment_method})\n${b.payment_ref?'Ref: '+b.payment_ref:''}`);}catch(e){alert(e.message);}}
+async function rdRate(n){try{await api('/api/rides/'+rdState.rideId+'/rate',{method:'POST',body:JSON.stringify({rating:n})});$('rdRateBox').innerHTML='<b>Asante! Rating saved.</b> <button class="btn" onclick="rdReceipt(rdState.rideId,this)">Receipt</button>';}catch(e){alert(e.message);}}
+// ── Ride receipt module (customer-facing financial record) ──
+// Modal + PDF download + share. Only customer-facing fields are ever
+// rendered; commission, earnings, internal modes and IDs never appear.
+// Receipt data stays in memory — never in URLs, storage or logs.
+function kesFmt(n){return 'KES '+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function nrbDate(dt,dateOnly){try{return new Intl.DateTimeFormat('en-KE',{timeZone:'Africa/Nairobi',day:'2-digit',month:'short',year:'numeric',...(dateOnly?{}:{hour:'2-digit',minute:'2-digit',hour12:false})}).format(new Date(dt))+(dateOnly?'':' EAT');}catch(e){return '';}}
+const rcptState={loading:false,lastFocus:null,keyHandler:null,rideId:null,data:null};
+function rcptInlineNotice(btn,msg){
+ if(!btn||!btn.parentNode)return;
+ let n=btn.parentNode.querySelector('.rcpt-notice');
+ if(!n){n=document.createElement('small');n.className='rcpt-notice';n.setAttribute('role','alert');n.style.cssText='display:block;color:var(--bad);margin-top:4px';btn.parentNode.appendChild(n);}
+ n.textContent=msg;
+}
+async function rdReceipt(rideId=rdState.rideId,btn){
+ if(rcptState.loading||!rideId)return; // prevent duplicate receipt requests
+ rcptState.loading=true;
+ const oldLabel=btn?btn.textContent:'';
+ if(btn){btn.disabled=true;btn.textContent='Loading receipt…';btn.parentNode.querySelector('.rcpt-notice')?.remove();}
+ try{
+  const rec=await api('/api/rides/'+rideId+'/receipt');
+  rcptOpen(rideId,rec,btn);
+ }catch(e){rcptInlineNotice(btn,e.message||'Could not load the receipt. Please try again.');}
+ finally{rcptState.loading=false;if(btn){btn.disabled=false;btn.textContent=oldLabel;}}
+}
+function rcptOpen(rideId,rec,btn){
+ rcptClose(); // never stack modals or leak listeners/locks
+ const b=rec.body||{},c=b.components||{};
+ rcptState.rideId=rideId;rcptState.data=rec;rcptState.lastFocus=btn||document.activeElement;
+ const rows=[['Base fare',c.base_fare],['Booking fee',c.booking_fee],['Distance charge',c.distance_charge],['Time charge',c.time_charge]].filter(x=>x[1]!=null);
+ if(Number(c.waiting_charge)>0)rows.push(['Waiting charge',c.waiting_charge]);
+ const pm=b.payment_method==='mpesa'?'M-Pesa':b.payment_method==='cash'?'Cash':(b.payment_method||'');
+ const ov=document.createElement('div');
+ ov.className='modal-backdrop';ov.id='rcptOverlay';
+ ov.innerHTML=`<div class="modal" id="rcptDialog" role="dialog" aria-modal="true" aria-labelledby="rcptTitle" style="max-width:480px;padding:0;overflow:hidden">
+  <div style="background:var(--hapa-header);color:#fff;padding:18px 22px;border-bottom:4px solid var(--hapa-primary)">
+   <div class="row" style="align-items:flex-start">
+    <span><span style="font-weight:800;font-size:22px;letter-spacing:1px">HAPA</span><br><span id="rcptTitle" style="font-size:13px;opacity:.85">Official ride receipt</span></span>
+    <button class="btn" id="rcptX" aria-label="Close receipt" style="min-width:44px;min-height:44px;background:transparent;color:#fff;border-color:rgba(255,255,255,.35)">✕</button>
+   </div>
+   <div class="row" style="margin-top:8px"><b style="font-size:13px">${esc(rec.reference)}</b><small style="opacity:.85">${esc(nrbDate(b.datetime||rec.created_at))}</small></div>
+  </div>
+  <div style="padding:18px 22px;max-height:60vh;overflow:auto">
+   <div class="row"><span style="background:var(--ok);color:#fff;font-weight:800;border-radius:6px;padding:4px 12px;font-size:13px">✓ PAID</span><small class="muted">${esc(pm)}${b.payment_ref?' · Ref '+esc(b.payment_ref):''}</small></div>
+   <div style="margin-top:14px;font-size:14px">
+    <div class="row" style="padding:3px 0"><span class="muted">From</span><b style="text-align:right;max-width:65%">${esc(b.pickup||'')}</b></div>
+    <div class="row" style="padding:3px 0"><span class="muted">To</span><b style="text-align:right;max-width:65%">${esc(b.destination||'')}</b></div>
+    ${b.distance_m!=null?`<div class="row" style="padding:3px 0"><span class="muted">Trip</span><span>${esc((Number(b.distance_m)/1000).toFixed(1))} km · ${esc(String(Math.round(Number(b.duration_s||0)/60)))} min</span></div>`:''}
+    <div class="row" style="padding:3px 0"><span class="muted">Driver</span><span>${esc(b.driver||'HAPA Driver')}</span></div>
+    ${b.vehicle?`<div class="row" style="padding:3px 0"><span class="muted">Vehicle</span><span>${esc(b.vehicle)}${b.registration?' · '+esc(b.registration):''}</span></div>`:''}
+   </div>
+   <div style="border-top:1px solid var(--hapa-border);margin-top:12px;padding-top:10px;font-size:14px">
+    ${rows.map(([l,v])=>`<div class="row" style="padding:3px 0"><span class="muted">${esc(l)}</span><span>${esc(kesFmt(v))}</span></div>`).join('')}
+    ${b.note?`<small class="muted">${esc(b.note)}</small>`:''}
+    <div class="row" style="border-top:1px solid var(--hapa-border);margin-top:8px;padding-top:10px"><b style="font-size:16px">Total paid</b><b style="font-size:16px">${esc(kesFmt(b.total))}</b></div>
+   </div>
+   <small class="muted" style="display:block;margin-top:10px">This is a ride receipt, not a tax invoice.</small>
+   <small id="rcptStatus" role="status" aria-live="polite" style="display:block;margin-top:6px;min-height:16px"></small>
+  </div>
+  <div class="modal-actions" style="padding:0 22px 18px;margin-top:0">
+   <button class="btn" id="rcptShareBtn" style="min-height:44px">Share</button>
+   <button class="btn" id="rcptDlBtn" style="min-height:44px">Download PDF</button>
+   <button class="btn primary" id="rcptCloseBtn" style="min-height:44px">Close</button>
+  </div></div>`;
+ document.body.appendChild(ov);
+ document.body.style.overflow='hidden';
+ ov.addEventListener('click',e=>{if(e.target===ov)rcptClose();});
+ $('rcptX').addEventListener('click',()=>rcptClose());
+ $('rcptCloseBtn').addEventListener('click',()=>rcptClose());
+ $('rcptDlBtn').addEventListener('click',()=>rcptDownload());
+ $('rcptShareBtn').addEventListener('click',()=>rcptShare());
+ rcptState.keyHandler=e=>{
+  if(e.key==='Escape'){e.preventDefault();rcptClose();return;}
+  if(e.key!=='Tab')return;
+  const f=['rcptX','rcptShareBtn','rcptDlBtn','rcptCloseBtn'].map(id=>$(id)).filter(x=>x&&!x.disabled);
+  if(!f.length)return;
+  const i=f.indexOf(document.activeElement);
+  e.preventDefault();
+  f[(i+(e.shiftKey?-1:1)+f.length)%f.length].focus();
+ };
+ document.addEventListener('keydown',rcptState.keyHandler);
+ $('rcptCloseBtn').focus();
+}
+function rcptClose(){
+ const ov=$('rcptOverlay');
+ if(rcptState.keyHandler){document.removeEventListener('keydown',rcptState.keyHandler);rcptState.keyHandler=null;}
+ if(ov)ov.remove();
+ document.body.style.overflow='';
+ rcptState.rideId=null;rcptState.data=null;
+ if(rcptState.lastFocus&&rcptState.lastFocus.focus)try{rcptState.lastFocus.focus();}catch(e){}
+ rcptState.lastFocus=null;
+}
+function rcptStatusMsg(msg,bad){const el=$('rcptStatus');if(el){el.textContent=msg;el.style.color=bad?'var(--bad)':'var(--ok)';}}
+function rcptFileName(){return 'HAPA-Receipt-'+String(rcptState.data.reference).replace(/[^A-Za-z0-9-]/g,'')+'.pdf';}
+async function rcptFetchPdf(){
+ const r=await fetch('/api/rides/'+rcptState.rideId+'/receipt.pdf',{headers:token?{Authorization:'Bearer '+token}:{}});
+ if(!r.ok)throw new Error('Could not prepare the PDF. Please try again.');
+ return r.blob();
+}
+async function rcptDownload(){
+ const btn=$('rcptDlBtn');if(!rcptState.rideId||(btn&&btn.disabled))return;
+ if(btn){btn.disabled=true;btn.textContent='Preparing…';}
+ try{
+  const blob=await rcptFetchPdf();
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=rcptFileName();document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  rcptStatusMsg('Receipt downloaded.');
+ }catch(e){rcptStatusMsg(e.message||'Download failed. Please try again.',true);}
+ finally{if(btn){btn.disabled=false;btn.textContent='Download PDF';}}
+}
+function rcptText(){
+ const rec=rcptState.data,b=rec.body||{},c=b.components||{};
+ const pm=b.payment_method==='mpesa'?'M-Pesa':b.payment_method==='cash'?'Cash':(b.payment_method||'');
+ const lines=[`HAPA ride receipt ${rec.reference}`,nrbDate(b.datetime||rec.created_at),`From: ${b.pickup||''}`,`To: ${b.destination||''}`,`Driver: ${b.driver||'HAPA Driver'}`];
+ if(b.vehicle)lines.push(`Vehicle: ${b.vehicle}${b.registration?' · '+b.registration:''}`);
+ lines.push(`Total paid: ${kesFmt(b.total)} (${pm}${b.payment_ref?', ref '+b.payment_ref:''})`);
+ return lines.join('\n');
+}
+async function rcptShare(){
+ if(!rcptState.data)return;
+ try{
+  if(navigator.canShare){
+   try{
+    const blob=await rcptFetchPdf();
+    const file=new File([blob],rcptFileName(),{type:'application/pdf'});
+    if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'HAPA ride receipt'});rcptStatusMsg('Receipt shared.');return;}
+   }catch(e){if(e&&e.name==='AbortError')return; /* user cancelled — not an error */}
+  }
+  if(navigator.share){try{await navigator.share({title:'HAPA ride receipt',text:rcptText()});rcptStatusMsg('Receipt shared.');return;}catch(e){if(e&&e.name==='AbortError')return;}}
+  await navigator.clipboard.writeText(rcptText());
+  rcptStatusMsg('Receipt copied to clipboard.');
+ }catch(e){rcptStatusMsg('Could not share the receipt.',true);}
+}
+// ── end ride receipt module ──
 // ── Ride chat widget (draft-preserving; shared by rider & driver panels) ──
 // Drafts live in memory only, keyed by ride id — never in URLs, storage,
 // logs or HTML attributes. The input element is created once per ride and
@@ -3475,7 +3613,9 @@ async function rdLoadContacts(){try{const c=await api('/api/me/trusted-contacts'
 async function rdAddContact(){try{await api('/api/me/trusted-contacts',{method:'POST',body:JSON.stringify({name:$('rdTcName').value.trim(),phone:$('rdTcPhone').value.trim()})});$('rdTcName').value='';$('rdTcPhone').value='';rdLoadContacts();}catch(e){alert(e.message);}}
 async function rdDelContact(id){try{await api('/api/me/trusted-contacts/'+id,{method:'DELETE'});rdLoadContacts();}catch(e){}}
 async function rdLoadHistory(){try{const rows=await api('/api/rides/mine');const open=rows.find(r=>RD_OPEN.includes(r.status));if(open&&!rdState.rideId){rdState.rideId=open.id;localStorage.setItem('hapa_ride',open.id);rdRefresh();}
- $('rdHistory').innerHTML=rows.filter(r=>!RD_OPEN.includes(r.status)).slice(0,5).map(r=>`<div class="row" style="padding:6px 0"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${new Date(r.created_at).toLocaleDateString()} · ${esc(rdStatusCopy[r.status]||r.status)}</small></span><b>${r.final_fare?'KES '+Number(r.final_fare).toLocaleString():''}</b></div>`).join('')||'No rides yet.';}catch(e){}}
+ const term=rows.filter(r=>!RD_OPEN.includes(r.status))
+  .sort((a,b)=>new Date(b.completed_at||b.created_at)-new Date(a.completed_at||a.created_at)).slice(0,5);
+ $('rdHistory').innerHTML=term.map(r=>`<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(nrbDate(r.completed_at||r.created_at,true))} · ${esc(rdStatusCopy[r.status]||r.status)}</small></span><span style="text-align:right"><b>${r.final_fare!=null?esc(kesFmt(r.final_fare)):''}</b>${r.status==='closed'?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`).join('')||'No rides yet.';}catch(e){}}
 
 // ── Driver mode ──
 async function drvLoad(){

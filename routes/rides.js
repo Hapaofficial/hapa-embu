@@ -5,6 +5,7 @@
 // All legal/operational limits live in compliance_settings (audited), never in code.
 const crypto=require('crypto');
 const mpesa=require('../lib/mpesa');
+const {buildReceiptPdf}=require('../lib/receipt-pdf');
 
 module.exports=function(app,deps){
  const{q,pool,auth,active,owner,audit,writeLimiter}=deps;
@@ -812,6 +813,21 @@ module.exports=function(app,deps){
    const rec=(await q(`SELECT reference,body,created_at FROM ride_receipts WHERE ride_id=$1`,[ctx.r.id])).rows[0];
    if(!rec)return res.status(404).json({error:'No receipt yet'});
    res.json(rec);
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ // Branded customer-facing PDF (same auth as the JSON receipt; never public,
+ // never cached, no commission/earnings/internal accounting fields).
+ app.get('/api/rides/:id/receipt.pdf',auth,active,async(req,res)=>{
+  try{
+   const ctx=await loadRideFor(req,res);if(!ctx)return;
+   const rec=(await q(`SELECT reference,body,created_at FROM ride_receipts WHERE ride_id=$1`,[ctx.r.id])).rows[0];
+   if(!rec)return res.status(404).json({error:'No receipt yet'});
+   const pdf=buildReceiptPdf(rec.reference,rec.body,rec.created_at);
+   const safeRef=String(rec.reference).replace(/[^A-Za-z0-9-]/g,'');
+   res.set({'Content-Type':'application/pdf',
+    'Content-Disposition':`attachment; filename="HAPA-Receipt-${safeRef}.pdf"`,
+    'Cache-Control':'private, no-store'});
+   res.send(pdf);
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
 
