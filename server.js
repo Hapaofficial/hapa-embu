@@ -1116,5 +1116,5 @@ require('./routes/merchant')(app,moduleDeps);
 require('./routes/driver')(app,moduleDeps);
 require('./routes/requests')(app,moduleDeps);
 
-app.get('*',(req,res)=>res.sendFile(path.join(__dirname,'public/index.html')));
+app.get('*',(req,res)=>{res.set('Cache-Control','no-cache, must-revalidate');res.sendFile(path.join(__dirname,'public/index.html'));});
 boot().then(()=>app.listen(PORT,'0.0.0.0',()=>console.log('HAPA v1.6 running on '+PORT))).catch(e=>{console.error(e);process.exit(1)});
