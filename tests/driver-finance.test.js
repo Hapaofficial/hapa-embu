@@ -152,9 +152,25 @@ async function runRide(riderTok, drvTok, pay = 'cash') {
   ok('payout settlement clears HAPA owes Driver', setOut.s === 201 && Number((await j('GET', '/api/driver/finance', drv.tok)).d.balances.hapa_owes_driver) === 0);
   ok('settlements are owner-only', (await j('POST', `/api/owner/drivers/${drv.uid}/settlements`, drv.tok, { direction: 'driver_to_hapa', amount: 1, method: 'cash_office' })).s === 403);
 
+  // ── Reserve-offset settlement + reversal restores BOTH sides ──────────────
+  await j('POST', '/api/driver/reserve/topup', drv.tok, { amount: 10 });
+  const ride5 = await runRide(rider.tok, drv.tok, 'cash'); // reserve 10 covers part; 41.92 receivable
+  fin = (await j('GET', '/api/driver/finance', drv.tok)).d;
+  ok('ride5: reserve 10 debited, 41.92 receivable', Number(fin.balances.reserve_balance) === 0 && Number(fin.balances.driver_owes_hapa) === 41.92, fin.balances);
+  await j('POST', '/api/driver/reserve/topup', drv.tok, { amount: 41.92 });
+  const roSet = await j('POST', `/api/owner/drivers/${drv.uid}/settlements`, ownerTok, { direction: 'driver_to_hapa', amount: 41.92, method: 'reserve_offset' });
+  ok('reserve-offset settlement clears the debt', roSet.s === 201 && Number((await j('GET', '/api/driver/finance', drv.tok)).d.balances.driver_owes_hapa) === 0, roSet.d);
+  const rev = await j('POST', `/api/owner/settlements/${roSet.d.settlement.id}/status`, ownerTok, { status: 'reversed', reason: 'test reversal' });
+  fin = (await j('GET', '/api/driver/finance', drv.tok)).d;
+  ok('reversal restores the receivable', rev.s === 200 && Number(fin.balances.driver_owes_hapa) === 41.92, fin.balances);
+  ok('reversal refunds the reserve', Number(fin.balances.reserve_balance) === 41.92, fin.balances.reserve_balance);
+  ok('second reversal rejected (one-way)', (await j('POST', `/api/owner/settlements/${roSet.d.settlement.id}/status`, ownerTok, { status: 'reversed', reason: 'again' })).s === 409);
+  const reSet = await j('POST', `/api/owner/drivers/${drv.uid}/settlements`, ownerTok, { direction: 'driver_to_hapa', amount: 41.92, method: 'reserve_offset' });
+  ok('debt re-settled after reversal', reSet.s === 201 && Number((await j('GET', '/api/driver/finance', drv.tok)).d.balances.driver_owes_hapa) === 0);
+
   // ── Owner drill-down + platform summary ───────────────────────────────────
   const dd = await j('GET', `/api/owner/drivers/${drv.uid}/finance`, ownerTok);
-  ok('drill-down lists per-ride rows with routes', dd.s === 200 && dd.d.rides.length === 4 && dd.d.rides.every(r => r.pickup_address && r.dest_address), dd.d.rides?.length);
+  ok('drill-down lists per-ride rows with routes', dd.s === 200 && dd.d.rides.length === 5 && dd.d.rides.every(r => r.pickup_address && r.dest_address), dd.d.rides?.length);
   ok('drill-down reports Africa/Nairobi', dd.d.timezone === 'Africa/Nairobi');
   const sum = await j('GET', '/api/owner/finance/summary', ownerTok);
   ok('platform summary has direction-separated balances', sum.s === 200 && sum.d.balances.drivers_owe_hapa !== undefined && sum.d.balances.hapa_owes_drivers !== undefined && sum.d.timezone === 'Africa/Nairobi', sum.d);
@@ -173,7 +189,7 @@ async function runRide(riderTok, drvTok, pay = 'cash') {
   ok('regeneration reuses the same statement (one per driver/month)', gen2.d.generated[0].reference === gen.d.generated[0].reference);
   const list = await j('GET', `/api/owner/statements?year=${y}&month=${m}`, ownerTok);
   const st = list.d.statements.find(s => s.reference === gen.d.generated[0].reference);
-  ok('statement listed with summary', !!st && st.summary && Number(st.summary.gross) === 4 * 346.13, st?.summary);
+  ok('statement listed with summary', !!st && st.summary && Number(st.summary.gross) === 5 * 346.13, st?.summary);
   const stJson = await j('GET', '/api/statements/' + st.id, drv.tok);
   ok('driver can open own statement + disclaimer', stJson.s === 200 && /not a tax invoice/i.test(stJson.d.disclaimer), stJson.d.disclaimer);
   ok('other users cannot open the statement', (await j('GET', '/api/statements/' + st.id, rider.tok)).s === 403);

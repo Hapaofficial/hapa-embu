@@ -233,6 +233,15 @@ module.exports=function(app,deps){
      const table=it.item_type==='receivable'?'driver_receivables':'driver_payables';
      await client.query(`UPDATE ${table} SET outstanding=outstanding+$2,status=CASE WHEN outstanding+$2>=amount THEN 'open' ELSE 'partially_settled' END WHERE id=$1`,[it.item_id,it.amount]);
     }
+    // Reserve-offset settlements moved money OUT of the driver's reserve;
+    // a reversal must put it back, or balances stop reconciling.
+    if(s.method==='reserve_offset'){
+     const rv=await finance.lockReserve(client,s.driver_user_id);
+     const afterC=finance.cents(rv.balance)+finance.cents(s.amount);
+     await client.query(`UPDATE driver_commission_reserves SET balance=$2,updated_at=NOW() WHERE driver_user_id=$1`,[s.driver_user_id,finance.kes(afterC)]);
+     await finance.reserveEntry(client,s.driver_user_id,'adjustment',finance.cents(s.amount),afterC,{idem:'settle-reverse:'+s.id,meta:{reason:'settlement reversal refund',settlement:s.reference}});
+     await finance.postTxn(client,{type:'settlement_reversal',driverId:s.driver_user_id,debit:'hapa_commission',credit:'driver_commission_reserve',amount:s.amount,idem:'settle-reverse-txn:'+s.id});
+    }
     const adjRef=await finance.nextRef(client,'adjustment');
     await client.query(`INSERT INTO accounting_adjustments(reference,kind,driver_user_id,related_reference,amount,reason,actor_user_id)
      VALUES($1,'adjustment',$2,$3,$4,$5,$6)`,[adjRef,s.driver_user_id,s.reference,s.amount,('Settlement reversal: '+reason).slice(0,300),req.user.id]);
