@@ -6,6 +6,7 @@
 const crypto=require('crypto');
 const mpesa=require('../lib/mpesa');
 const {buildReceiptPdf}=require('../lib/receipt-pdf');
+const finance=require('../lib/finance');
 
 module.exports=function(app,deps){
  const{q,pool,auth,active,owner,audit,writeLimiter}=deps;
@@ -250,7 +251,7 @@ module.exports=function(app,deps){
    if(!zone)return res.status(400).json({error:'Service area not found'});
    const el=await driverEligibility(req.user.id,zone.id,String(req.body?.vehicle_id||''));
    if(!el.ok)return res.status(403).json({error:'You cannot go online yet',reasons:el.reasons});
-   const r=await q(`INSERT INTO driver_availability_sessions(driver_user_id,zone_id,vehicle_id) VALUES($1,$2,$3) RETURNING *`,[req.user.id,zone.id,req.body.vehicle_id]);
+   const r=await q(`INSERT INTO driver_availability_sessions(driver_user_id,zone_id,vehicle_id,last_seen_at) VALUES($1,$2,$3,NOW()) RETURNING *`,[req.user.id,zone.id,req.body.vehicle_id]);
    await q(`INSERT INTO driver_presence(driver_user_id,session_id) VALUES($1,$2)
     ON CONFLICT(driver_user_id) DO UPDATE SET session_id=$2,seq=0,updated_at=NOW()`,[req.user.id,r.rows[0].id]);
    pushOwner({type:'driver_online',driver_id:req.user.id,ts:Date.now()});
@@ -261,17 +262,27 @@ module.exports=function(app,deps){
    console.error(e);res.status(500).json({error:'Server error'});
   }
  });
- async function endOrPause(req,res,newStatus){
+ async function endOrPause(req,res,newStatus,endReason){
   try{
    const s=(await q(`SELECT * FROM driver_availability_sessions WHERE driver_user_id=$1 AND status IN('online','paused')`,[req.user.id])).rows[0];
    if(!s)return res.status(404).json({error:'Not online'});
    if(newStatus==='ended'){
-    await q(`UPDATE driver_availability_sessions SET status='ended',ended_at=NOW(),online_seconds=EXTRACT(EPOCH FROM NOW()-started_at)::int WHERE id=$1`,[s.id]);
+    await q(`UPDATE driver_availability_sessions SET status='ended',ended_at=NOW(),
+      online_seconds=EXTRACT(EPOCH FROM NOW()-started_at)::int,
+      paused_seconds=paused_seconds+CASE WHEN status='paused' AND last_paused_at IS NOT NULL THEN EXTRACT(EPOCH FROM NOW()-last_paused_at)::int ELSE 0 END,
+      last_paused_at=NULL,end_reason=$2 WHERE id=$1`,[s.id,endReason||'driver_offline']);
+    await q(`INSERT INTO driver_session_events(session_id,event,reason) VALUES($1,'ended',$2)`,[s.id,endReason||'driver_offline']);
     await q(`UPDATE driver_presence SET session_id=NULL,updated_at=NOW() WHERE driver_user_id=$1`,[req.user.id]);
     await q(`UPDATE ride_offers SET status='withdrawn',responded_at=NOW() WHERE driver_user_id=$1 AND status='pending'`,[req.user.id]);
     pushOwner({type:'driver_offline',driver_id:req.user.id,ts:Date.now()});
+   }else if(newStatus==='paused'){
+    await q(`UPDATE driver_availability_sessions SET status='paused',last_paused_at=COALESCE(last_paused_at,NOW()),last_seen_at=NOW() WHERE id=$1`,[s.id]);
+    await q(`INSERT INTO driver_session_events(session_id,event) VALUES($1,'paused')`,[s.id]);
    }else{
-    await q(`UPDATE driver_availability_sessions SET status=$2 WHERE id=$1`,[s.id,newStatus]);
+    await q(`UPDATE driver_availability_sessions SET status='online',
+      paused_seconds=paused_seconds+CASE WHEN last_paused_at IS NOT NULL THEN EXTRACT(EPOCH FROM NOW()-last_paused_at)::int ELSE 0 END,
+      last_paused_at=NULL,last_seen_at=NOW() WHERE id=$1`,[s.id]);
+    await q(`INSERT INTO driver_session_events(session_id,event) VALUES($1,'resumed')`,[s.id]);
    }
    res.json({ok:true,status:newStatus});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
@@ -316,6 +327,7 @@ module.exports=function(app,deps){
    const s=(await q(`SELECT id FROM driver_availability_sessions WHERE driver_user_id=$1 AND status='online'`,[req.user.id])).rows[0];
    const ride=(await q(`SELECT * FROM ride_requests WHERE driver_user_id=$1 AND status=ANY($2)`,[req.user.id,ACTIVE_RIDE])).rows[0];
    if(!s&&!ride)return res.status(409).json({error:'Location updates are only accepted while online or on an active ride'});
+   await q(`UPDATE driver_availability_sessions SET last_seen_at=NOW() WHERE driver_user_id=$1 AND status IN('online','paused')`,[req.user.id]);
    const up=await q(`UPDATE driver_presence SET lat=$2,lng=$3,accuracy_m=$4,heading=$5,speed_mps=$6,seq=$7,updated_at=NOW(),session_id=COALESCE($8,session_id)
     WHERE driver_user_id=$1 AND seq<$7 RETURNING driver_user_id`,[req.user.id,lat,lng,Number(b.accuracy)||null,Number(b.heading)||null,Number(b.speed)||null,seq,s?s.id:null]);
    if(!up.rowCount){
@@ -395,9 +407,10 @@ module.exports=function(app,deps){
    // card's own label (e.g. 'car'): dispatch matches vehicles against the
    // quote's category, so an alias card name would strand rides in search.
    const catCanonical=cats.find(c=>c.toLowerCase()===category.toLowerCase())||category;
-   const r=(await q(`INSERT INTO fare_quotes(rider_id,zone_id,rate_card_id,vehicle_category,currency,distance_m,duration_s,components,total,route_source,expires_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+make_interval(secs=>$11)) RETURNING *`,
-    [req.user.id,zone.id,card.id,catCanonical,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl])).rows[0];
+   const qref=await finance.nextRef({query:q},'quote');
+   const r=(await q(`INSERT INTO fare_quotes(rider_id,zone_id,rate_card_id,vehicle_category,currency,distance_m,duration_s,components,total,route_source,expires_at,reference)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+make_interval(secs=>$11),$12) RETURNING *`,
+    [req.user.id,zone.id,card.id,catCanonical,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl,qref])).rows[0];
    res.status(201).json({quote:r,polyline:route.polyline,zone_name:zone.name,mock_routing:route.source!=='google',
     note:route.source==='google'?null:'Route estimated without Google Maps — development estimate only.'});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
@@ -421,11 +434,12 @@ module.exports=function(app,deps){
    if(!inKenya(pLat,pLng)||!inKenya(dLat,dLng))return res.status(400).json({error:'Locations must be within Kenya'});
    let r;
    try{
-    r=(await q(`INSERT INTO ride_requests(rider_id,quote_id,zone_id,vehicle_category,status,pickup_lat,pickup_lng,dest_lat,dest_lng,pickup_address,dest_address,pickup_note,landmark,payment_method,pin_hash,idempotency_key,search_started_at)
-     VALUES($1,$2,$3,$4,'searching',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()) RETURNING *`,
+    const rref=await finance.nextRef({query:q},'ride');
+    r=(await q(`INSERT INTO ride_requests(rider_id,quote_id,zone_id,vehicle_category,status,pickup_lat,pickup_lng,dest_lat,dest_lng,pickup_address,dest_address,pickup_note,landmark,payment_method,pin_hash,idempotency_key,search_started_at,ride_reference)
+     VALUES($1,$2,$3,$4,'searching',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),$16) RETURNING *`,
      [req.user.id,quote.id,quote.zone_id,quote.vehicle_category,pLat,pLng,dLat,dLng,
       String(b.pickup_address||'').slice(0,300),String(b.dest_address||'').slice(0,300),
-      String(b.pickup_note||'').slice(0,300),String(b.landmark||'').slice(0,200),method,pinHash(pin),idem])).rows[0];
+      String(b.pickup_note||'').slice(0,300),String(b.landmark||'').slice(0,200),method,pinHash(pin),idem,rref])).rows[0];
    }catch(e){
     if(e.code==='23505'){
      const dup=(await q(`SELECT * FROM ride_requests WHERE rider_id=$1 AND idempotency_key=$2`,[req.user.id,idem])).rows[0];
@@ -445,6 +459,13 @@ module.exports=function(app,deps){
   const staleS=Number(await cfg('presence_stale_s'));
   const required=await cfg('docs_required');
   const maxMin=Number(await cfg('max_continuous_minutes'));
+  const fin=finance.flags();
+  // Cash-ride eligibility (server-side): a driver whose "Driver owes HAPA"
+  // balance exceeds the credit limit gets no CASH offers (M-Pesa unaffected)
+  // unless their Commission Reserve holds the configured minimum.
+  const cashClause=ride.payment_method==='cash'?`AND(
+     COALESCE((SELECT SUM(dr.outstanding) FROM driver_receivables dr WHERE dr.driver_user_id=s.driver_user_id AND dr.status IN('open','partially_settled')),0)<=${Number(fin.cashCreditLimit)||0}
+     OR COALESCE((SELECT rv.balance FROM driver_commission_reserves rv WHERE rv.driver_user_id=s.driver_user_id),0)>=${Math.max(0.01,Number(fin.cashMinReserve)||0.01)})`:'';
   return(await q(`SELECT s.driver_user_id,s.vehicle_id,p.lat,p.lng,
      COALESCE(2*6371000*asin(sqrt(pow(sin(radians(($4-p.lat)/2)),2)+cos(radians(p.lat))*cos(radians($4))*pow(sin(radians(($5-p.lng)/2)),2))),1e9)::int AS dist_m
     FROM driver_availability_sessions s
@@ -459,6 +480,7 @@ module.exports=function(app,deps){
      AND NOT EXISTS(SELECT 1 FROM ride_offers o WHERE o.driver_user_id=s.driver_user_id AND o.status='pending')
      AND NOT EXISTS(SELECT 1 FROM ride_requests rr WHERE rr.driver_user_id=s.driver_user_id AND rr.status=ANY($10))
      AND(SELECT count(*)::int FROM driver_document_status d WHERE d.driver_user_id=s.driver_user_id AND d.doc_type=ANY($7) AND d.status='approved' AND (d.expires_on IS NULL OR d.expires_on>=CURRENT_DATE))=$11
+     ${cashClause}
     ORDER BY dist_m ASC LIMIT 5`,
    [ride.id,ride.vehicle_category,ride.zone_id,ride.pickup_lat,ride.pickup_lng,staleS,required,maxMin,ride.rider_id,ACTIVE_RIDE,required.length])).rows;
  }
@@ -676,7 +698,8 @@ module.exports=function(app,deps){
    await q(`UPDATE trip_share_tokens SET expires_at=LEAST(expires_at,NOW()+make_interval(mins=>$2)) WHERE ride_id=$1`,[r.id,Number(await cfg('share_ttl_after_complete_min'))]);
    await rideEvent(r,req.user.id,'ride_completed',{final_fare:final,note});
    if(r.payment_method==='cash'){
-    await q(`INSERT INTO ride_payments(ride_id,method,mode,amount,currency,status) VALUES($1,'cash','cash',$2,'KES','pending') ON CONFLICT DO NOTHING`,[r.id,final]);
+    const pref=await finance.nextRef({query:q},'payment');
+    await q(`INSERT INTO ride_payments(ride_id,method,mode,amount,currency,status,reference) VALUES($1,'cash','cash',$2,'KES','pending',$3) ON CONFLICT DO NOTHING`,[r.id,final,pref]);
    }
    res.json({ride:await rideView(r,'driver'),final_fare:final});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
@@ -740,6 +763,10 @@ module.exports=function(app,deps){
     commission:commission,driver_earnings:net,note:r.fare_difference_note||null};
    await client.query(`INSERT INTO ride_receipts(ride_id,reference,body) VALUES($1,$2,$3) ON CONFLICT(ride_id) DO NOTHING`,[r.id,ref,JSON.stringify(body)]);
    const closed=(await client.query(`UPDATE ride_requests SET status='closed',closed_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *`,[r.id])).rows[0];
+   // Financial postings (same transaction, idempotent). Cash: commission becomes
+   // "Driver owes HAPA" (reserve-covered when permitted). M-Pesa: net becomes
+   // "HAPA owes Driver". Existing ledger rows are never modified.
+   await finance.applyRideAccounting(client,closed,{gross_fare:closed.final_fare,commission_amount:commission,net_earnings:net},{providerRef:pay?.provider_ref||null});
    await client.query('COMMIT');
    await rideEvent(closed,null,'payment_confirmed',{receipt:ref,method:pay?.method});
    return closed;
@@ -752,7 +779,8 @@ module.exports=function(app,deps){
    const ctx=await loadRideFor(req,res,false);if(!ctx)return;
    if(!ctx.isDriver)return res.status(403).json({error:'Only the assigned driver can confirm cash'});
    if(ctx.r.status!=='payment_pending'||ctx.r.payment_method!=='cash')return res.status(409).json({error:'No cash payment is pending'});
-   const p=(await q(`UPDATE ride_payments SET status='confirmed',updated_at=NOW() WHERE ride_id=$1 AND method='cash' AND status='pending' RETURNING *`,[ctx.r.id])).rows[0];
+   const cashRef=await finance.nextRef({query:q},'cash');
+   const p=(await q(`UPDATE ride_payments SET status='confirmed',cash_confirmation_reference=COALESCE(cash_confirmation_reference,$2),updated_at=NOW() WHERE ride_id=$1 AND method='cash' AND status='pending' RETURNING *`,[ctx.r.id,cashRef])).rows[0];
    if(!p)return res.status(409).json({error:'Payment already processed'});
    await q(`INSERT INTO ride_payment_events(payment_id,event_type,dedupe_key,payload) VALUES($1,'cash_confirmed',$2,'{}') ON CONFLICT DO NOTHING`,[p.id,'cash_'+ctx.r.id]);
    const closed=await finalizeRide(ctx.r.id,p.id);
@@ -781,9 +809,10 @@ module.exports=function(app,deps){
    const init=await mpesa.stkPush({phone,amount:ctx.r.final_fare,reference:'HAPARIDE',description:'HAPA ride'});
    let p;
    try{
-    p=(await q(`INSERT INTO ride_payments(ride_id,method,mode,amount,currency,status,provider_request_id,phone_masked,idempotency_key)
-     VALUES($1,'mpesa',$2,$3,'KES','initiated',$4,$5,$6) RETURNING *`,
-     [ctx.r.id,init.mode,ctx.r.final_fare,init.checkoutRequestId,phone.slice(0,6)+'***'+phone.slice(-2),idem])).rows[0];
+    const pref=await finance.nextRef({query:q},'payment');
+    p=(await q(`INSERT INTO ride_payments(ride_id,method,mode,amount,currency,status,provider_request_id,phone_masked,idempotency_key,reference)
+     VALUES($1,'mpesa',$2,$3,'KES','initiated',$4,$5,$6,$7) RETURNING *`,
+     [ctx.r.id,init.mode,ctx.r.final_fare,init.checkoutRequestId,phone.slice(0,6)+'***'+phone.slice(-2),idem,pref])).rows[0];
    }catch(e){
     if(e.code==='23505')return res.status(409).json({error:'A payment is already in progress for this ride'});
     throw e;
@@ -834,9 +863,11 @@ module.exports=function(app,deps){
  app.get('/api/rides/:id/receipt',auth,active,async(req,res)=>{
   try{
    const ctx=await loadRideFor(req,res);if(!ctx)return;
-   const rec=(await q(`SELECT reference,body,created_at FROM ride_receipts WHERE ride_id=$1`,[ctx.r.id])).rows[0];
+   const rec=(await q(`SELECT reference,body,created_at,tax_document_status FROM ride_receipts WHERE ride_id=$1`,[ctx.r.id])).rows[0];
    if(!rec)return res.status(404).json({error:'No receipt yet'});
-   res.json(rec);
+   // Tip shown separately (never merged into the fare or the immutable receipt body)
+   const tip=(await q(`SELECT amount,method,status,reference,verified_by_hapa FROM ride_tips WHERE ride_id=$1 AND status IN('declared','pending','confirmed')`,[ctx.r.id])).rows[0]||null;
+   res.json({...rec,tip});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
  // Branded customer-facing PDF (same auth as the JSON receipt; never public,
@@ -1119,6 +1150,8 @@ module.exports=function(app,deps){
  // Owner-only Driver earnings report (persisted rides + ledgers, never cards).
  app.get('/api/owner/driver-earnings',auth,owner,async(req,res)=>{
   try{
+   // Close stale sessions first so "Online" durations never include dead sessions.
+   await finance.autoCloseStaleSessions(q,{audit:(a,act,tt,ti,d)=>audit(a,act,tt,ti,d)}).catch(e=>console.error('stale sweep:',e.message));
    const{where,vals}=ownerRideFilter(req.query);
    const base=where?where+' AND r.driver_user_id IS NOT NULL':'WHERE r.driver_user_id IS NOT NULL';
    const rows=(await q(`SELECT du.id AS driver_id,du.name AS driver_name,du.status AS account_status,
@@ -1128,22 +1161,30 @@ module.exports=function(app,deps){
      COALESCE(SUM(l.gross),0) AS gross,COALESCE(SUM(l.commission),0) AS commission,COALESCE(SUM(l.net),0) AS net,
      COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='cash' AND r.status='closed'),0) AS cash_collected,
      COALESCE(SUM(l.gross) FILTER (WHERE r.payment_method='mpesa' AND r.status='closed'),0) AS mpesa_collected,
-     COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='unsettled'),0) AS unsettled,
      COALESCE(SUM(l.net) FILTER (WHERE l.payout_status='paid'),0) AS settled,
      COALESCE(SUM(EXTRACT(EPOCH FROM (r.completed_at-r.started_at)) ) FILTER (WHERE r.completed_at IS NOT NULL AND r.started_at IS NOT NULL),0)::bigint AS driving_seconds,
      (SELECT ROUND(AVG(rating)::numeric,1) FROM ride_ratings rr WHERE rr.ratee_id=du.id AND rr.status='active') AS rating,
      (SELECT g2.name FROM driver_availability_sessions s JOIN geo_areas g2 ON g2.id=s.zone_id WHERE s.driver_user_id=du.id ORDER BY s.started_at DESC LIMIT 1) AS zone_name,
      (SELECT v2.make||' '||v2.model||' · '||v2.registration_number FROM driver_vehicles v2 WHERE v2.driver_user_id=du.id ORDER BY v2.created_at DESC LIMIT 1) AS vehicle_label,
-     (SELECT COALESCE(SUM(s.online_seconds+CASE WHEN s.status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-s.started_at))::int ELSE 0 END),0) FROM driver_availability_sessions s WHERE s.driver_user_id=du.id)::bigint AS online_seconds
+     (SELECT COALESCE(SUM(s.online_seconds+CASE WHEN s.status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-s.started_at))::int ELSE 0 END),0) FROM driver_availability_sessions s WHERE s.driver_user_id=du.id)::bigint AS online_seconds,
+     (SELECT COALESCE(SUM(s.stale_seconds),0) FROM driver_availability_sessions s WHERE s.driver_user_id=du.id)::bigint AS stale_seconds,
+     (SELECT COALESCE(SUM(s.paused_seconds+CASE WHEN s.status='paused' AND s.last_paused_at IS NOT NULL THEN EXTRACT(EPOCH FROM (NOW()-s.last_paused_at))::int ELSE 0 END),0) FROM driver_availability_sessions s WHERE s.driver_user_id=du.id)::bigint AS paused_seconds,
+     (SELECT EXISTS(SELECT 1 FROM driver_availability_sessions s WHERE s.driver_user_id=du.id AND s.status IN('online','paused'))) AS is_online,
+     COALESCE((SELECT SUM(outstanding) FROM driver_receivables dr2 WHERE dr2.driver_user_id=du.id AND dr2.status IN('open','partially_settled')),0) AS driver_owes_hapa,
+     COALESCE((SELECT SUM(outstanding) FROM driver_payables dp2 WHERE dp2.driver_user_id=du.id AND dp2.status IN('open','partially_settled')),0) AS hapa_owes_driver,
+     COALESCE((SELECT balance FROM driver_commission_reserves rv WHERE rv.driver_user_id=du.id),0) AS reserve_balance,
+     COALESCE((SELECT SUM(amount) FROM ride_tips t2 WHERE t2.driver_user_id=du.id AND t2.status='confirmed'),0) AS tips_mpesa,
+     COALESCE((SELECT SUM(amount) FROM ride_tips t3 WHERE t3.driver_user_id=du.id AND t3.status='declared'),0) AS tips_cash_declared
     ${OWNER_RIDE_FROM} ${base}
     GROUP BY du.id,du.name,du.status ORDER BY gross DESC LIMIT 200`,vals)).rows;
    const totals=rows.reduce((t,r)=>({
     completed_rides:t.completed_rides+Number(r.completed_rides),gross:t.gross+Number(r.gross),
     commission:t.commission+Number(r.commission),net:t.net+Number(r.net),
     cash_collected:t.cash_collected+Number(r.cash_collected),mpesa_collected:t.mpesa_collected+Number(r.mpesa_collected),
-    unsettled:t.unsettled+Number(r.unsettled)
-   }),{completed_rides:0,gross:0,commission:0,net:0,cash_collected:0,mpesa_collected:0,unsettled:0});
-   res.json({drivers:rows,totals});
+    driver_owes_hapa:t.driver_owes_hapa+Number(r.driver_owes_hapa),hapa_owes_driver:t.hapa_owes_driver+Number(r.hapa_owes_driver),
+    reserve_balance:t.reserve_balance+Number(r.reserve_balance),tips_mpesa:t.tips_mpesa+Number(r.tips_mpesa),tips_cash_declared:t.tips_cash_declared+Number(r.tips_cash_declared)
+   }),{completed_rides:0,gross:0,commission:0,net:0,cash_collected:0,mpesa_collected:0,driver_owes_hapa:0,hapa_owes_driver:0,reserve_balance:0,tips_mpesa:0,tips_cash_declared:0});
+   res.json({drivers:rows,totals,timezone:'Africa/Nairobi'});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
 
@@ -1169,6 +1210,7 @@ module.exports=function(app,deps){
    // a separate, explicitly audited support action (POST …/locations).
    scrubCoords(view);events.forEach(e=>scrubCoords(e.payload));
    view.payment_status=paymentStatusOf(r.status);
+   view.ride_reference=r.ride_reference||null;// canonical HAPA-RIDE-* reference
    const actual_duration_s=r.started_at&&r.completed_at?Math.round((new Date(r.completed_at)-new Date(r.started_at))/1000):null;
    res.json({ride:view,zone,rider,ledger,quote,events,offers,payments,receipt,incidents,ratings,actual_duration_s});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
@@ -1188,6 +1230,7 @@ module.exports=function(app,deps){
  // Driver earnings totals for a Nairobi-operational date range.
  app.get('/api/driver/earnings',auth,active,dvCap,async(req,res)=>{
   try{
+   await finance.autoCloseStaleSessions(q,{}).catch(e=>console.error('stale sweep:',e.message));
    const vals=[req.user.id];let range='';
    if(req.query.from&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.from)){vals.push(req.query.from);range+=` AND (COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date>=$${vals.length}::date`;}
    if(req.query.to&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.to)){vals.push(req.query.to);range+=` AND (COALESCE(r.completed_at,r.created_at) AT TIME ZONE 'Africa/Nairobi')::date<=$${vals.length}::date`;}
@@ -1201,9 +1244,15 @@ module.exports=function(app,deps){
      COALESCE(SUM(EXTRACT(EPOCH FROM (r.completed_at-r.started_at))) FILTER (WHERE r.completed_at IS NOT NULL AND r.started_at IS NOT NULL),0)::bigint AS driving_seconds
     FROM ride_requests r LEFT JOIN driver_earnings_ledger l ON l.ride_id=r.id
     WHERE r.driver_user_id=$1${range}`,vals)).rows[0];
-   const ses=(await q(`SELECT COALESCE(SUM(online_seconds+CASE WHEN status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-started_at))::int ELSE 0 END),0)::bigint AS online_seconds
+   const ses=(await q(`SELECT COALESCE(SUM(online_seconds+CASE WHEN status IN('online','paused') THEN EXTRACT(EPOCH FROM (NOW()-started_at))::int ELSE 0 END),0)::bigint AS online_seconds,
+     COALESCE(SUM(stale_seconds),0)::bigint AS stale_seconds,
+     COALESCE(SUM(paused_seconds+CASE WHEN status='paused' AND last_paused_at IS NOT NULL THEN EXTRACT(EPOCH FROM (NOW()-last_paused_at))::int ELSE 0 END),0)::bigint AS paused_seconds
     FROM driver_availability_sessions WHERE driver_user_id=$1${range.replace(/COALESCE\(r\.completed_at,r\.created_at\)/g,'started_at')}`,vals)).rows[0];
-   res.json({...t,online_seconds:ses.online_seconds});
+   const bal=await finance.driverBalances({query:q},req.user.id);
+   const tips=(await q(`SELECT COALESCE(SUM(amount) FILTER(WHERE status='confirmed'),0) AS mpesa,COALESCE(SUM(amount) FILTER(WHERE status='declared'),0) AS cash_declared FROM ride_tips WHERE driver_user_id=$1`,[req.user.id])).rows[0];
+   res.json({...t,online_seconds:ses.online_seconds,stale_seconds:ses.stale_seconds,paused_seconds:ses.paused_seconds,
+    driver_owes_hapa:bal.owesHapa,hapa_owes_driver:bal.hapaOwes,reserve_balance:bal.reserve,
+    tips_mpesa:tips.mpesa,tips_cash_declared:tips.cash_declared});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
  app.post('/api/owner/rides/:id/cancel',auth,owner,async(req,res)=>{

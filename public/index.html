@@ -658,6 +658,10 @@ h1,h2,h3,h4{color:var(--hapa-text)}
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Earnings</h3><div id="drvEarnings" class="muted" style="font-size:13px">—</div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><label style="font-size:12px">From <input id="deFrom" type="date"></label><label style="font-size:12px">To <input id="deTo" type="date"></label><button class="btn" onclick="drvEarnRange()">Totals for range</button></div>
   <div id="drvEarnRange" class="muted" style="font-size:13px;margin-top:8px"></div></div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Finance</h3>
+  <div id="drvFinance" class="muted" style="font-size:13px">—</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" onclick="drvFinance()">Refresh</button></div>
+  <div id="drvStatements" class="muted" style="font-size:13px;margin-top:10px"></div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent trips</h3><div id="drvHistory" class="muted" style="font-size:13px">—</div></div>
 </div>
 </section>
@@ -787,6 +791,24 @@ h1,h2,h3,h4{color:var(--hapa-text)}
   </div>
   <div id="otEarningsRep" class="muted" style="font-size:13px;overflow-x:auto">—</div>
  </div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Platform financial summary</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+   <label style="font-size:12px">From <input id="fsFrom" type="date"></label><label style="font-size:12px">To <input id="fsTo" type="date"></label>
+   <button class="btn primary" onclick="otFinSummary()">Load summary</button>
+   <button class="btn" onclick="otFinSummaryCsv()">Export CSV</button>
+   <span class="muted" style="font-size:12px">Timezone: Africa/Nairobi</span>
+  </div>
+  <div id="otFinSummary" class="muted" style="font-size:13px">—</div>
+ </div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Monthly driver statements</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+   <input id="stYear" type="number" placeholder="Year" style="width:90px" value="2026"><input id="stMonth" type="number" min="1" max="12" placeholder="Month" style="width:80px">
+   <button class="btn primary" onclick="otGenStatements()">Generate for month</button>
+   <button class="btn" onclick="otListStatements()">List</button>
+  </div>
+  <div id="otStatements" class="muted" style="font-size:13px">—</div>
+  <small class="muted">Driver earnings statements — not tax invoices. Months use Africa/Nairobi bounds; finalized statements are immutable.</small>
+ </div>
 </div>
 
 <div id="ownerAreasPanel" class="hidden" style="margin-top:14px">
@@ -870,7 +892,7 @@ function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
 function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s!=='undefined')?s:PH_IMG;}
 
 // ── State ────────────────────────────────────────────────────────────────────
-const HAPA_SHELL='1.9.6';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
+const HAPA_SHELL='1.9.7';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
 let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
 // ── Native (Capacitor) bridge: Keystore/Keychain-backed token storage when the
 // SecureStoragePlugin is present. On native builds the token is mirrored to
@@ -3467,7 +3489,7 @@ function rdRenderActive(ride){
  if(st==='payment_failed')h+=`<button class="btn primary" onclick="rdPayMpesa()">Retry M-Pesa</button>`;
  if(['closed','rider_cancelled','driver_cancelled'].includes(st))h+=`<button class="btn primary" onclick="rdClearRide()">Done</button>`;
  h+=`</div>`;
- if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt(rdState.rideId,this)">Receipt</button></div>`;
+ if(st==='closed')h+=`<div id="rdRateBox" style="margin-top:10px"><b>Rate your trip:</b> ${[1,2,3,4,5].map(n=>`<button class="btn" style="padding:6px 10px" onclick="rdRate(${n})">★${n}</button>`).join('')} <button class="btn" onclick="rdReceipt(rdState.rideId,this)">Receipt</button></div><div id="rdTipBox" style="margin-top:10px"><b>Tip your driver</b> <small class="muted">(optional — 100% goes to the driver)</small><br>${[20,50,100].map(a=>`<button class="btn" style="padding:6px 10px;margin-top:6px" onclick="rdTip(${a})">KES ${a}</button>`).join(' ')} <button class="btn" style="padding:6px 10px;margin-top:6px" onclick="rdTipCustom()">Custom</button></div>`;
  // Persistent skeleton: only the status area is re-rendered on realtime
  // refreshes; the chat composer DOM element is never recreated while open,
  // so drafts, focus and caret survive location/status/poll updates.
@@ -3482,6 +3504,14 @@ async function rdShare(){try{const r=await api('/api/rides/'+rdState.rideId+'/sh
 async function rdEmergency(){try{const r=await api('/api/rides/'+rdState.rideId+'/emergency');alert((r.configured?`Emergency line: ${r.emergency_phone}\n`:'')+r.note+`\nRide ref: ${r.ride_reference}`);}catch(e){alert(e.message);}}
 async function rdPayMpesa(){const ph=prompt('M-Pesa phone number (2547XXXXXXXX):');if(!ph)return;try{const r=await api('/api/rides/'+rdState.rideId+'/pay-mpesa',{method:'POST',body:JSON.stringify({phone:ph})});alert(r.note);setTimeout(rdRefresh,2500);}catch(e){alert(e.message);}}
 async function rdRate(n){try{await api('/api/rides/'+rdState.rideId+'/rate',{method:'POST',body:JSON.stringify({rating:n})});$('rdRateBox').innerHTML='<b>Asante! Rating saved.</b> <button class="btn" onclick="rdReceipt(rdState.rideId,this)">Receipt</button>';}catch(e){alert(e.message);}}
+async function rdTip(amount){
+ const method=confirm('Tip KES '+amount+' via M-Pesa?\nOK = M-Pesa · Cancel = I gave cash directly')?'mpesa':'cash';
+ try{
+  const r=await api('/api/rides/'+rdState.rideId+'/tip',{method:'POST',body:JSON.stringify({amount,method})});
+  const box=$('rdTipBox');if(box)box.innerHTML='<b>Tip recorded — asante!</b> <small class="muted">'+esc(r.note||'')+'</small>';
+ }catch(e){alert(e.message);}
+}
+function rdTipCustom(){const v=prompt('Tip amount (KES):');if(!v)return;const n=Number(v);if(!Number.isFinite(n)||n<=0)return alert('Enter a valid amount');rdTip(n);}
 // ── Ride receipt module (customer-facing financial record) ──
 // Modal + PDF download + share. Only customer-facing fields are ever
 // rendered; commission, earnings, internal modes and IDs never appear.
@@ -3745,6 +3775,7 @@ async function drvLoad(){
   $('ddType').innerHTML=dd.required.map(t=>`<option value="${t}">${t.replace(/_/g,' ')}</option>`).join('');
   $('drvDocs').innerHTML=dd.required.map(t=>{const d=dd.documents.find(x=>x.doc_type===t);const expSoon=d&&d.expires_on&&new Date(d.expires_on)<new Date(Date.now()+30*86400000);return`<div class="row" style="padding:4px 0"><span>${t.replace(/_/g,' ')}${d&&d.expires_on?`<small class="muted"> · expires ${d.expires_on.slice(0,10)}</small>`:''}</span><b style="color:${!d?'var(--muted)':d.status==='approved'?(expSoon?'var(--hapa-warning)':'var(--ok)'):d.status==='rejected'?'var(--bad)':'var(--a)'}">${d?esc(d.status)+(expSoon?' ⚠':''):'missing'}</b></div>`;}).join('');
   $('drvEarnings').innerHTML=`<div class="row"><span>Today</span><b>KES ${Number(h.earnings.today).toLocaleString()}</b></div><div class="row"><span>Total (${h.earnings.trips} trips)</span><b>KES ${Number(h.earnings.total).toLocaleString()}</b></div><small class="muted">Earnings are shown net of the platform commission.</small>`;
+  drvFinance().catch(()=>{});
   // Driver trip history — persisted server-side, survives relogin/restart.
   $('drvHistory').innerHTML=(h.history||[]).slice(0,5).map(r=>{
    const paid=r.status==='closed', hasEarn=r.net!=null;
@@ -3851,10 +3882,10 @@ async function otEarnings(){
   const th='padding:6px 8px;text-align:left;border-bottom:1px solid var(--hapa-border);white-space:nowrap';
   const td='padding:6px 8px;border-bottom:1px solid var(--hapa-border);white-space:nowrap';
   $('otEarningsRep').innerHTML=`<table style="border-collapse:collapse;font-size:12px;min-width:100%">
-   <tr>${['Driver','Status','Zone','Vehicle','Trips','Gross','Commission','Net','Cash','M-Pesa','Unpaid','Unsettled','Settled','Online','Driving','Cancels','Rating'].map(h=>`<th style="${th}">${h}</th>`).join('')}</tr>
-   ${d.drivers.map(r=>`<tr><td style="${td}">${esc(r.driver_name)}</td><td style="${td}">${esc(r.account_status||'')}</td><td style="${td}">${esc(r.zone_name||'—')}</td><td style="${td}">${esc(r.vehicle_label||'—')}</td><td style="${td}">${esc(String(r.completed_rides))}</td><td style="${td}">${esc(kesFmt(r.gross))}</td><td style="${td}">${esc(kesFmt(r.commission))}</td><td style="${td}">${esc(kesFmt(r.net))}</td><td style="${td}">${esc(kesFmt(r.cash_collected))}</td><td style="${td}">${esc(kesFmt(r.mpesa_collected))}</td><td style="${td}">${esc(String(r.unpaid_rides))}</td><td style="${td}">${esc(kesFmt(r.unsettled))}</td><td style="${td}">${esc(kesFmt(r.settled))}</td><td style="${td}">${esc(hm(Number(r.online_seconds)))}</td><td style="${td}">${esc(hm(Number(r.driving_seconds)))}</td><td style="${td}">${esc(String(r.cancellations))}</td><td style="${td}">${r.rating!=null?esc(String(r.rating))+' ★':'—'}</td></tr>`).join('')}
-   <tr><td style="${td}"><b>Totals</b></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"><b>${esc(String(d.totals.completed_rides))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.gross))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.commission))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.net))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.cash_collected))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.mpesa_collected))}</b></td><td style="${td}"></td><td style="${td}"><b>${esc(kesFmt(d.totals.unsettled))}</b></td><td style="${td}" colspan="5"></td></tr>
-  </table><small class="muted">All dates use Africa/Nairobi. Figures come from persisted rides, payments and ledgers.</small>`;
+   <tr>${['Driver','Status','Zone','Vehicle','Trips','Gross fares','HAPA commission','Driver fare earnings','Cash collected by Driver','M-Pesa collected by HAPA','Driver owes HAPA','HAPA owes Driver','Reserve','Tips (M-Pesa)','Tips (cash, declared)','Online','Driving','Cancels','Rating'].map(h=>`<th style="${th}">${h}</th>`).join('')}</tr>
+   ${d.drivers.map(r=>`<tr style="cursor:pointer" onclick="otDriverFinance('${r.driver_id}','${esc(r.driver_name)}')"><td style="${td};text-decoration:underline">${esc(r.driver_name)}${r.is_online?' <span style="color:var(--ok)">●</span>':''}</td><td style="${td}">${esc(r.account_status||'')}</td><td style="${td}">${esc(r.zone_name||'—')}</td><td style="${td}">${esc(r.vehicle_label||'—')}</td><td style="${td}">${esc(String(r.completed_rides))}</td><td style="${td}">${esc(kesFmt(r.gross))}</td><td style="${td}">${esc(kesFmt(r.commission))}</td><td style="${td}">${esc(kesFmt(r.net))}</td><td style="${td}">${esc(kesFmt(r.cash_collected))}</td><td style="${td}">${esc(kesFmt(r.mpesa_collected))}</td><td style="${td}">${esc(kesFmt(r.driver_owes_hapa))}</td><td style="${td}">${esc(kesFmt(r.hapa_owes_driver))}</td><td style="${td}">${esc(kesFmt(r.reserve_balance))}</td><td style="${td}">${esc(kesFmt(r.tips_mpesa))}</td><td style="${td}">${esc(kesFmt(r.tips_cash_declared))}</td><td style="${td}">${esc(hm(Number(r.online_seconds)))}</td><td style="${td}">${esc(hm(Number(r.driving_seconds)))}</td><td style="${td}">${esc(String(r.cancellations))}</td><td style="${td}">${r.rating!=null?esc(String(r.rating))+' ★':'—'}</td></tr>`).join('')}
+   <tr><td style="${td}"><b>Totals</b></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"><b>${esc(String(d.totals.completed_rides))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.gross))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.commission))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.net))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.cash_collected))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.mpesa_collected))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.driver_owes_hapa))}</b></td><td style="${td}"><b>${esc(kesFmt(d.totals.hapa_owes_driver))}</b></td><td style="${td}" colspan="7"></td></tr>
+  </table><small class="muted">Timezone: Africa/Nairobi. Click a driver row for the per-ride financial drill-down. Figures come from persisted rides, payments and ledgers.</small>`;
  }catch(e){$('otEarningsRep').textContent=e.message;}
 }
 async function otOpenRide(id){
@@ -3919,6 +3950,118 @@ async function drvEarnRange(){
   $('drvEarnRange').innerHTML=[['Completed rides',d.completed_rides],['Gross fares',kesFmt(d.gross)],['HAPA commission',kesFmt(d.commission)],['Your net earnings',kesFmt(d.net)],['Cash collected',kesFmt(d.cash_collected)],['M-Pesa collected',kesFmt(d.mpesa_collected)],['Unsettled payout',kesFmt(d.unsettled)],['Settled payout',kesFmt(d.settled)],['Online time',hm(Number(d.online_seconds))],['Active driving time',hm(Number(d.driving_seconds))]]
    .map(([k,v])=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><b>${esc(String(v))}</b></div>`).join('')+'<small class="muted">Dates use Africa/Nairobi.</small>';
  }catch(e){$('drvEarnRange').textContent=e.message;}
+}
+async function otFinSummary(){
+ const f=$('fsFrom').value,t=$('fsTo').value,qs=[f?'from='+f:'',t?'to='+t:''].filter(Boolean).join('&');
+ $('otFinSummary').textContent='Loading…';
+ try{
+  const s=await api('/api/owner/finance/summary'+(qs?'?'+qs:''));
+  const rows=[['Reporting period',`${s.reporting_period.from} → ${s.reporting_period.to}`],['Completed rides',s.rides.completed_rides],['Cancellations',s.rides.cancellations],
+   ['Gross fares',kesFmt(s.rides.gross)],['HAPA commission',kesFmt(s.rides.commission)],['Driver fare earnings',kesFmt(s.rides.driver_earnings)],
+   ['Cash collected by Drivers',kesFmt(s.rides.cash_collected_by_drivers)],['M-Pesa collected by HAPA',kesFmt(s.rides.mpesa_collected_by_hapa)],
+   ['Commission from cash rides',kesFmt(s.rides.commission_from_cash_rides)],['Commission from M-Pesa rides',kesFmt(s.rides.commission_from_mpesa_rides)],
+   ['Drivers owe HAPA (outstanding)',kesFmt(s.balances.drivers_owe_hapa)],['HAPA owes Drivers (outstanding)',kesFmt(s.balances.hapa_owes_drivers)],
+   ['Commission Reserve held',kesFmt(s.balances.reserve_held)],['Settled: Drivers → HAPA',kesFmt(s.balances.settled_in)],['Settled: HAPA → Drivers',kesFmt(s.balances.settled_out)],
+   ['Tips via M-Pesa',kesFmt(s.balances.tips_mpesa)],['Tips in cash (declared, unverified)',kesFmt(s.balances.tips_cash_declared)]];
+  $('otFinSummary').innerHTML=rows.map(([k,v])=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><b>${esc(String(v))}</b></div>`).join('')+`<small class="muted">${esc(s.note)}</small>`;
+ }catch(e){$('otFinSummary').textContent=e.message;}
+}
+function otFinSummaryCsv(){
+ const f=$('fsFrom').value,t=$('fsTo').value,qs=[f?'from='+f:'',t?'to='+t:''].filter(Boolean).join('&');
+ finDownload('/api/owner/finance/summary.csv'+(qs?'?'+qs:''),'hapa-financial-summary.csv');
+}
+async function otGenStatements(){
+ const y=Number($('stYear').value),m=Number($('stMonth').value);
+ if(!y||!m)return alert('Enter year and month');
+ try{const r=await api('/api/owner/statements/generate',{method:'POST',body:JSON.stringify({year:y,month:m})});alert('Generated '+r.generated.length+' statement(s).');otListStatements();}catch(e){alert(e.message);}
+}
+async function otListStatements(){
+ const y=$('stYear').value,m=$('stMonth').value,qs=[y?'year='+y:'',m?'month='+m:''].filter(Boolean).join('&');
+ $('otStatements').textContent='Loading…';
+ try{
+  const d=await api('/api/owner/statements'+(qs?'?'+qs:''));
+  $('otStatements').innerHTML=d.statements.map(s=>`<div class="row" style="padding:4px 0"><span>${esc(s.reference)} · ${esc(s.driver_name)} · ${s.period_year}-${String(s.period_month).padStart(2,'0')} · <b>${esc(s.status)}</b></span><span>
+   <button class="btn" style="padding:4px 8px" onclick="finDownload('/api/statements/${s.id}.pdf','${esc(s.reference)}.pdf')">PDF</button>
+   <button class="btn" style="padding:4px 8px" onclick="finDownload('/api/statements/${s.id}.csv','${esc(s.reference)}.csv')">CSV</button>
+   ${s.status!=='finalized'?`<button class="btn" style="padding:4px 8px" onclick="otFinalizeStatement('${s.id}')">Finalize</button>`:''}</span></div>`).join('')||'No statements for this period.';
+ }catch(e){$('otStatements').textContent=e.message;}
+}
+async function otFinalizeStatement(id){
+ if(!confirm('Finalize this statement? It becomes immutable.'))return;
+ try{await api('/api/owner/statements/'+id+'/finalize',{method:'POST'});otListStatements();}catch(e){alert(e.message);}
+}
+async function otDriverFinance(id,name){
+ let d;
+ try{d=await api('/api/owner/drivers/'+id+'/finance');}catch(e){alert(e.message);return;}
+ const td='padding:5px 8px;border-bottom:1px solid var(--hapa-border);white-space:nowrap';
+ const b=d.balances;
+ const ov=document.createElement('div');ov.id='otFinOverlay';
+ ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow:auto';
+ ov.innerHTML=`<div class="card" style="max-width:960px;width:100%;margin:0">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">${esc(d.driver.name)} — finance</h3>
+   <span><button class="btn" onclick="finDownload('/api/owner/drivers/${id}/finance.csv','hapa-driver-finance.csv')">Export CSV</button>
+   <button class="btn" onclick="otForceOffline('${id}')">Force offline</button>
+   <button class="btn" onclick="otCloseFin()">Close</button></span></div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;font-size:13px">
+   <span>Driver owes HAPA: <b>${esc(kesFmt(b.driver_owes_hapa))}</b></span>
+   <span>HAPA owes Driver: <b>${esc(kesFmt(b.hapa_owes_driver))}</b></span>
+   <span>Reserve: <b>${esc(kesFmt(b.reserve_balance))}</b></span>
+   <span class="muted">Timezone: Africa/Nairobi</span></div>
+  <div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12px;min-width:100%">
+   <tr>${['Date','Route','Method','Gross fare','HAPA commission','Driver fare earnings','Driver owes HAPA','HAPA owes Driver','Tip','Receipt'].map(h=>`<th style="${td};text-align:left">${h}</th>`).join('')}</tr>
+   ${d.rides.map(r=>`<tr><td style="${td}">${esc((r.completed_at||r.created_at||'').slice(0,10))}</td><td style="${td}">${esc((r.pickup_address||'')+' → '+(r.dest_address||''))}</td><td style="${td}">${esc(r.payment_method)}</td><td style="${td}">${esc(kesFmt(r.gross))}</td><td style="${td}">${esc(kesFmt(r.commission))}</td><td style="${td}">${esc(kesFmt(r.net))}</td><td style="${td}">${r.owes_hapa_outstanding!=null?esc(kesFmt(r.owes_hapa_outstanding)):'KES 0.00'}</td><td style="${td}">${r.hapa_owes_outstanding!=null?esc(kesFmt(r.hapa_owes_outstanding)):'KES 0.00'}</td><td style="${td}">${r.tip_amount?esc(kesFmt(r.tip_amount)+' ('+r.tip_method+')'):'—'}</td><td style="${td}">${esc(r.receipt_reference||'—')}</td></tr>`).join('')}
+  </table></div>
+  <h4 style="margin:14px 0 6px">Record a settlement</h4>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px">
+   <select id="setDir"><option value="driver_to_hapa">Driver pays HAPA</option><option value="hapa_to_driver">HAPA pays Driver</option></select>
+   <input id="setAmt" type="number" step="0.01" placeholder="Amount KES" style="width:110px">
+   <select id="setMethod"><option value="mpesa">M-Pesa</option><option value="bank_transfer">Bank transfer</option><option value="cash_office">Cash at office</option><option value="manual_external">Manual/external</option></select>
+   <input id="setRef" placeholder="External ref (optional)" style="width:150px">
+   <button class="btn primary" onclick="otRecordSettlement('${id}')">Record</button></div>
+  <div style="font-size:13px;margin-top:10px"><b>Settlements</b>${d.settlements.map(s=>`<div class="row" style="padding:3px 0">${esc(`${s.reference} · ${s.direction==='driver_to_hapa'?'Driver → HAPA':'HAPA → Driver'} · ${kesFmt(s.amount)} · ${s.method} · ${s.status}`)}</div>`).join('')||'<div class="muted">None yet.</div>'}</div>
+  <div style="font-size:13px;margin-top:10px"><b>Statements</b>${d.statements.map(s=>`<div class="row" style="padding:3px 0"><span>${esc(s.reference)} · ${esc(s.status)}</span><span><button class="btn" style="padding:3px 8px" onclick="finDownload('/api/statements/${s.id}.pdf','${esc(s.reference)}.pdf')">PDF</button> <button class="btn" style="padding:3px 8px" onclick="finDownload('/api/statements/${s.id}.csv','${esc(s.reference)}.csv')">CSV</button></span></div>`).join('')||'<div class="muted">None yet.</div>'}</div>
+ </div>`;
+ document.body.appendChild(ov);document.body.style.overflow='hidden';
+ ov.addEventListener('click',e=>{if(e.target===ov)otCloseFin();});
+}
+function otCloseFin(){const ov=$('otFinOverlay');if(ov)ov.remove();document.body.style.overflow='';}
+async function otRecordSettlement(id){
+ const amount=Number($('setAmt').value);
+ if(!Number.isFinite(amount)||amount<=0)return alert('Enter a valid amount');
+ try{
+  await api('/api/owner/drivers/'+id+'/settlements',{method:'POST',body:JSON.stringify({direction:$('setDir').value,amount,method:$('setMethod').value,external_ref:$('setRef').value})});
+  alert('Settlement recorded.');otCloseFin();otEarnings();
+ }catch(e){alert(e.message);}
+}
+async function otForceOffline(id){
+ const reason=prompt('Reason for forcing this driver offline (audited):');
+ if(!reason)return;
+ try{const r=await api('/api/owner/drivers/'+id+'/force-offline',{method:'POST',body:JSON.stringify({reason})});alert('Sessions closed: '+r.sessions_closed);}catch(e){alert(e.message);}
+}
+async function drvFinance(){
+ try{
+  const d=await api('/api/driver/finance');
+  const b=d.balances;
+  $('drvFinance').innerHTML=[
+   ['You owe HAPA (cash-ride commission)',kesFmt(b.driver_owes_hapa)],
+   ['HAPA owes you (M-Pesa earnings)',kesFmt(b.hapa_owes_driver)],
+   ['Commission Reserve balance',kesFmt(b.reserve_balance)],
+   ['Tips via M-Pesa',kesFmt(d.tips.mpesa)],
+   ['Tips in cash (declared by riders)',kesFmt(d.tips.cash_declared)]]
+   .map(([k,v])=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><b>${esc(v)}</b></div>`).join('')
+   +`<small class="muted">${esc(d.reserve_status.note)}</small>`
+   +(d.cash_ride_eligibility.eligible_for_cash_rides?'':`<div style="color:var(--bad);font-size:13px;margin-top:6px">Cash-ride requests are paused: pay in KES ${esc(d.cash_ride_eligibility.amount_to_restore)} to restore them. M-Pesa rides continue as normal.</div>`);
+  $('drvStatements').innerHTML=(d.statements.length?'<b>Monthly statements</b> <small class="muted">(not a tax invoice)</small>':'<small class="muted">No monthly statements yet.</small>')
+   +d.statements.map(s=>`<div class="row" style="padding:4px 0"><span>${esc(s.reference)} · ${s.period_year}-${String(s.period_month).padStart(2,'0')} · ${esc(s.status)}</span><span><button class="btn" style="padding:4px 8px" onclick="finDownload('/api/statements/${s.id}.pdf','${esc(s.reference)}.pdf')">PDF</button> <button class="btn" style="padding:4px 8px" onclick="finDownload('/api/statements/${s.id}.csv','${esc(s.reference)}.csv')">CSV</button></span></div>`).join('');
+ }catch(e){$('drvFinance').textContent=e.message;}
+}
+async function finDownload(url,name){
+ try{
+  const r=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error('Download failed');
+  const blob=await r.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+ }catch(e){alert(e.message);}
 }
 async function otVeh(id,st){try{await api('/api/owner/vehicles/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}
 async function otDoc(id,st){try{await api('/api/owner/driver-documents/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}

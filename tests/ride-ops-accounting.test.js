@@ -155,7 +155,10 @@ async function runRide(riderTok, drvTok, pay = 'cash') {
   // it must appear neither as this driver's cancellation nor in earnings.
   ok('unassigned cancelled ride excluded from driver stats', dr && Number(dr.cancellations) === 0 && Number(dr.completed_rides) === 2);
   ok('payment methods separated (all cash)', dr && Number(dr.cash_collected) === 692.26 && Number(dr.mpesa_collected) === 0);
-  ok('unsettled payout equals net', dr && Number(dr.unsettled) === 588.42);
+  // Cash rides: driver already holds the gross, so commission is a receivable
+  // ("Driver owes HAPA") and there is never a payable in the other direction.
+  ok('cash rides: Driver owes HAPA the commission (103.84)', dr && Number(dr.driver_owes_hapa) === 103.84, dr && dr.driver_owes_hapa);
+  ok('cash rides: HAPA owes Driver nothing', dr && Number(dr.hapa_owes_driver) === 0);
   ok('report totals aggregate correctly', Number(rep.d.totals.gross) === 692.26 && Number(rep.d.totals.commission) === 103.84 && rep.d.totals.completed_rides === 2, rep.d.totals);
   ok('driver has online + driving time recorded', dr && Number(dr.online_seconds) > 0 && Number(dr.driving_seconds) >= 1, dr && { on: dr.online_seconds, dr: dr.driving_seconds });
   // Africa/Nairobi date-range filtering (EAT = UTC+3)

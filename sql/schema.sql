@@ -653,3 +653,225 @@ CREATE TABLE IF NOT EXISTS ride_ratings(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  UNIQUE(ride_id,rater_id)
 );
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- DRIVER FINANCE: commission reserve, receivables/payables, tips, settlements,
+-- monthly statements, references, availability hygiene. All additive/idempotent.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- Server-generated unique human-readable references (safe under concurrency)
+CREATE TABLE IF NOT EXISTS transaction_reference_sequences(
+ kind TEXT PRIMARY KEY,
+ next_val BIGINT NOT NULL DEFAULT 1
+);
+
+-- Double-entry style operational ledger (source of truth for money movements)
+CREATE TABLE IF NOT EXISTS financial_transactions(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reference TEXT NOT NULL UNIQUE,
+ txn_type TEXT NOT NULL,
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE SET NULL,
+ driver_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ zone_id UUID REFERENCES geo_areas(id),
+ currency TEXT NOT NULL DEFAULT 'KES',
+ debit_account TEXT NOT NULL,
+ credit_account TEXT NOT NULL,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>=0),
+ status TEXT NOT NULL DEFAULT 'posted' CHECK(status IN('posted','pending','reversed')),
+ effective_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ settlement_id UUID,
+ provider_ref TEXT,
+ idempotency_key TEXT UNIQUE,
+ actor_user_id UUID REFERENCES users(id),
+ adjustment_of UUID REFERENCES financial_transactions(id),
+ meta JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS fin_txn_driver_idx ON financial_transactions(driver_user_id,created_at);
+CREATE INDEX IF NOT EXISTS fin_txn_ride_idx ON financial_transactions(ride_id);
+
+-- Commission Reserve (NOT a consumer wallet; commission cover only)
+CREATE TABLE IF NOT EXISTS driver_commission_reserves(
+ driver_user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ balance NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK(balance>=0),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS driver_commission_reserve_entries(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ entry_type TEXT NOT NULL CHECK(entry_type IN('topup','commission_debit','refund','adjustment')),
+ status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN('pending','completed','failed','reversed')),
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>=0),
+ balance_after NUMERIC(12,2),
+ reference TEXT NOT NULL UNIQUE,
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE SET NULL,
+ provider_ref TEXT,
+ idempotency_key TEXT UNIQUE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ meta JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS reserve_entries_driver_idx ON driver_commission_reserve_entries(driver_user_id,created_at);
+
+-- Driver owes HAPA (cash-ride commission not covered by the reserve)
+CREATE TABLE IF NOT EXISTS driver_receivables(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE SET NULL,
+ reference TEXT NOT NULL UNIQUE,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ outstanding NUMERIC(12,2) NOT NULL CHECK(outstanding>=0),
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','partially_settled','settled','written_off')),
+ source TEXT NOT NULL DEFAULT 'cash_commission',
+ idempotency_key TEXT UNIQUE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ meta JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS receivables_driver_idx ON driver_receivables(driver_user_id,status);
+
+-- HAPA owes Driver (M-Pesa fare earnings and M-Pesa tips held by HAPA)
+CREATE TABLE IF NOT EXISTS driver_payables(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ ride_id UUID REFERENCES ride_requests(id) ON DELETE SET NULL,
+ reference TEXT NOT NULL UNIQUE,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ outstanding NUMERIC(12,2) NOT NULL CHECK(outstanding>=0),
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','partially_settled','settled')),
+ source TEXT NOT NULL DEFAULT 'mpesa_fare' CHECK(source IN('mpesa_fare','mpesa_tip','adjustment')),
+ idempotency_key TEXT UNIQUE,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ meta JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS payables_driver_idx ON driver_payables(driver_user_id,status);
+
+-- Settlements (bidirectional, immutable when completed; corrections = adjustments)
+CREATE TABLE IF NOT EXISTS driver_settlements(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reference TEXT NOT NULL UNIQUE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ direction TEXT NOT NULL CHECK(direction IN('driver_to_hapa','hapa_to_driver')),
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ method TEXT NOT NULL CHECK(method IN('mpesa','bank_transfer','cash_office','reserve_offset','manual_external')),
+ external_ref TEXT,
+ status TEXT NOT NULL DEFAULT 'completed' CHECK(status IN('pending','completed','disputed','reversed')),
+ period TEXT,
+ notes TEXT NOT NULL DEFAULT '',
+ actor_user_id UUID REFERENCES users(id),
+ initiated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ completed_at TIMESTAMPTZ,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ idempotency_key TEXT UNIQUE
+);
+CREATE INDEX IF NOT EXISTS settlements_driver_idx ON driver_settlements(driver_user_id,created_at);
+CREATE TABLE IF NOT EXISTS driver_settlement_items(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ settlement_id UUID NOT NULL REFERENCES driver_settlements(id) ON DELETE CASCADE,
+ item_type TEXT NOT NULL CHECK(item_type IN('receivable','payable')),
+ item_id UUID NOT NULL,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ UNIQUE(settlement_id,item_type,item_id)
+);
+
+-- Payout boundary (real provider integration comes later; no fake success)
+CREATE TABLE IF NOT EXISTS driver_payouts(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reference TEXT NOT NULL UNIQUE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ settlement_id UUID REFERENCES driver_settlements(id),
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ method TEXT NOT NULL CHECK(method IN('mpesa_b2c','bank_transfer','manual_external')),
+ provider_ref TEXT,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN('pending','completed','failed','reversed')),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ completed_at TIMESTAMPTZ
+);
+
+-- Tips (separate from fare; 100% driver by default; never in HAPA commission)
+CREATE TABLE IF NOT EXISTS ride_tips(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ ride_id UUID NOT NULL REFERENCES ride_requests(id) ON DELETE CASCADE,
+ rider_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0),
+ method TEXT NOT NULL CHECK(method IN('cash','mpesa')),
+ status TEXT NOT NULL CHECK(status IN('declared','pending','confirmed','failed')),
+ verified_by_hapa BOOLEAN NOT NULL DEFAULT FALSE,
+ reference TEXT NOT NULL UNIQUE,
+ provider_ref TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS one_tip_per_ride ON ride_tips(ride_id) WHERE status IN('declared','pending','confirmed');
+
+-- Monthly driver statements (Africa/Nairobi months; immutable once finalized)
+CREATE TABLE IF NOT EXISTS driver_monthly_statements(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reference TEXT NOT NULL UNIQUE,
+ driver_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ period_year INTEGER NOT NULL,
+ period_month INTEGER NOT NULL CHECK(period_month BETWEEN 1 AND 12),
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','ready_for_review','partially_settled','settled','disputed','finalized')),
+ opening JSONB NOT NULL DEFAULT '{}'::jsonb,
+ closing JSONB NOT NULL DEFAULT '{}'::jsonb,
+ summary JSONB NOT NULL DEFAULT '{}'::jsonb,
+ issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ finalized_at TIMESTAMPTZ,
+ updated_at TIMESTAMPTZ,
+ UNIQUE(driver_user_id,period_year,period_month)
+);
+CREATE TABLE IF NOT EXISTS driver_monthly_statement_items(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ statement_id UUID NOT NULL REFERENCES driver_monthly_statements(id) ON DELETE CASCADE,
+ item_type TEXT NOT NULL CHECK(item_type IN('ride','reserve_entry','settlement','tip','adjustment')),
+ ref_id UUID NOT NULL,
+ reference TEXT,
+ data JSONB NOT NULL DEFAULT '{}'::jsonb,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(statement_id,item_type,ref_id)
+);
+
+-- Credit/debit notes and adjustments (corrections never edit finalized data)
+CREATE TABLE IF NOT EXISTS accounting_adjustments(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ reference TEXT NOT NULL UNIQUE,
+ kind TEXT NOT NULL CHECK(kind IN('credit_note','debit_note','adjustment')),
+ driver_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ statement_id UUID REFERENCES driver_monthly_statements(id) ON DELETE SET NULL,
+ related_reference TEXT,
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>=0),
+ reason TEXT NOT NULL,
+ actor_user_id UUID REFERENCES users(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Human-readable references on existing records (backfilled idempotently at boot)
+ALTER TABLE ride_requests ADD COLUMN IF NOT EXISTS ride_reference TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS ride_reference_uniq ON ride_requests(ride_reference) WHERE ride_reference IS NOT NULL;
+ALTER TABLE fare_quotes ADD COLUMN IF NOT EXISTS reference TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS quote_reference_uniq ON fare_quotes(reference) WHERE reference IS NOT NULL;
+ALTER TABLE ride_payments ADD COLUMN IF NOT EXISTS reference TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS payment_reference_uniq ON ride_payments(reference) WHERE reference IS NOT NULL;
+ALTER TABLE ride_payments ADD COLUMN IF NOT EXISTS cash_confirmation_reference TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS cash_conf_reference_uniq ON ride_payments(cash_confirmation_reference) WHERE cash_confirmation_reference IS NOT NULL;
+
+-- eTIMS boundary (optional fields only; never fabricated)
+ALTER TABLE ride_receipts ADD COLUMN IF NOT EXISTS tax_document_status TEXT NOT NULL DEFAULT 'not_a_tax_invoice';
+ALTER TABLE ride_receipts ADD COLUMN IF NOT EXISTS etims_invoice_reference TEXT;
+ALTER TABLE ride_receipts ADD COLUMN IF NOT EXISTS etims_credit_note_reference TEXT;
+ALTER TABLE ride_receipts ADD COLUMN IF NOT EXISTS etims_debit_note_reference TEXT;
+
+-- Availability session hygiene (stale detection, explicit end reasons, pauses)
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS end_reason TEXT;
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS auto_closed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS stale_seconds INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS paused_seconds INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE driver_availability_sessions ADD COLUMN IF NOT EXISTS last_paused_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS driver_session_events(
+ id BIGSERIAL PRIMARY KEY,
+ session_id UUID NOT NULL REFERENCES driver_availability_sessions(id) ON DELETE CASCADE,
+ event TEXT NOT NULL,
+ reason TEXT NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS session_events_idx ON driver_session_events(session_id,id);
