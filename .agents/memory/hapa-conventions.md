@@ -58,3 +58,9 @@ Rule: any customer-facing receipt surface (modal, PDF, share text) must exclude 
 - Express route gotcha: register `/api/x/:id.pdf` and `:id.csv` BEFORE `/api/x/:id` or the bare param route captures "uuid.pdf".
 - ShellExec self-kill trap extended: any literal substring of the running command (e.g. "PORT=5208") passed to pkill -f kills the session; kill by inspecting /proc/<pid>/environ instead. Background `node server.js &` from one ShellExec dies when the session ends — start server and tests in the SAME command.
 - Workspace files can be silently reverted/deleted mid-session (checkpoint restore): after any unexpected "file not found", check `git status` for lost tracked edits AND untracked new files before assuming your edits persist.
+
+## Monthly statement accounting + PDF verification (2026-08-01)
+- Accrual rule: statement opening/closing/movement math must date receivables/payables by ride completion time (`COALESCE(ride.completed_at,row.created_at)`), never row created_at — backfilled rows carry deploy-time created_at and silently fall out of the month they belong to (July closing showed 0.00 instead of 103.84 on staging).
+- Statement generation must reconcile loudly: opening + period movements must equal closing (integer cents) or generation throws — never issue an unbalanced statement.
+- PDF layout verification must be geometric, not string-based: `pdftotext -bbox` word boxes checked per page (splitting pages first — comparing across pages yields false overlaps of repeated headers), plus `pdftoppm` render for eyeball check. Poppler bins live under the replit-runtime-path nix store dir.
+- CodeExecution quirk: `requestSecrets` values may arrive empty inside a `"use impure"` function argument; read `process.env.<KEY>` inside the impure body instead.
