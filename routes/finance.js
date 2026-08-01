@@ -3,7 +3,7 @@
 // lib/finance.js (integer cents); this module is auth + validation + views.
 const finance=require('../lib/finance');
 const mpesa=require('../lib/mpesa');
-const {buildStatementPdf}=require('../lib/statement-pdf');
+const {buildStatementPdf,human:humanize}=require('../lib/statement-pdf');
 
 module.exports=function(app,deps){
  const{q,pool,auth,active,owner,audit,writeLimiter}=deps;
@@ -273,7 +273,7 @@ module.exports=function(app,deps){
    const out=[];
    for(const id of driverIds){
     await client.query('BEGIN');
-    try{const st=await finance.generateStatement(client,id,y,m);await client.query('COMMIT');out.push({driver_id:id,reference:st.reference,status:st.status});}
+    try{const st=await finance.generateStatement(client,id,y,m);await client.query('COMMIT');out.push({id:st.id,driver_id:id,reference:st.reference,status:st.status});}
     catch(e){await client.query('ROLLBACK');throw e}
    }
    await audit(req.user.id,'statement.generated','driver_monthly_statements',null,`period=${y}-${m} drivers=${out.length}`);
@@ -327,7 +327,7 @@ module.exports=function(app,deps){
   try{
    const st=await loadStatementFor(req,res);if(!st)return;
    const items=(await q(`SELECT item_type,ref_id,reference,data FROM driver_monthly_statement_items WHERE statement_id=$1 ORDER BY created_at,id`,[st.id])).rows;
-   const pdf=buildStatementPdf(st,st.driver_name,items);
+   const pdf=buildStatementPdf(st,st.driver_name,items,st.meta||{});
    res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${String(st.reference).replace(/[^A-Za-z0-9-]/g,'')}.pdf"`,'Cache-Control':'private, no-store'});
    res.send(pdf);
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
@@ -336,12 +336,21 @@ module.exports=function(app,deps){
   try{
    const st=await loadStatementFor(req,res);if(!st)return;
    const items=(await q(`SELECT item_type,reference,data FROM driver_monthly_statement_items WHERE statement_id=$1 AND item_type='ride' ORDER BY created_at,id`,[st.id])).rows;
-   const head=['Statement',st.reference,'Period',`${st.period_year}-${String(st.period_month).padStart(2,'0')}`,'Timezone','Africa/Nairobi'].map(cell).join(',');
-   const cols=['Date (Africa/Nairobi)','Ride reference','From','To','Payment method','Gross fare (KES)','HAPA commission (KES)','Driver fare earnings (KES)','Tip (KES)'];
-   const lines=[head,cols.map(cell).join(',')];
-   for(const it of items){const d=it.data||{};lines.push([nrbD(d.completed_at),d.ride_reference||d.receipt_reference||'',d.pickup_label||'',d.dest_label||'',d.payment_method,kesF(d.gross_fare),kesF(d.commission_amount),kesF(d.net_earnings),d.tip_amount?kesF(d.tip_amount):''].map(cell).join(','));}
+   const meta=st.meta||{},opening=st.opening||{},closing=st.closing||{};
+   const head=['Statement',st.reference,'Period',`${st.period_year}-${String(st.period_month).padStart(2,'0')}`,'Timezone','Africa/Nairobi','Driver',st.driver_name||'','Status',humanize(st.status)].map(cell).join(',');
+   const cols=['Date (Africa/Nairobi)','Ride reference','Receipt reference','From','To','Payment method','Payment status','Vehicle','Distance (km)','Duration (min)','Gross fare (KES)','HAPA commission (KES)','Driver fare earnings (KES)','Tip (KES)','Driver owes HAPA (KES)','HAPA owes Driver (KES)','Settlement status'];
+   const lines=[head,
+    ['Opening balances','Driver owes HAPA',kesF(opening.driver_owes_hapa),'HAPA owes Driver',kesF(opening.hapa_owes_driver),'Commission Reserve',kesF(opening.reserve)].map(cell).join(','),
+    cols.map(cell).join(',')];
+   for(const it of items){const d=it.data||{};
+    const owes=d.payment_method==='cash'?(d.receivable_amount||d.commission_amount):0,owed=d.payment_method==='cash'?0:(d.payable_amount||d.net_earnings);
+    const settle=humanize(d.payment_method==='cash'?(d.receivable_status||'unsettled'):(d.payable_status||'unsettled'));
+    lines.push([nrbD(d.completed_at),d.ride_reference||'',d.receipt_reference||'',d.pickup_label||'',d.dest_label||'',d.payment_method,'Paid',d.vehicle_registration||'',d.distance_m?(d.distance_m/1000).toFixed(1):'',d.actual_duration_s!=null?(d.actual_duration_s/60).toFixed(1):'',kesF(d.gross_fare),kesF(d.commission_amount),kesF(d.net_earnings),d.tip_amount?kesF(d.tip_amount):'0.00',kesF(owes),kesF(owed),settle].map(cell).join(','));}
    const sum=st.summary||{};
-   lines.push('');lines.push(['Summary','Gross',kesF(sum.gross),'Commission',kesF(sum.commission),'Driver fare earnings',kesF(sum.net)].map(cell).join(','));
+   lines.push('');
+   lines.push(['Summary','Completed rides',sum.rides,'Gross fares',kesF(sum.gross),'Cash collected by Driver',kesF(sum.cash_gross),'M-Pesa collected by HAPA',kesF(sum.mpesa_gross),'Driver fare earnings',kesF(sum.net),'HAPA commission',kesF(sum.commission)].map(cell).join(','));
+   lines.push(['','Tips (M-Pesa)',kesF(sum.tips_mpesa),'Cash tips declared by Rider (not verified by HAPA)',kesF(sum.tips_cash_declared),'Settled: Driver to HAPA',kesF(sum.settled_to_hapa),'Settled: HAPA to Driver',kesF(sum.settled_to_driver)].map(cell).join(','));
+   lines.push(['Closing balances','Driver owes HAPA',kesF(closing.driver_owes_hapa),'HAPA owes Driver',kesF(closing.hapa_owes_driver),'Commission Reserve',kesF(closing.reserve)].map(cell).join(','));
    lines.push(['','Driver earnings statement - not a tax invoice'].map(cell).join(','));
    if(req.user.role==='owner')await audit(req.user.id,'accounting_export','driver_monthly_statements',st.id,'csv');
    sendCsv(res,String(st.reference).replace(/[^A-Za-z0-9-]/g,'')+'.csv',lines);
@@ -351,7 +360,7 @@ module.exports=function(app,deps){
   try{
    const st=await loadStatementFor(req,res);if(!st)return;
    const items=(await q(`SELECT item_type,ref_id,reference,data FROM driver_monthly_statement_items WHERE statement_id=$1 ORDER BY created_at,id`,[st.id])).rows;
-   res.json({statement:st,items,disclaimer:'Driver earnings statement - not a tax invoice.'});
+   res.json({statement:st,status_label:humanize(st.status),items,disclaimer:'Driver earnings statement - not a tax invoice.'});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
  app.get('/api/driver/statements',auth,active,dvCap,async(req,res)=>{

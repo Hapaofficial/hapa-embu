@@ -819,6 +819,7 @@ CREATE TABLE IF NOT EXISTS driver_monthly_statements(
  updated_at TIMESTAMPTZ,
  UNIQUE(driver_user_id,period_year,period_month)
 );
+ALTER TABLE driver_monthly_statements ADD COLUMN IF NOT EXISTS meta JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS driver_monthly_statement_items(
  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
  statement_id UUID NOT NULL REFERENCES driver_monthly_statements(id) ON DELETE CASCADE,
