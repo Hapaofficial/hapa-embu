@@ -1,0 +1,182 @@
+FINAL RESPONSIVE LAYOUT POLISH — DESKTOP WIDTH AND MOBILE APP NAVIGATION
+
+Continue on:
+feature/professional-public-profile
+
+Current staging:
+https://hapa-embu-staging.onrender.com
+
+Current mobile review was performed at 390 × 844.
+
+The light design direction is approved. Do not redesign the colors again and do not expand product functionality.
+
+Fix only the remaining responsive layout and navigation issues.
+
+1. DESKTOP WIDTH
+
+- Increase the useful desktop content width.
+- Use a responsive max-width around 1280–1440px where appropriate.
+- Reduce excessive empty margins on large monitors.
+- The dark header background may span the full browser width, while its internal content remains centered.
+- Forms and marketplace content must not remain unnecessarily narrow.
+- Preserve readable line lengths for legal/help text.
+
+2. MOBILE MAIN NAVIGATION
+
+At widths below approximately 768px, do not render the desktop navigation as multiple wrapped rows.
+
+Create a professional mobile navigation pattern.
+
+Preferred implementation:
+- compact top header with HAPA logo, account badge and logout/menu control
+- fixed or sticky bottom navigation for the most important customer sections:
+  - Home
+  - Marketplace
+  - Requests
+  - Account
+  - More
+
+Inside “More” provide:
+- Professional roles
+- Help
+- Owner dashboard when the logged-in user is Owner
+
+Alternative mobile navigation is acceptable only if it is equally clear and app-like.
+
+Requirements:
+- no wrapped desktop menu
+- no overlapping items
+- active section clearly highlighted
+- minimum 44px touch targets
+- correct safe-area padding
+- Owner controls must not dominate the customer navigation
+- logout must remain accessible but separated from normal navigation
+
+3. MARKETPLACE SECONDARY NAVIGATION
+
+For:
+- Browse
+- Pros
+- Shops
+- Transport
+- Sell
+- My Listings
+- Saved
+
+Use one of:
+- horizontally scrollable tab bar with clear active state
+- compact category selector plus contextual actions
+
+Do not shrink all seven buttons into tiny controls.
+
+Requirements:
+- minimum readable font size
+- minimum 40–44px height
+- touch-friendly spacing
+- no clipped labels
+- no horizontal page overflow
+- horizontal scrolling must be limited to the tab strip only, if used
+
+4. MOBILE SEARCH AND FILTERS
+
+At 390px and smaller:
+- search input full width
+- sorting selector full width or in a balanced two-column row when space allows
+- Filters button prominent and touch-friendly
+- consistent vertical spacing
+- keyboard must not hide primary actions
+- filter panel must fit the viewport
+
+5. MOBILE EMPTY STATES
+
+Improve:
+- No listings found
+- No professionals found
+- No shops found
+- No transport providers found
+- No requests yet
+
+Use:
+- constrained but wider card
+- larger relevant icon
+- clear title
+- short useful explanation
+- one useful action only when appropriate
+
+Do not leave the empty-state card extremely small in a large unused area.
+
+6. MOBILE TYPOGRAPHY AND TOUCH
+
+At 360–430px:
+- body text minimum readable size
+- labels and buttons must not look scaled down
+- primary buttons minimum 44px height
+- form fields minimum 44px height
+- avoid tiny badge text
+- long emails and phone numbers wrap safely
+- confirmation modals fit without horizontal scrolling
+
+7. OWNER MOBILE EXPERIENCE
+
+Owner Dashboard must remain usable on mobile.
+
+Requirements:
+- metric cards stack cleanly
+- user cards remain readable
+- moderation actions fit the screen
+- Owner Dashboard accessed through More or another non-dominating mobile control
+- document cards fit the screen
+- no multi-row cramped top navigation
+
+8. DESKTOP AND MOBILE REGRESSION
+
+Verify:
+- 1440px
+- 1024px
+- 768px
+- 430px
+- 390px
+- 360px
+
+Check:
+- no page-level horizontal overflow
+- no clipped controls
+- no navigation wrapping
+- no console errors
+- Marketplace, Requests, Account, Help, Professional editor and Owner screens still work
+- PWA safe-area behavior remains correct
+- Android/iOS projects remain untouched except shared responsive web assets where required
+
+9. TESTS
+
+Add or update tests for:
+- no wrapped desktop navigation at mobile widths
+- mobile navigation items have accessible labels
+- minimum touch-target classes/styles exist
+- marketplace tab strip does not create page-level overflow
+- desktop container uses the wider approved max-width
+- Owner Dashboard remains reachable on mobile
+- no functional regressions
+
+Run the full test suite.
+
+If all tests pass:
+- commit:
+  fix: polish responsive layout and mobile navigation
+- push only:
+  feature/professional-public-profile
+
+Do not merge main.
+Do not touch production.
+Do not change database, APIs, storage, Render, secrets, Google Maps or native signing configuration.
+Allow staging to auto-deploy and verify it becomes Live.
+
+Return:
+- files changed
+- desktop result
+- mobile navigation result
+- tested viewport results
+- test totals
+- commit SHA
+- staging deployment status
+- confirmation main and production were untouched

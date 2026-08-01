@@ -1,0 +1,86 @@
+FIX THE RENDER BUILD FAILURE NOW — DO NOT CHANGE APPLICATION FUNCTIONALITY
+
+Current branch:
+feature/professional-public-profile
+
+Latest commit:
+def0e51
+
+Render staging repeatedly fails before application startup during:
+npm install
+
+The exact error is:
+npm error Exit handler never called!
+npm error This is an error with npm itself.
+
+Confirmed:
+- Node 22.23.2 + npm failed
+- Node 22.22.0 + npm 10.9.4 failed
+- clearing Render build cache did not help
+- application code never started
+- this is a dependency-install/build portability problem
+
+Do not modify production.
+Do not merge main.
+Do not change database data, APIs, frontend behavior, storage, secrets or business functionality.
+Do not manually deploy Render.
+
+Implement a deterministic repository-owned Render build that avoids the failing npm installer.
+
+Required work:
+
+1. Inspect:
+   - package.json
+   - package-lock.json
+   - dependency and optional-dependency changes
+   - Capacitor/mobile dependencies
+   - install scripts
+   - Node engine configuration
+
+2. Reproduce the failure or validate the solution in a completely clean environment with:
+   - no existing node_modules
+   - no npm cache
+   - Node 22.22.0
+
+3. Migrate the Render dependency installation to a pinned stable pnpm version.
+
+Preferred implementation:
+   - add a pinned packageManager field to package.json
+   - generate and commit pnpm-lock.yaml
+   - add an executable script such as scripts/render-build.sh
+   - enable Corepack
+   - activate the exact pinned pnpm version
+   - install dependencies using a frozen lockfile
+   - install only what the running web service requires
+   - do not build Android or iOS native projects during the Render web-service build
+   - do not delete the native projects
+
+4. The Render build script must be deterministic and fail with a meaningful error.
+
+5. Verify in a fresh clean environment:
+   - dependency installation succeeds
+   - node server.js starts
+   - /api/health returns 200
+   - the complete 228-test suite still passes
+   - no secret, media, database dump or generated native build output is tracked
+
+6. Confirm that npm install is no longer required by the Render build.
+
+7. Commit with:
+fix: make Render dependency installation deterministic
+
+8. Push only:
+feature/professional-public-profile
+
+Do not deploy manually and do not touch main or production.
+
+Return only:
+- root cause
+- exact files changed
+- clean-install result
+- test result
+- commit SHA
+- push result
+- exact Render Build Command I must enter
+- exact Render Start Command
+- whether NODE_VERSION=22.22.0 should remain or be removed

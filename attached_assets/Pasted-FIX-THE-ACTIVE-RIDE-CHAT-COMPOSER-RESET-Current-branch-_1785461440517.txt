@@ -1,0 +1,95 @@
+FIX THE ACTIVE-RIDE CHAT COMPOSER RESET
+
+Current branch:
+feature/professional-public-profile
+
+Current staging:
+https://hapa-embu-staging.onrender.com
+
+Current deployed commit:
+0e73006
+
+Confirmed manual staging defect during an active synthetic ride:
+
+- Rider and Driver chat is available.
+- After typing approximately 2–3 characters, the composer loses focus or rerenders.
+- The unsent message is erased.
+- This appears to happen during realtime ride/location/status refreshes.
+
+Do not complete, cancel or alter the current staging ride.
+Do not change ride pricing, dispatch, state transitions, Maps, payments or credentials.
+
+Diagnose the exact cause and implement the smallest robust fix.
+
+Requirements:
+
+1. The chat input must remain stable while realtime events arrive:
+   - driver location updates
+   - ride status updates
+   - polling refreshes
+   - Socket.IO/WebSocket events
+   - reconnects
+
+2. Do not replace or recreate the active chat input DOM element while the user is typing.
+
+3. Preserve:
+   - unsent draft text
+   - input focus
+   - caret position
+   - selected text where practical
+
+4. Keep an in-memory draft per ride and per logged-in participant.
+   - drafts for different rides must never mix
+   - do not put draft text or JWTs in URLs, logs or HTML attributes
+   - clear drafts on successful send, logout and ride completion
+
+5. Message sending:
+   - send only on explicit Send or the intended Enter action
+   - prevent duplicate sends
+   - disable Send while submitting
+   - on success, clear the draft once
+   - on failure, retain the draft and show a safe error
+   - reconnect must not auto-send an unsent draft
+
+6. Preserve authorization:
+   - only the rider and assigned driver may chat
+   - Owner access remains limited to justified reported support cases
+   - no cross-ride or cross-user message access
+
+7. Preserve XSS protection, rate limits and message escaping.
+
+8. Add tests proving:
+   - typing survives repeated location updates
+   - typing survives repeated ride-status refreshes
+   - focus and caret remain stable
+   - successful send clears once
+   - failed send retains the draft
+   - reconnect does not erase or auto-send
+   - two rides do not share drafts
+   - logout and ride completion clear the draft
+   - no duplicate messages
+   - unrelated users remain blocked
+   - HTML/script content remains safely escaped
+
+9. Run the complete test suite.
+
+If all tests pass:
+
+Commit:
+fix: preserve ride chat drafts during realtime updates
+
+Push only:
+feature/professional-public-profile
+
+Do not merge main.
+Do not touch production.
+Do not modify current staging ride data manually.
+Allow staging to auto-deploy.
+
+Return:
+- exact root cause
+- files changed
+- test totals
+- commit SHA
+- staging deployment result
+- confirmation current ride data was not altered

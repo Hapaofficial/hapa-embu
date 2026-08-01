@@ -1,0 +1,670 @@
+FINAL HAPA UI REDESIGN AND STAGING POLISH
+
+Continue from the current HEAD of:
+
+feature/professional-public-profile
+
+Current staging:
+
+https://hapa-embu-staging.onrender.com
+
+Current working deployment before this task:
+
+3179103
+
+The HAPA v1.7 functionality is working on staging. Customer navigation, Marketplace, Requests, Account, Help, Professional profiles, Owner Dashboard, All Users and Professional application details were manually reviewed.
+
+This task is the final visual redesign and staging-quality pass.
+
+Do not expand business functionality.
+Do not rebuild working backend modules.
+Do not change database schema unless absolutely required for an identified bug.
+Do not touch main or production.
+Do not modify Render, R2, Google Maps credentials or production configuration.
+
+==================================================
+1. DESIGN DIRECTION
+==================================================
+
+Replace the current heavy all-dark interface with a modern, professional, light-first HAPA design.
+
+The product should look like a trustworthy modern marketplace, not a technical administration panel.
+
+Use a consistent design system based on CSS variables.
+
+Required base palette:
+
+--hapa-background: #F5F7FA;
+--hapa-surface: #FFFFFF;
+--hapa-surface-muted: #F8FAFC;
+--hapa-header: #101C2C;
+--hapa-primary: #F5A623;
+--hapa-primary-hover: #DE8F12;
+--hapa-text: #172033;
+--hapa-text-muted: #667085;
+--hapa-border: #E1E6ED;
+--hapa-success: #198754;
+--hapa-warning: #E59A00;
+--hapa-danger: #C63C49;
+--hapa-info: #2563EB;
+
+The exact shades may be adjusted slightly only when needed for accessibility, contrast or visual consistency.
+
+Use:
+
+- dark navy for the main header and navigation
+- white cards and forms
+- light grey page background
+- orange only for primary actions and active navigation
+- green only for approval, verified and success states
+- red only for destructive, suspension or deletion actions
+- neutral grey for secondary controls
+- blue only for informational links where appropriate
+
+Do not use orange on every button.
+Do not use red for ordinary navigation.
+Do not leave large empty dark areas.
+
+Default launch appearance must be the new light theme.
+
+Do not add a theme switch in this task unless it can be done safely without increasing scope. A future optional dark mode must not delay this redesign.
+
+==================================================
+2. DESIGN SYSTEM
+==================================================
+
+Create one centralized visual system rather than changing colors independently throughout the file.
+
+Centralize:
+
+- colors
+- spacing
+- border radii
+- shadows
+- typography sizes
+- button heights
+- form input heights
+- focus styles
+- card styles
+- badges
+- status colors
+- navigation states
+- mobile breakpoints
+
+Use consistent components for:
+
+- primary button
+- secondary button
+- destructive button
+- text/link button
+- form input
+- select
+- textarea
+- checkbox
+- status badge
+- verified badge
+- empty state
+- error alert
+- success alert
+- confirmation modal
+- content card
+- profile card
+- listing card
+- dashboard metric card
+
+Required quality:
+
+- clear visual hierarchy
+- readable typography
+- sufficient whitespace
+- subtle borders and shadows
+- consistent card widths
+- no cramped forms
+- no excessive rounded “pill” controls
+- no raw browser-default styling
+- accessible focus indicators
+- WCAG AA contrast for normal text and controls
+
+==================================================
+3. GLOBAL NAVIGATION
+==================================================
+
+Redesign the navigation consistently across:
+
+- Customer
+- Professional
+- Merchant
+- Driver
+- Owner
+
+Requirements:
+
+- HAPA logo and tagline remain visible
+- active main section is obvious
+- secondary navigation is visually subordinate
+- buttons do not wrap awkwardly on desktop
+- mobile navigation is touch-friendly
+- no duplicate navigation rows
+- no overlapping controls
+- correct back navigation
+- Logout remains clearly separated from normal navigation
+- Owner Dashboard remains visually distinct but not oversized
+- destructive account actions must never appear in the main navigation
+
+Check these sections:
+
+- Home
+- Marketplace
+- Requests
+- Professional roles
+- Account
+- Help
+- Owner Dashboard
+
+Marketplace secondary tabs:
+
+- Browse
+- Pros
+- Shops
+- Transport
+- Sell
+- My Listings
+- Saved
+
+==================================================
+4. PAGE LAYOUTS
+==================================================
+
+Apply the new design consistently to:
+
+- login and registration
+- Home
+- Marketplace
+- Professional discovery
+- Shops
+- Transport
+- listing detail
+- public provider profiles
+- Requests
+- Account
+- Help and legal pages
+- Professional roles
+- Professional editor
+- Merchant editor
+- Driver editor
+- Owner Dashboard
+- All Users
+- User details
+- verification application details
+- reports and moderation panels
+
+Use a sensible maximum content width on large screens.
+
+Do not allow forms to become extremely narrow on desktop.
+
+For editing screens, use appropriate grouped sections such as:
+
+- Public identity
+- Services
+- Pricing
+- Location
+- Contact
+- Photos
+- Availability
+
+Use two-column layouts only where they improve readability and collapse cleanly on mobile.
+
+==================================================
+5. OWNER DASHBOARD FIXES
+==================================================
+
+Replace all raw internal property names with professional English labels.
+
+Current examples include:
+
+- pendingGenericReports
+- openRequests
+- activeProfessionalProfiles
+- activeMerchantProfiles
+- activeDriverProfiles
+- reviews
+
+Use readable labels such as:
+
+- Pending reports
+- Open requests
+- Active professional profiles
+- Active merchant profiles
+- Active driver profiles
+- Reviews
+
+Inspect the cards currently labelled:
+
+- Pending Reports
+- pendingGenericReports
+
+If they represent identical data, remove the duplicate card.
+
+If they represent different data, use explicit distinct names such as:
+
+- Pending listing reports
+- Pending user and content reports
+
+Never display raw JavaScript or database field names.
+
+Redesign dashboard statistic cards so that:
+
+- numbers are prominent
+- labels are readable
+- related metrics are grouped
+- empty metrics do not dominate the page
+- cards stack correctly on mobile
+- no horizontal overflow occurs
+
+==================================================
+6. OWNER USER ACTION SAFETY
+==================================================
+
+On the active customer detail page, the current actions include:
+
+- Reject
+- Block
+
+Inspect the actual backend behavior.
+
+Do not show an ambiguous “Reject” action for an already active and approved customer unless there is a genuinely pending account-access decision.
+
+Either:
+
+- hide the action when not applicable, or
+- rename it to an exact description of the real operation
+
+Rename:
+
+- Block → Suspend account
+
+For suspended accounts show:
+
+- Reactivate account
+
+Every restrictive or destructive action must display a confirmation modal containing:
+
+- customer name
+- exact action
+- consequence
+- Cancel button
+- explicit confirmation button
+
+General account suspension must not:
+
+- remove customer role
+- delete approved capabilities
+- alter verified categories
+- delete verification history
+- silently remove public content history
+
+Suspension may hide public content as required, but restoration must preserve prior records.
+
+==================================================
+7. ACTIVITY TAB
+==================================================
+
+Remove the unfinished production-facing text:
+
+“Full activity log will be available in a future release.”
+
+Display recorded activity normally.
+
+When no additional activity exists, show:
+
+“No additional activity recorded yet.”
+
+Do not invent activity entries.
+
+Do not build a new audit system in this task.
+
+==================================================
+8. PROFESSIONAL APPLICATION OWNER VIEW
+==================================================
+
+Improve the approved Professional application screen.
+
+Required:
+
+- county capitalization, e.g. “Embu”
+- starting price displayed as “KES 100”
+- readable and consistent date/time formatting
+- clearly separated application details
+- verified status badge
+- improved document section
+- fixed-size private-document preview cards
+- preserve original image aspect ratio
+- no tall, narrow or distorted previews
+- explicit “Open securely” action
+- clear document type label where available
+- responsive document grid
+
+Private verification documents must remain:
+
+- Owner-only
+- authenticated
+- inaccessible from public APIs
+- inaccessible from customer Marketplace views
+- protected by the existing private-document architecture
+
+Do not convert private verification documents into public media.
+
+==================================================
+9. SUPPORT AND HELP
+==================================================
+
+The Help page currently shows:
+
+- Support email — Coming soon
+- Support phone — Coming soon
+
+Do not display “Coming soon” as launch content.
+
+Use:
+
+- SUPPORT_EMAIL
+- SUPPORT_PHONE
+
+When one contact method is not configured, omit only that row.
+
+When neither is configured:
+
+- keep the working Report a problem form
+- show:
+  “Direct support contact details are not configured yet.”
+
+Do not invent contact details.
+
+Keep or improve:
+
+- Help & Support
+- Safety tips
+- Community rules
+- Your data
+- Terms
+- Privacy
+- Report a problem
+
+Make legal and support text readable with appropriate line width, headings and spacing.
+
+Document the missing configuration requirements:
+
+- SUPPORT_EMAIL
+- SUPPORT_PHONE
+- LEGAL_ENTITY_NAME
+- LEGAL_ADDRESS
+
+Do not include secret values.
+
+==================================================
+10. FORMS AND BUTTONS
+==================================================
+
+Improve all forms consistently.
+
+Requirements:
+
+- visible labels
+- readable help text
+- clear required fields
+- validation near the related field
+- consistent input heights
+- good textarea sizes
+- visible focus states
+- correct mobile input types
+- disabled states
+- loading states
+- success confirmation
+- safe error messages
+- no overly wide destructive buttons
+- no destructive action beside a primary save button without separation
+
+Primary actions:
+
+- Save
+- Publish
+- Submit request
+- Send
+- Confirm
+
+Secondary actions:
+
+- Preview
+- Cancel
+- Back
+- Pause
+- Edit
+
+Destructive actions:
+
+- Delete
+- Suspend
+- Remove
+- Permanently delete account
+
+Destructive buttons must use red styling and confirmation.
+
+==================================================
+11. EMPTY STATES
+==================================================
+
+Keep the existing empty-state functionality but redesign it consistently.
+
+Examples:
+
+- No requests yet
+- No professionals found
+- No shops found
+- No transport providers found
+- No reports
+- No reviews
+- No merchant application
+- No driver application
+
+Each empty state should contain:
+
+- a simple relevant icon
+- a clear heading or message
+- one useful next action only when appropriate
+
+Do not leave the message floating inside a massive empty area.
+
+Use a centered card or constrained empty-state block.
+
+==================================================
+12. RESPONSIVE AND MOBILE QUALITY
+==================================================
+
+Validate the redesigned application at:
+
+- 1440px desktop
+- 1024px tablet
+- 768px tablet
+- 430px iPhone
+- 390px iPhone
+- 412px Android
+- 360px small Android
+
+Required:
+
+- no horizontal overflow
+- no clipped buttons
+- no overlapping navigation
+- no unreadably small text
+- no full-width page elements extending beyond the viewport
+- forms stack correctly
+- metric cards stack correctly
+- document cards remain usable
+- confirmation dialogs fit the screen
+- keyboard does not hide critical submit actions
+- safe-area spacing remains correct
+- touch targets are large enough
+- long email addresses and phone numbers wrap safely
+- marketplace filters remain usable
+- Owner screens remain functional on mobile
+
+==================================================
+13. FUNCTIONAL REGRESSION RULES
+==================================================
+
+Do not break:
+
+- authentication
+- Professional profiles
+- Merchant profiles
+- Driver profiles
+- Marketplace
+- Requests
+- reviews
+- reports
+- Owner moderation
+- public media
+- authenticated media
+- private documents
+- Account deletion
+- PWA
+- Google Maps integration boundaries
+- Android/iOS projects
+- Render build script
+- pnpm lockfile
+
+Do not change:
+
+- Render Build Command
+- storage credentials
+- environment secrets
+- R2 configuration
+- production configuration
+- main branch
+
+==================================================
+14. TESTING
+==================================================
+
+Run the full existing suite.
+
+Add or update tests covering:
+
+- raw internal stat property names never render
+- duplicate report metric cards do not appear ambiguously
+- active approved users do not see irrelevant Reject controls
+- Suspend account and Reactivate account labels follow account status
+- confirmation is required before account suspension
+- suspension does not remove verification history or capabilities
+- future-release Activity placeholder is absent
+- safe Activity empty state appears
+- support contacts render only when configured
+- support fallback appears when both are missing
+- private Professional documents remain Owner-only
+- starting price uses KES formatting
+- no “Coming soon” support values
+- design-system variables exist
+- primary/destructive controls use distinct styles
+- common mobile widths have no horizontal overflow where testable
+
+Run:
+
+- backend suite
+- Professional suite
+- frontend authenticated-media suite
+- launch-readiness suite
+- any added UI tests
+
+Perform browser smoke tests on:
+
+- Customer Marketplace
+- Requests
+- Account
+- Help
+- Professional editor
+- Owner Stats
+- All Users
+- User details
+- Professional application
+
+Verify no JavaScript console errors.
+
+==================================================
+15. GIT AND STAGING
+==================================================
+
+Before committing:
+
+- inspect the complete diff
+- remove debug output
+- confirm no secrets are included
+- confirm no uploaded media is included
+- confirm no screenshots or temporary artifacts are tracked
+- confirm native projects and Render build remain intact
+
+If all tests pass, commit with:
+
+feat: redesign HAPA interface and polish owner experience
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge into main.
+Do not deploy production.
+Do not access production database or storage.
+Do not manually deploy Render.
+
+Allow Render staging to auto-deploy.
+
+Verify that the staging deployment becomes Live.
+
+==================================================
+16. FINAL RESPONSE
+==================================================
+
+Return one concise final report:
+
+STATUS:
+- COMPLETE
+or
+- BLOCKED
+
+DESIGN:
+- design-system files changed
+- screens redesigned
+- responsive result
+
+OWNER POLISH:
+- stat-label result
+- account-action result
+- Activity result
+- Professional application result
+
+SUPPORT:
+- contact rendering result
+- fallback result
+
+TESTS:
+- total passed/failed
+- browser smoke result
+- mobile result
+- regression result
+
+GIT:
+- commit SHA
+- push result
+- branch
+
+STAGING:
+- deployed SHA
+- Live status
+- URL
+
+SAFETY:
+- main untouched
+- production untouched
+- secrets/storage configuration untouched
+
+Do not return another plan.
+Implement, test, commit, push and verify staging now.

@@ -1,0 +1,1438 @@
+FINAL HAPA DRIVER FINANCE, COMMISSION RESERVE, TIPS AND MONTHLY STATEMENTS ORDER
+
+This is one complete financial and operational task.
+
+It supersedes every earlier partial prompt concerning:
+
+- Driver earnings reports
+- cash-ride commission accounting
+- unsettled Driver balances
+- Driver payout accounting
+- monthly Driver statements
+- ride and transaction reference numbers
+- Driver tips
+- stale Driver online sessions
+- missing route details in Driver reports
+- settlement and reconciliation workflows
+
+Continue from the CURRENT HEAD of:
+
+feature/professional-public-profile
+
+Staging:
+
+https://hapa-embu-staging.onrender.com
+
+Do not rebuild the ride-hailing system.
+
+Preserve all currently working functionality, including:
+
+- Rider ride history
+- Driver ride history
+- Owner ride details
+- ride event timeline
+- fare quotes
+- dispatch
+- PIN verification
+- realtime chat
+- cash payment confirmation
+- receipts and PDFs
+- earnings ledger
+- Owner accounting CSV
+- Kenya-wide geography
+- zone rate cards
+- Android and iOS projects
+- deterministic Render build
+
+Do not create another staging ride merely to complete this task.
+
+Use existing staging rides for read-only acceptance checks and use isolated synthetic local fixtures for new financial scenarios.
+
+Do not manually rewrite, delete or fabricate existing ride, payment, receipt or ledger records.
+
+Do not touch:
+
+- main
+- production
+- production database
+- production R2
+- Render configuration
+- Google Maps configuration
+- live M-Pesa credentials
+- app-store credentials
+
+Use additive, idempotent and non-destructive migrations.
+
+==================================================
+1. CONFIRMED CURRENT ACCOUNTING PROBLEM
+==================================================
+
+The current Owner Driver earnings report shows, for two completed cash rides:
+
+- Gross fares: KES 692.26
+- HAPA commission: KES 103.84
+- Driver net earnings: KES 588.42
+- Cash collected: KES 692.26
+- Unsettled: KES 588.42
+
+This is financially ambiguous and incorrect for cash rides.
+
+For a cash ride:
+
+- the customer pays the full fare directly to the Driver
+- the Driver already possesses both:
+  - the Driver earnings portion
+  - the HAPA commission portion
+- HAPA does not owe the Driver the net earnings
+- the Driver owes HAPA the commission unless it has already been deducted from an internal Commission Reserve
+
+For each current cash ride:
+
+- gross cash collected by Driver: KES 346.13
+- Driver fare earnings: KES 294. collected by Driver: KES 346.13
+- Driver fare21
+- HAPA commission receivable: KES 51.92
+- HAPA payout due to Driver: KES 0.00
+
+For two rides:
+
+- cash collected by Driver: KES 692.26
+- Driver earnings retained: KES 588.42
+- Driver owes HAPA: KES 103.84
+- HAPA owes Driver: KES 0.00
+
+The system must always distinguish:
+
+- Driver owes HAPA
+- HAPA owes Driver
+
+Never represent both directions through one ambiguous “Unsettled” value.
+
+==================================================
+2. FINANCIAL ACCOUNTING MODEL
+==================================================
+
+Implement a double-entry-style operational ledger suitable for reconciliation and audit.
+
+This does not need to become a full general accounting platform, but every financial movement must have:
+
+- immutable transaction ID
+- human-readable reference
+- transaction type
+- related ride where applicable
+- Driver
+- service zone
+- currency
+- debit account
+- credit account
+- amount
+- status
+- effective timestamp
+- created timestamp
+- settlement reference where applicable
+- provider reference where applicable
+- idempotency key
+- actor
+- audit metadata
+- adjustment link where applicable
+
+Create or safely extend additive structures such as:
+
+- financial_transactions
+- driver_commission_reserves
+- driver_commission_reserve_entries
+- driver_receivables
+- driver_payables
+- driver_settlements
+- driver_settlement_items
+- driver_payouts
+- ride_tips
+- driver_monthly_statements
+- driver_monthly_statement_items
+- accounting_adjustments
+- transaction_reference_sequences
+
+Reuse the current:
+
+- ride_payments
+- ride_payment_events
+- driver_earnings_ledger
+- platform_commission_ledger
+- ride_receipts
+
+Do not duplicate existing persisted financial events unnecessarily.
+
+Create one clear source of truth and safe compatibility views where required.
+
+Accounting invariants must be enforced server-side and covered by tests.
+
+==================================================
+3. UNIQUE HUMAN-READABLE REFERENCES
+==================================================
+
+Every material operation must have an immutable, unique, searchable HAPA reference.
+
+Keep internal UUIDs as primary database identifiers.
+
+Add human-facing references such as:
+
+- Ride:
+  HAPA-RIDE-...
+
+- Fare quote:
+  HAPA-QUOTE-...
+
+- Ride receipt:
+  HAPA-RCP-...
+
+- Payment:
+  HAPA-PAY-...
+
+- Cash confirmation:
+  HAPA-CASH-...
+
+- Tip:
+  HAPA-TIP-...
+
+- Commission charge:
+  HAPA-COM-...
+
+- Commission Reserve top-up:
+  HAPA-TOPUP-...
+
+- Settlement:
+  HAPA-SET-...
+
+- Driver payout:
+  HAPA-PAYOUT-...
+
+- Monthly Driver statement:
+  HAPA-STMT-...
+
+- Adjustment:
+  HAPA-ADJ-...
+
+- Refund:
+  HAPA-REF-...
+
+- Credit note:
+  HAPA-CRN-...
+
+- Debit note:
+  HAPA-DBN-...
+
+Requirements:
+
+- unique database constraints
+- generated server-side only
+- no user-supplied reference
+- no reuse after rollback
+- safe under concurrency
+- idempotent callback handling
+- searchable in Owner tools
+- visible in PDFs, statements and CSVs
+- no personal information encoded in references
+
+Preserve existing receipt references such as:
+
+HAPA-MS8ADAEC-2698
+
+Do not replace or invalidate already-issued references.
+
+Generate missing references for historical records only through a safe, idempotent migration.
+
+==================================================
+4. CASH-RIDE COMMISSION ACCOUNTING
+==================================================
+
+Implement correct cash accounting.
+
+When the Driver confirms cash collected:
+
+1. Record the full fare as:
+   Cash collected by Driver.
+
+2. Record the Driver’s fare earnings.
+
+3. Record the HAPA commission as:
+   Commission due from Driver to HAPA.
+
+4. Do not create a HAPA payout payable for the Driver’s net fare earnings.
+
+5. Apply the commission against the Driver Commission Reserve when enabled and funded.
+
+Example:
+
+Gross cash:
+KES 346.13
+
+Driver earnings:
+KES 294.21
+
+HAPA commission:
+KES 51.92
+
+When Commission Reserve contains sufficient funds:
+
+- reserve debit: KES 51.92
+- Driver owes HAPA: KES 0.00
+- HAPA owes Driver: KES 0.00
+
+When the reserve has insufficient funds:
+
+- debit the available reserve amount
+- create the remaining Driver-to-HAPA receivable
+- do not create an uncontrolled hidden negative balance
+- show the exact outstanding amount
+- preserve an immutable breakdown
+
+Example with reserve KES 20.00:
+
+- reserve debit: KES 20.00
+- Driver owes HAPA: KES 31.92
+
+Cash ride accounting must never display:
+
+HAPA owes Driver KES 294.21
+
+because the Driver already received the money directly from the customer.
+
+==================================================
+5. DRIVER COMMISSION RESERVE
+==================================================
+
+Implement an internal Driver Commission Reserve.
+
+This is not a general consumer wallet.
+
+Do not implement:
+
+- person-to-person transfers
+- arbitrary withdrawals
+- customer payments from the balance
+- interest
+- currency exchange
+- transferable stored value
+- public claims that HAPA operates a bank account or digital wallet
+
+The reserve exists only to:
+
+- receive approved Driver top-ups
+- cover HAPA commissions from cash rides
+- cover approved Driver debts to HAPA
+- process explicit refunds or corrections
+- produce a transparent ledger
+
+Use feature and compliance gates such as:
+
+COMMISSION_RESERVE_ENABLED
+COMMISSION_RESERVE_LEGAL_APPROVED
+CASH_RIDE_CREDIT_LIMIT_KES
+CASH_RIDE_MINIMUM_RESERVE_KES
+
+Do not enable it in production until the financial structure has been reviewed by qualified Kenyan legal and accounting professionals.
+
+Reserve features:
+
+- current available balance
+- pending top-ups
+- completed top-ups
+- commission debits
+- refunds
+- adjustments
+- failed top-ups
+- complete immutable history
+- each entry with a unique HAPA reference
+
+Provide Driver UI:
+
+- Reserve balance
+- Outstanding commission
+- Minimum required balance
+- Top up
+- Recent transactions
+- Download statement
+- explanation of how cash-ride commission is collected
+
+Provide Owner UI:
+
+- Driver reserve balance
+- outstanding receivable
+- reserve history
+- top-up status
+- commission debits
+- exceptions
+- reconciliation status
+
+==================================================
+6. CASH-RIDE ELIGIBILITY AND CREDIT LIMIT
+==================================================
+
+Create configurable cash-ride financial eligibility.
+
+A Driver may receive cash rides when:
+
+- Commission Reserve is sufficiently funded, or
+- outstanding Driver-to-HAPA debt remains below the approved credit limit
+
+Do not block M-Pesa rides solely because the Driver owes cash commission unless operational policy explicitly requires it.
+
+When the Driver exceeds the configured limit:
+
+- stop offering new cash rides
+- clearly explain the reason
+- allow eligible electronic-payment rides where policy permits
+- show the amount required to restore cash eligibility
+- do not silently suspend the whole account
+- do not delete approved Driver capability
+- do not alter completed ride history
+
+Every cash-ride eligibility decision must be server-side.
+
+The Driver app must not be able to bypass it by modifying frontend data.
+
+==================================================
+7. M-PESA ACCOUNTING
+==================================================
+
+Implement the opposite accounting direction for M-Pesa payments received by HAPA.
+
+When a customer pays the full ride amount to HAPA through M-Pesa:
+
+- gross amount is received by HAPA
+- HAPA commission is retained
+- Driver net earnings become:
+  HAPA owes Driver
+
+Example:
+
+Customer M-Pesa payment:
+KES 346.13
+
+HAPA commission:
+KES 51.92
+
+HAPA owes Driver:
+KES 294.21
+
+Do not mark the Driver as paid until an actual payout or approved offset occurs.
+
+Integrate with the existing Daraja adapter architecture.
+
+Support:
+
+- sandbox
+- live
+- payment initiation
+- callback verification
+- provider reference
+- idempotent callback
+- replay protection
+- reconciliation
+- failed payment
+- reversed payment
+- refund
+- Driver payout boundary
+
+Do not enable live M-Pesa without real approved credentials.
+
+Do not create fake successful payouts.
+
+Prepare payout integration boundaries for:
+
+- M-Pesa B2C
+- bank transfer where later approved
+- manual settlement with an external reference
+
+==================================================
+8. DRIVER TIPS
+==================================================
+
+Implement Driver tips after a completed ride.
+
+Rider options:
+
+- KES 20
+- KES 50
+- KES 100
+- Other amount
+- No tip
+
+Requirements:
+
+- completed ride only
+- authorized Rider only
+- one final tip transaction per ride by default
+- configurable tip window after completion
+- amount validation
+- maximum tip protection
+- explicit confirmation
+- unique HAPA-TIP reference
+- separate from the fare
+- separate from HAPA commission
+- shown separately on receipt and Driver statement
+
+Default policy:
+
+- 100% of the tip belongs to the Driver
+- HAPA commission on tip = 0%
+- do not silently change this policy
+
+Make the commission policy configurable but locked behind legal and Owner approval.
+
+For an M-Pesa tip received by HAPA:
+
+- create HAPA owes Driver payable
+- include in next payout/settlement
+
+For a cash tip:
+
+- record only when the Rider declares it
+- label clearly:
+  Cash tip declared by Rider
+- mark:
+  Not collected or verified by HAPA
+- do not create a payout
+- do not treat HAPA as holding the funds
+
+Tips must not change the immutable original ride fare.
+
+Do not combine fare and tip into one unexplained amount.
+
+==================================================
+9. SETTLEMENT WORKFLOW
+==================================================
+
+Implement a proper Driver settlement workflow.
+
+Support:
+
+- Driver pays HAPA
+- HAPA pays Driver
+- bidirectional netting only when policy explicitly allows it
+- full settlement
+- partial settlement
+- disputed settlement
+- reversed settlement
+- adjusted settlement
+
+Every settlement must include:
+
+- HAPA settlement reference
+- Driver
+- statement period
+- settlement direction:
+  - Driver to HAPA
+  - HAPA to Driver
+- amount
+- method:
+  - M-Pesa
+  - bank transfer
+  - cash office settlement
+  - reserve offset
+  - approved manual external method
+- external transaction reference
+- initiated timestamp
+- completed timestamp
+- status
+- Owner/operator identity
+- notes
+- related ledger items
+- audit history
+
+Prevent:
+
+- double settlement
+- settling the same ledger entry twice
+- negative over-settlement
+- duplicate provider callbacks
+- deleting completed settlements
+- silent edits to completed settlement amounts
+
+Corrections after completion must be separate adjustments with their own references.
+
+==================================================
+10. MONTHLY DRIVER STATEMENTS
+==================================================
+
+Every Driver must have an automatic monthly statement.
+
+Use Africa/Nairobi month boundaries.
+
+Example reference:
+
+HAPA-STMT-DRV-2026-07-000123
+
+Statement period:
+
+1 July 2026 – 31 July 2026
+
+Statuses:
+
+- Open
+- Ready for review
+- Partially settled
+- Settled
+- Disputed
+- Finalized
+
+Statement must include:
+
+HEADER
+
+- HAPA name
+- Driver name
+- Driver account reference
+- statement reference
+- period
+- issue date/time
+- Africa/Nairobi timezone
+- statement status
+- service zones
+- vehicles used
+
+OPENING BALANCES
+
+- Commission Reserve opening balance
+- Driver owes HAPA opening balance
+- HAPA owes Driver opening balance
+- pending payout opening balance
+
+RIDE LINE ITEMS
+
+For every ride:
+
+- ride reference
+- receipt reference
+- operational date
+- requested time
+- accepted time
+- started time
+- completed time
+- pickup address
+- destination address
+- distance
+- duration
+- vehicle
+- payment method
+- gross fare
+- cash collected by Driver
+- M-Pesa collected by HAPA
+- HAPA commission
+- Driver fare earnings
+- tip
+- cancellation fee
+- waiting charge
+- adjustments
+- settlement status
+
+RESERVE LINE ITEMS
+
+- top-ups
+- pending top-ups
+- completed top-ups
+- commission debits
+- refunds
+- corrections
+- reserve balance after every entry
+
+PAYOUT AND SETTLEMENT LINE ITEMS
+
+- Driver-to-HAPA payments
+- HAPA-to-Driver payouts
+- partial settlements
+- external references
+- failed or reversed transactions
+
+SUMMARY
+
+- completed rides
+- cancelled rides
+- gross fares
+- cash collected by Driver
+- M-Pesa collected by HAPA
+- Driver fare earnings
+- tips
+- HAPA commission
+- Reserve top-ups
+- Reserve commission debits
+- refunds
+- adjustments
+- Driver owes HAPA
+- HAPA owes Driver
+- amount settled
+- amount still outstanding
+
+CLOSING BALANCES
+
+- Commission Reserve closing balance
+- Driver owes HAPA closing balance
+- HAPA owes Driver closing balance
+- unsettled payout closing balance
+
+Once finalized, a statement must be immutable.
+
+Later corrections must use:
+
+- credit note
+- debit note
+- adjustment
+
+with:
+
+- unique reference
+- reason
+- related original transaction
+- actor
+- timestamp
+- audit history
+
+==================================================
+11. STATEMENT DELIVERY
+==================================================
+
+Statements must be available as:
+
+- in-app view
+- downloadable PDF
+- downloadable CSV
+
+Email delivery may be prepared but must work only when a real email provider is configured.
+
+Never claim:
+
+Statement emailed
+
+when no message was delivered.
+
+Driver statement access:
+
+- Driver accesses only their own statements
+- Owner accesses statements through Owner-only routes
+- unrelated users are blocked
+- statement URLs do not contain JWTs
+- no statement data is publicly cached
+
+==================================================
+12. DRIVER REPORT DRILL-DOWN
+==================================================
+
+The current Driver earnings report shows totals but does not show clearly where each Driver travelled.
+
+Make each Driver row and the Trips count clickable.
+
+Open a Driver financial details screen containing:
+
+DRIVER SUMMARY
+
+- Driver name
+- account status
+- Driver rating
+- operating zones
+- vehicles
+- reporting period
+- timezone
+
+PER-RIDE TABLE
+
+- ride reference
+- from
+- to
+- date/time
+- distance
+- actual duration
+- payment method
+- payment status
+- gross fare
+- tip
+- HAPA commission
+- Driver net fare earnings
+- Driver owes HAPA
+- HAPA owes Driver
+- settlement status
+- receipt reference
+- Details action
+
+FINANCIAL TOTALS
+
+- completed rides
+- gross fare
+- cash collected by Driver
+- M-Pesa received by HAPA
+- tips
+- HAPA commission
+- Driver net earnings
+- Driver owes HAPA
+- HAPA owes Driver
+- reserve balance
+- settled amount
+- outstanding amount
+
+Do not force the Owner to find routes in a separate unrelated list.
+
+Keep the existing general Recent rides register as well.
+
+==================================================
+13. OWNER PLATFORM FINANCIAL SUMMARY
+==================================================
+
+Create an Owner platform financial summary.
+
+Show for the selected period:
+
+- completed rides
+- gross fares
+- cash collected by Drivers
+- M-Pesa collected by HAPA
+- total tips
+- HAPA commission earned
+- Commission Reserve balances
+- Driver-to-HAPA receivables
+- HAPA-to-Driver payables
+- settled Driver-to-HAPA amount
+- settled HAPA-to-Driver amount
+- failed payments
+- reversed payments
+- refunds
+- adjustments
+- unsettled payouts
+- disputed settlements
+
+Provide filters:
+
+- date range
+- county
+- service zone
+- Driver
+- vehicle category
+- payment method
+- settlement status
+
+Display clearly:
+
+Reporting period: All time
+
+or the selected period.
+
+Display:
+
+Timezone: Africa/Nairobi
+
+==================================================
+14. CLEAR TABLE LABELS
+==================================================
+
+Replace ambiguous headings.
+
+Examples:
+
+- Cash → Cash collected by Driver
+- Unsettled → remove this ambiguous single column
+- Unpaid → Unpaid rides or Unpaid amount, whichever is actually displayed
+- Cancels → Driver cancellations
+- Rat → Rating
+- Online → Online time in selected period
+- Driving → Active trip time
+- Net → Driver fare earnings
+- Commission → HAPA commission
+
+Use separate columns:
+
+- Driver owes HAPA
+- HAPA owes Driver
+- Reserve balance
+- Unsettled Driver payout
+
+Do not mix counts and KES values without units.
+
+Every financial value must display:
+
+KES 0.00
+
+Every duration must clearly indicate:
+
+- hours
+- minutes
+
+==================================================
+15. ONLINE TIME AND STALE SESSION DEFECT
+==================================================
+
+Confirmed current defect:
+
+The Driver report displays approximately:
+
+Online: 22h 43m
+
+even though the synthetic Driver was not intentionally operating for that duration.
+
+Diagnose the real root cause.
+
+Inspect:
+
+- availability session start/end
+- stale heartbeat handling
+- browser closure
+- logout
+- server restart
+- network loss
+- Driver going offline
+- ride completion
+- session overlap
+- duplicate active sessions
+- continuous-hours enforcement
+
+Create explicit availability states:
+
+- offline
+- online_available
+- paused
+- offered
+- assigned
+- on_trip
+- stale
+- forced_offline
+
+Requirements:
+
+- Driver heartbeat
+- last_seen timestamp
+- configurable stale threshold
+- stale sessions stop receiving offers immediately
+- stale sessions do not continue accumulating ordinary available time indefinitely
+- active rides remain recoverable after reconnect
+- browser/app closure does not leave an unlimited online session
+- logout closes or invalidates availability safely
+- account suspension closes availability
+- expired documents close availability
+- working-hour limit closes or pauses availability
+- only one active availability session per Driver
+
+Do not silently erase historical timestamps.
+
+When repairing an orphaned session:
+
+- preserve original start
+- add a safe inferred end where policy allows
+- mark:
+  auto_closed_stale
+- record reason
+- create audit entry
+
+Owner must have an action:
+
+Force Driver offline
+
+Requirements:
+
+- confirmation
+- reason
+- audit record
+- no ride-history deletion
+- cannot abandon an active ride without an explicit emergency workflow
+
+Recalculate report durations using valid sessions only.
+
+Show separately:
+
+- Online time
+- Available time
+- On-trip time
+- Stale time
+- Paused time
+
+==================================================
+16. MONTHLY STATEMENT SCHEDULING
+==================================================
+
+Implement idempotent statement generation.
+
+Requirements:
+
+- generate or update the open statement during the month
+- finalize only after the month ends or Owner-approved close
+- one statement per Driver per calendar month
+- safe rerun without duplicates
+- all new eligible ledger entries included once
+- late adjustments added through debit/credit notes
+- no changes to a finalized statement’s original lines
+
+Provide:
+
+- generate current statements
+- generate previous-month statements
+- preview
+- finalize
+- dispute
+- resolve dispute
+- settle
+
+All Owner actions must be audited.
+
+==================================================
+17. RECEIPTS, STATEMENTS AND ETIMS BOUNDARY
+==================================================
+
+Continue to call the existing Rider document:
+
+Ride receipt
+
+Do not call it a tax invoice.
+
+Continue displaying:
+
+This is a ride receipt, not a tax invoice.
+
+Add optional fields for a future approved tax system:
+
+- tax_document_status
+- etims_invoice_reference
+- etims_credit_note_reference
+- etims_debit_note_reference
+
+Do not fabricate eTIMS references.
+
+Do not claim KRA tax-invoice compliance without a real approved integration.
+
+Driver monthly statements must also say:
+
+Driver earnings statement — not a tax invoice
+
+unless the legal and tax integration later requires a different approved document.
+
+==================================================
+18. CSV AND PDF EXPORTS
+==================================================
+
+Provide Owner exports for:
+
+- platform financial summary
+- Driver earnings summary
+- Driver per-ride details
+- monthly statements
+- reserve ledger
+- settlement register
+
+Requirements:
+
+- current filters applied
+- UTF-8
+- consistent Africa/Nairobi timestamps
+- two-decimal KES values
+- safe CSV quoting
+- spreadsheet-formula injection prevention for values beginning:
+  =, +, -, @
+- Owner-only authorization
+- audit record for every export
+
+Do not export:
+
+- passwords
+- JWTs
+- API keys
+- signed URLs
+- private verification documents
+- exact GPS coordinates
+- private chat content
+- unnecessary personal data
+
+==================================================
+19. DRIVER AND OWNER USER EXPERIENCE
+==================================================
+
+Driver must be able to see clearly:
+
+- Gross fares
+- Cash held by Driver
+- M-Pesa earnings due
+- Tips
+- HAPA commission
+- Commission Reserve
+- Driver owes HAPA
+- HAPA owes Driver
+- Settled
+- Outstanding
+- next required settlement action
+
+Do not show a misleading single balance.
+
+Owner must be able to understand immediately:
+
+- who has the money
+- who owes whom
+- why
+- which ride created the balance
+- which transaction settled it
+- what remains outstanding
+
+Use clear colours:
+
+- green: paid/settled
+- orange: action required/pending
+- red: overdue/blocked/disputed
+- neutral: informational
+
+Do not use red for normal earnings.
+
+Ensure desktop and mobile layouts remain usable.
+
+Avoid an excessively wide single table on mobile.
+
+Use expandable Driver cards or a detail view where necessary.
+
+==================================================
+20. SECURITY AND AUTHORIZATION
+==================================================
+
+Driver:
+
+- accesses only their own reserve
+- accesses only their own statements
+- accesses only their own settlement history
+- cannot alter calculated commission
+- cannot mark settlements complete
+
+Owner:
+
+- Owner-only financial routes
+- every manual settlement audited
+- every adjustment audited
+- every export audited
+- exact ride-location access remains separately audited
+
+Public users:
+
+- no financial ledgers
+- no Driver balances
+- no payout status
+- no transaction details
+
+Protect against:
+
+- IDOR
+- SQL injection
+- duplicate callbacks
+- replay
+- double settlement
+- double payout
+- negative invalid amounts
+- integer/decimal rounding errors
+- client-supplied commission values
+- client-supplied balances
+- reference collisions
+
+Use fixed decimal handling suitable for KES accounting.
+
+Do not use floating-point arithmetic as the financial source of truth.
+
+==================================================
+21. REQUIRED TESTS
+==================================================
+
+CASH ACCOUNTING
+
+Test one KES 346.13 cash ride:
+
+- cash collected by Driver: 346.13
+- Driver fare earnings: 294.21
+- HAPA commission receivable: 51.92
+- HAPA owes Driver: 0.00
+
+Test two rides:
+
+- cash collected by Driver: 692.26
+- Driver fare earnings: 588.42
+- Driver owes HAPA: 103.84
+- HAPA owes Driver: 0.00
+
+COMMISSION RESERVE
+
+Test:
+
+- sufficient reserve covers commission
+- partial reserve creates remaining Driver receivable
+- zero reserve creates full Driver receivable
+- reserve cannot be spent twice
+- duplicate callback cannot top up twice
+- cash eligibility blocked only after configured threshold
+- M-Pesa ride eligibility remains separate
+
+M-PESA ACCOUNTING
+
+Test:
+
+- HAPA receives gross
+- HAPA retains commission
+- HAPA owes Driver net
+- payout settles payable
+- duplicate callback does not duplicate income
+- failed payment creates no collected earnings
+- reversal creates correct adjustment
+
+TIPS
+
+Test:
+
+- KES 20/50/100/custom
+- tip belongs fully to Driver by default
+- tip receives unique reference
+- tip is not included in HAPA commission
+- cash tip is marked unverified by HAPA
+- M-Pesa tip creates HAPA-to-Driver payable
+- unrelated user cannot tip a ride
+- incomplete ride cannot be tipped
+- duplicate tip prevented
+
+REFERENCES
+
+Test uniqueness and immutability for:
+
+- ride
+- quote
+- receipt
+- payment
+- cash confirmation
+- tip
+- commission
+- top-up
+- settlement
+- payout
+- statement
+- adjustment
+- refund
+
+MONTHLY STATEMENT
+
+Test:
+
+- correct Africa/Nairobi month
+- one statement per Driver/month
+- correct opening balances
+- all rides included once
+- from/to shown for each ride
+- gross/commission/net correct
+- cash and M-Pesa separated
+- tips separated
+- reserve entries included
+- settlements included
+- Driver owes HAPA correct
+- HAPA owes Driver correct
+- closing balances correct
+- finalized statement immutable
+- late adjustment creates separate credit/debit note
+- Driver can access own statement
+- unrelated user blocked
+
+SETTLEMENTS
+
+Test:
+
+- full settlement
+- partial settlement
+- Driver-to-HAPA settlement
+- HAPA-to-Driver payout
+- no double settlement
+- external reference preserved
+- completed settlement immutable
+- reversal/adjustment uses new reference
+
+ONLINE SESSION
+
+Test:
+
+- only one active session
+- heartbeat updates freshness
+- stale session stops offers
+- stale session auto-closes safely
+- browser closure does not create unlimited time
+- logout closes session
+- suspension closes session
+- expired documents close session
+- active ride is not abandoned
+- working-hour limit enforced
+- Online/Available/Driving/Stale durations calculated separately
+- synthetic 22h 43m orphan session does not remain ordinary valid online time
+
+OWNER REPORT
+
+Test:
+
+- Driver row opens per-ride routes
+- pickup and destination visible
+- route details match ride
+- totals match ledgers
+- payment directions shown correctly
+- report period displayed
+- filters work
+- mobile layout does not expose unusable horizontal tables
+- no cross-zone leakage
+
+EXPORTS
+
+Test:
+
+- Owner-only
+- filtered data
+- correct two-decimal KES
+- safe CSV
+- formula injection neutralized
+- no exact coordinates
+- no secrets
+- export audit record
+
+Run the complete existing HAPA test suite plus all new tests.
+
+==================================================
+22. STAGING ACCEPTANCE
+==================================================
+
+After local tests pass:
+
+1. Push only the feature branch.
+2. Allow staging to auto-deploy.
+3. Verify health and deployed SHA.
+4. Use existing staging rides read-only.
+5. Verify the Driver report no longer describes cash earnings as HAPA payable.
+6. Verify the report shows:
+   - Cash collected by Driver
+   - Driver owes HAPA
+   - HAPA owes Driver
+   - Commission Reserve
+7. Click the Driver and verify both routes:
+   - Embu CBD (receipt pilot) → Kangaru
+   - Embu Town CBD → Kangaru School gate
+8. Verify gross, commission and Driver earnings for every ride.
+9. Verify monthly statement preview.
+10. Verify statement PDF and CSV.
+11. Verify Owner financial summary.
+12. Verify stale availability session is handled through audited logic.
+13. Do not create a new live staging ride merely for this check.
+14. Do not manually change existing completed ride financial data.
+
+==================================================
+23. GIT AND SAFETY
+==================================================
+
+Before committing:
+
+- inspect full diff
+- remove debug output
+- remove generated statements/CSVs/PDFs from tracked files
+- confirm no credentials
+- confirm no private coordinates
+- confirm no exported personal data
+- preserve receipt history
+- preserve all previous ride and history fixes
+- preserve deterministic Render build
+- preserve native projects
+
+Create clean logical commits, preferably one:
+
+feat: add driver settlements, tips and monthly statements
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge main.
+
+Do not deploy production.
+
+Do not access production database or storage.
+
+==================================================
+24. FINAL RESPONSE FORMAT
+==================================================
+
+STATUS:
+- COMPLETE
+or
+- BLOCKED
+
+CASH ACCOUNTING:
+- Driver cash result
+- HAPA commission receivable result
+- reserve debit result
+- Driver owes HAPA result
+- HAPA owes Driver result
+
+M-PESA ACCOUNTING:
+- collected result
+- commission result
+- Driver payable result
+- payout status
+
+TIPS:
+- Rider UI result
+- transaction result
+- commission result
+- cash/M-Pesa result
+
+REFERENCES:
+- reference types created
+- uniqueness result
+- historical compatibility result
+
+COMMISSION RESERVE:
+- balance result
+- top-up result
+- debit result
+- cash eligibility result
+- legal gate result
+
+MONTHLY STATEMENTS:
+- in-app result
+- PDF result
+- CSV result
+- finalization result
+- adjustment result
+
+OWNER REPORTING:
+- platform summary result
+- Driver summary result
+- per-ride from/to result
+- reporting-period result
+- mobile result
+
+SETTLEMENTS:
+- Driver-to-HAPA result
+- HAPA-to-Driver result
+- partial settlement result
+- audit result
+
+ONLINE SESSIONS:
+- exact stale-session root cause
+- auto-close result
+- working-hours result
+- corrected report duration result
+
+TESTS:
+- total passed
+- total failed
+- accounting result
+- authorization result
+- live staging result
+
+GIT:
+- commit SHA
+- push result
+- branch
+- main untouched
+- production untouched
+
+DATA SAFETY:
+- existing completed rides not manually changed
+- no new staging ride created
+- no secrets committed
+- no precise locations exported
+
+EXTERNAL BLOCKERS:
+- Commission Reserve legal/accounting approval
+- live Daraja credentials
+- payout provider credentials
+- eTIMS integration and tax approval
+- include only genuine remaining blockers
+
+Do not return only a plan.
+
+Implement, test, push and verify staging now.

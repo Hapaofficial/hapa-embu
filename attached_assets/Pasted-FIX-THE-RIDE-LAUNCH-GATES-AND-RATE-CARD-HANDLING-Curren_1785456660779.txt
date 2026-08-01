@@ -1,0 +1,132 @@
+FIX THE RIDE LAUNCH GATES AND RATE-CARD HANDLING
+
+Current branch:
+feature/professional-public-profile
+
+Current staging commit:
+e15c49e
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+Confirmed staging defect:
+
+- Embu pilot area is active.
+- One active fare rate card exists for:
+  - area: Embu pilot area
+  - active fare rate card exists for:
+  - area: Embu pilot area
+  - vehicle category: car
+  - base fare: KES 100
+  - per km: KES 40
+  - per minute: KES 5
+  - minimum fare: KES 150
+- After a hard refresh, Owner Dashboard → Transport still shows:
+  RATE_CARD = BLOCKED
+
+Do not ask the Owner to add another rate card.
+Diagnose and fix the real root cause.
+
+Required:
+
+1. Inspect the launch-gate query and fare-rate-card resolver.
+
+Check:
+- exact pilot-zone ID
+- active/inactive state
+- vehicle-category comparison
+- effective_from handling
+- date/timezone conversion
+- area hierarchy and ancestor fallback
+- duplicate or overlapping cards
+- whether the gate checks a different category than the booking flow
+
+2. RATE_CARD must become READY when a currently effective active rate card can be resolved for the active pilot zone and supported passenger-car category.
+
+Do not bypass validation or return READY without a genuinely usable rate card.
+
+3. Fix date-only handling.
+
+A date selected as 07/30/2026 must not display or store as 07/29/2026 because of UTC/timezone conversion.
+
+Treat fare-card effective dates as calendar dates in Africa/Nairobi, not browser UTC timestamps.
+
+4. Prevent duplicate rate cards from repeated clicks.
+
+Implement:
+- disabled/loading Add rate card button while submitting
+- idempotent request handling
+- safe backend/database protection against exact duplicate active cards for the same area, vehicle category and effective date
+- clear user feedback when an identical card already exists
+
+Do not delete historical cards.
+
+5. Correct mandatory versus optional launch gates for a controlled cash pilot.
+
+Mandatory BLOCKED gates:
+- TNC licence confirmation
+- Google Maps browser key
+- Google Maps server key
+- emergency/support phone
+- active usable fare rate card
+
+Optional integrations must not block a controlled cash pilot:
+
+- M-Pesa:
+  show OPTIONAL / NOT CONFIGURED when cash payment is enabled and working
+- Phone masking:
+  show OPTIONAL / NOT CONFIGURED when authenticated in-app chat is working and personal numbers remain hidden
+
+Do not claim M-Pesa or phone masking is active.
+
+Production-pilot readiness must be calculated from mandatory gates only.
+
+6. Improve launch-gate labels.
+
+Use clear statuses:
+- READY
+- BLOCKED
+- OPTIONAL — NOT CONFIGURED
+
+Show a short readable reason for every blocked gate without exposing secrets.
+
+7. Add tests proving:
+
+- active Embu pilot car rate card makes RATE_CARD ready
+- inactive card remains blocked
+- future-effective card remains blocked until its date
+- expired/deactivated card remains blocked
+- zone card is preferred over county fallback
+- valid county fallback works where allowed
+- vehicle-category mismatch remains blocked
+- effective date does not shift by timezone
+- repeated submission cannot create exact duplicates
+- M-Pesa does not block a cash-only pilot
+- phone masking does not block when secure in-app chat is available
+- mandatory gates still block production-pilot readiness
+- public APIs expose no secret values
+
+8. Run the entire existing test suite.
+
+If everything passes:
+
+Commit:
+fix: correct ride launch gates and rate card handling
+
+Push only:
+feature/professional-public-profile
+
+Do not merge main.
+Do not touch production.
+Do not alter Render, R2, credentials or Google Maps configuration.
+Do not manually deploy.
+
+Return:
+- exact root cause
+- files changed
+- test totals
+- commit SHA
+- push result
+- staging auto-deploy status
+- final expected launch-gate statuses
+- confirmation main and production were untouched

@@ -1,0 +1,298 @@
+Implement a production-quality HAPA ride receipt and immediate ride-history update.
+
+This is not a prototype. Treat it as a customer-facing financial record for a real ride-hailing application.
+
+## STRICT DEPLOYMENT RULES
+
+* Repository: `Hapaofficial/hapa-embu`
+* Work only on branch: `feature/professional-public-profile`
+* Pull the latest branch using fast-forward only before editing.
+* Never modify, merge, push, or deploy `main`.
+* Never deploy to production: `https://hapa-embu.onrender.com`
+* Push and verify only staging: `https://hapa-embu-staging.onrender.com`
+* Preserve all existing ride, payment, safety, chat, authentication, authorization and database behavior.
+* Do not expose secrets or add credentials to source control.
+* Do not create a second receipt system or duplicate receipt records.
+* Use the existing immutable `ride_receipts` record as the source of truth.
+* This is a “Ride receipt,” not a “Tax invoice.” Do not make tax or VAT claims and do not invent KRA details.
+
+## PART 1 — PROFESSIONAL IN-APP RECEIPT
+
+Replace the browser `alert()` currently used by `rdReceipt()` in `public/index.html`.
+
+Create a polished HAPA receipt modal consistent with the existing design system:
+
+* Navy HAPA header
+* HAPA logo/wordmark
+* “Official ride receipt”
+* Green `PAID` status
+* Clear route presentation
+* Professional spacing and typography
+* Responsive desktop and mobile layouts
+
+Display only customer-facing information:
+
+* Receipt reference
+* Date and time in `Africa/Nairobi`
+* Pickup
+* Destination
+* Driver display name
+* Vehicle make/model
+* Vehicle registration
+* Distance in kilometres
+* Duration in minutes
+* Payment method: Cash or M-Pesa
+* Payment reference when available
+* Fare breakdown:
+
+  * Base fare
+  * Booking fee
+  * Distance charge
+  * Time charge
+  * Waiting charge when applicable
+* Final total
+
+Money formatting must always use:
+
+`KES 346.13`
+
+Use thousands separators and exactly two decimal places.
+
+Never expose:
+
+* Platform commission
+* Driver earnings
+* Internal user IDs
+* Rate-card IDs
+* Database IDs
+* Internal payment mode
+* Debug information
+* Raw API responses
+
+Every server-supplied value must be escaped before insertion into HTML.
+
+## PART 2 — RECEIPT INTERACTIONS
+
+Change the receipt function to:
+
+`rdReceipt(rideId = rdState.rideId)`
+
+This must allow receipts to be opened from both:
+
+* The active completed ride card
+* Historical closed rides
+
+Provide these actions:
+
+### Download PDF
+
+Do not download a `.txt` or `.html` file.
+
+Add an authenticated endpoint:
+
+`GET /api/rides/:id/receipt.pdf`
+
+Requirements:
+
+* Reuse the existing ride authorization and receipt record.
+* Only authorized ride participants and currently permitted owner/support access may download it.
+* An unrelated user must receive `403`.
+* An unauthenticated request must receive `401`.
+* A ride without a finalized receipt must receive `404`.
+* Generate a clean, branded PDF containing the same customer-facing receipt information shown in the modal.
+* Do not include commission, driver earnings or internal accounting fields.
+* Return:
+
+  * `Content-Type: application/pdf`
+  * `Content-Disposition: attachment; filename="HAPA-Receipt-<REFERENCE>.pdf"`
+  * `Cache-Control: private, no-store`
+* Sanitize the filename.
+* Do not create public receipt URLs.
+* Do not save additional PDF copies in the database or public storage.
+* Add the PDF dependency properly to `package.json`, `pnpm-lock.yaml` and `package-lock.json` if required by the repository.
+* Preserve the existing Render build process.
+
+### Share
+
+* Prefer sharing the generated PDF file through the native Web Share API when file sharing is supported.
+* Otherwise share a clean text version of the receipt.
+* If native sharing is unavailable, copy the text receipt to the clipboard.
+* Never create a public receipt link.
+* Show success/failure feedback inside the modal.
+* User cancellation of the native share sheet must not display an error.
+
+### Close
+
+The modal must close through:
+
+* Close button
+* X button
+* Escape key
+* Backdrop click
+
+Accessibility requirements:
+
+* `role="dialog"`
+* `aria-modal="true"`
+* Proper accessible title
+* Move focus into the modal
+* Trap Tab/Shift+Tab focus inside the modal
+* Restore focus to the original Receipt button after closing
+* Prevent background scrolling while open
+* Restore scrolling after closing
+* Minimum 44px touch targets
+* Visible keyboard focus
+* Do not rely only on colour to communicate status
+
+## PART 3 — LOADING AND ERROR STATES
+
+Receipt loading must be professional:
+
+* Prevent duplicate receipt requests.
+* Disable the clicked Receipt button while loading.
+* Show `Loading receipt…`
+* Restore the button after success or failure.
+* Display API errors in an inline HAPA notice.
+* Do not use browser alerts for receipt loading, sharing, downloading or errors.
+* Opening one receipt after another must not leave stale data, event listeners, body-scroll locks or focus state.
+
+## PART 4 — IMMEDIATE RECENT RIDES
+
+Currently a completed ride does not appear in `Recent rides` until the customer presses `Done`.
+
+Fix this.
+
+When `rdRefresh()` receives:
+
+* `closed`
+* `rider_cancelled`
+* `driver_cancelled`
+
+it must immediately refresh `Recent rides`.
+
+Important behavior:
+
+* Keep the terminal active-ride card visible.
+* The rider must still be able to rate a closed trip and open its receipt.
+* Do not automatically dismiss the active card.
+* Do not require `Done` before adding the ride to history.
+* Do not create duplicate history entries.
+* Do not create recursive refresh loops.
+* A failed history refresh must not clear the active ride.
+
+Update `rdLoadHistory()`:
+
+* Show the five latest terminal rides.
+* Use `completed_at` when available, otherwise `created_at`.
+* Format dates using `Africa/Nairobi`.
+* Format fares with exactly two decimals.
+* Show a clear status label.
+* Only `closed` rides with finalized payment may show the `Receipt` button.
+* Cancelled rides must appear in history but must not show a Receipt button.
+* The historical Receipt button must call `rdReceipt(r.id)`.
+
+## PART 5 — SECURITY AND PRIVACY
+
+Verify:
+
+* Receipt API authorization cannot be bypassed by changing the ride ID.
+* No receipt data is written to URLs, localStorage, logs or analytics.
+* No public/shareable URL exposes receipt information.
+* The PDF endpoint is not cached by the service worker.
+* Receipt HTML is protected against script/HTML injection.
+* Downloaded filenames cannot contain unsafe characters.
+* Existing payment and ride records remain immutable.
+* No database migration is required unless absolutely necessary; do not introduce one for presentation-only work.
+
+## PART 6 — AUTOMATED TESTS
+
+Add frontend tests covering:
+
+* Correct ride ID is requested.
+* Modal opens instead of a browser alert.
+* Receipt displays route, driver, vehicle, payment and total.
+* KES formatting always uses two decimal places.
+* Server-controlled text is escaped.
+* Loading state prevents duplicate requests.
+* API failures appear inline.
+* Download requests the authenticated PDF endpoint.
+* Correct PDF filename is used.
+* Native PDF sharing works when supported.
+* Clipboard fallback works.
+* Share cancellation is handled silently.
+* Escape, backdrop and Close button work.
+* Keyboard focus is trapped and restored.
+* Body scrolling is restored.
+* Closed rides update Recent rides immediately.
+* Cancelled rides appear without Receipt buttons.
+* Closed historical rides contain Receipt buttons.
+* Existing chat drafts remain intact.
+
+Add backend/integration tests covering:
+
+* Rider can download their PDF.
+* Assigned driver can download the PDF if current authorization permits it.
+* Unrelated user receives `403`.
+* Unauthenticated request receives `401`.
+* Missing receipt receives `404`.
+* Response begins with a valid PDF signature.
+* Response headers are correct.
+* Filename is sanitized.
+* Customer PDF does not contain internal accounting information.
+
+Run all relevant checks, including:
+
+* JavaScript syntax validation for `public/index.html`
+* New receipt frontend tests
+* New PDF endpoint tests
+* `node tests/ride-chat-frontend.test.js`
+* Existing ride-hailing tests
+* Existing fare-quote tests
+* `git diff --check`
+* Dependency/lockfile consistency check
+* Render build command or equivalent production dependency validation
+
+Do not remove, weaken or skip existing tests.
+
+## PART 7 — STAGING VERIFICATION
+
+After all tests pass:
+
+1. Review the complete diff for accidental changes and secrets.
+2. Commit with:
+
+`feat: add production ride receipts and instant history`
+
+3. Push only to:
+
+`feature/professional-public-profile`
+
+4. Wait for the Render staging deployment.
+5. Verify the deployed commit SHA.
+6. Test staging on desktop and mobile widths.
+7. Complete a staging pilot ride and confirm:
+
+   * Trip appears immediately in Recent rides
+   * Active closed card remains visible
+   * Rating still works
+   * Receipt modal opens
+   * PDF downloads and opens correctly
+   * Share/fallback works
+   * Historical Receipt button works
+   * Cancelled ride has no Receipt button
+   * No browser receipt alert appears
+   * No console errors occur
+8. Do not touch production.
+
+Return a final report containing:
+
+* Exact commit SHA
+* Files changed
+* Tests executed and results
+* Staging deployment status
+* Staging URL
+* PDF download verification
+* Desktop/mobile verification
+* Confirmation that production and `main` were untouched
+
+Proceed autonomously and complete the entire task. Stop only if access is genuinely blocked.

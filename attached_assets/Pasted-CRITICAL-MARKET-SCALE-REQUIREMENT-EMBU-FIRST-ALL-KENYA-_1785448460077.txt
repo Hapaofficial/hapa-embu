@@ -1,0 +1,93 @@
+CRITICAL MARKET-SCALE REQUIREMENT — EMBU FIRST, ALL KENYA NEXT
+
+HAPA must launch first as a controlled pilot in Embu, but the architecture must be Kenya-wide from day one.
+
+Do not hardcode Embu into the database, dispatch engine, fare engine, marketplace, URLs, driver eligibility or user profiles.
+
+Implement a configurable geographic hierarchy:
+
+- country
+- county
+- sub-county
+- town/city
+- service zone
+- pickup and destination coordinates
+
+Initial configuration:
+
+- Country: Kenya
+- First active county: Embu
+- First active service zone: Embu pilot area
+
+All other Kenyan counties may remain disabled until the Owner activates them.
+
+Required nationwide scalability:
+
+1. Service areas
+- configurable counties, towns and geofenced service zones
+- Owner can activate or pause each area
+- providers and drivers select approved operating areas
+- customers can search by county, town and current location
+- cross-county trips may be enabled through configuration
+
+2. Dispatch
+- driver matching must operate inside the selected service zone
+- search radius and expansion rules configurable by zone
+- no driver from an inactive area may receive offers
+- location logic must work anywhere within Kenya
+
+3. Pricing
+- separate fare rate cards by:
+  - county
+  - town/service zone
+  - vehicle category
+  - effective date
+- Embu pricing must not become the permanent nationwide rate
+- Owner can configure rates for Nairobi, Mombasa, Kisumu, Nakuru and other areas later without changing code
+
+4. Marketplace
+- Professionals, Merchants and Drivers must support nationwide county and town filters
+- public profiles must display their service locations clearly
+- Embu is the first active market, not the only supported location
+
+5. Owner operations
+- dashboard filters by county, town and service zone
+- statistics by location
+- driver availability and rides by area
+- reports and incidents by area
+- ability to activate a new Kenyan market through configuration rather than a code deployment
+
+6. Compliance
+- allow licence, insurance, document and operational requirements to vary by service type or location where legally required
+- never assume every county has identical operational rules
+- nationwide rollout remains disabled until the Owner confirms legal and operational readiness
+
+7. Data model and APIs
+- use stable location IDs, not free-text-only city names
+- retain readable addresses and exact coordinates
+- validate that locations belong to Kenya when appropriate
+- no precise ride coordinates in public APIs
+
+8. Mobile and web UX
+- launch messaging may say:
+  “Launching first in Embu”
+- do not describe HAPA as Embu-only
+- structure onboarding so additional Kenyan towns appear automatically when activated
+
+9. Testing
+Test:
+- Embu active
+- another county configured but inactive
+- inactive area blocks ride requests and driver online mode
+- activating a second county requires configuration only
+- separate rate cards work in two service zones
+- users cannot receive offers from the wrong zone
+- nationwide search and location filters remain secure
+
+The final product objective is:
+
+Phase 1 — controlled Embu pilot
+Phase 2 — expansion to selected Kenyan cities and counties
+Phase 3 — nationwide HAPA availability across Kenya
+
+Preserve the focused Embu pilot launch, but build the system so expansion across Kenya does not require redesigning the core architecture.

@@ -1,0 +1,69 @@
+FIX THE FARE QUOTE BASE-FARE CALCULATION
+
+Current branch:
+feature/professional-public-profile
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+Confirmed staging defect during a manual ride test:
+
+Active Embu pilot car rate card:
+- base fare: KES 100
+- per km: KES 40
+- per minute: KES 5
+- minimum fare: KES 150
+
+Generated quote displays:
+- Base: 0
+- Distance: KES 196.88
+- Time: KES 49.25
+- Total: KES 246.13
+
+The base fare is being omitted. The correct total for the same quote inputs is KES 346.13.
+
+Do not change staging data, credentials, Maps mode or the rate card.
+
+Required:
+
+1. Inspect the fare-rate-card resolver, quote calculation, immutable quote snapshot and frontend response mapping.
+2. Ensure the resolved base fare is included exactly once.
+3. Ensure:
+   total = base fare + distance charge + time charge + permitted fees
+4. Apply the minimum fare only after calculating all components.
+5. Ensure legitimate rate cards with base fare 0 still work.
+6. Store and return all fare components consistently.
+7. Display currency labels clearly:
+   - Base: KES ...
+   - Distance: KES ...
+   - Time: KES ...
+   - Total: KES ...
+8. Prevent the client from altering any server-calculated component.
+9. Ensure the final receipt uses the same immutable rate-card snapshot and does not omit or duplicate the base fare.
+
+Add tests proving:
+- KES 100 base + KES 196.88 distance + KES 49.25 time = KES 346.13
+- base fare is included once
+- zero-base rate cards remain valid
+- minimum fare works correctly
+- zone and county fallback cards retain their base fare
+- quote snapshot and receipt components match
+- client-supplied fare values are ignored
+- decimal rounding is consistent
+
+Run the complete test suite.
+
+If all tests pass:
+- commit: fix: include base fare in ride quotes
+- push only feature/professional-public-profile
+- allow staging to auto-deploy
+
+Do not merge main.
+Do not touch production.
+
+Return:
+- exact root cause
+- files changed
+- test totals
+- commit SHA
+- staging deployment result

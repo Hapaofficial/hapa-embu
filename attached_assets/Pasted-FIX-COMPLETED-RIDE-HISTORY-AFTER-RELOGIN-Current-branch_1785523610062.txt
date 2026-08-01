@@ -1,0 +1,146 @@
+FIX COMPLETED RIDE HISTORY AFTER RELOGIN
+
+Current branch:
+feature/professional-public-profile
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+Confirmed staging defect:
+
+A complete synthetic cash ride was successfully performed:
+
+Rider:
+pilotimpk.rider@example.com
+
+Driver:
+pilotimpk.driver@example.com
+
+Route:
+Embu Town CBD → Kangaru School gate
+
+Vehicle:
+Toyota Vitz, Silver, KDP 100A
+
+Fare:
+KES 346.13
+
+The full lifecycle succeeded:
+- driver online
+- dispatch
+- offer accepted
+- driver arrived
+- PIN verified
+- trip started
+- trip completed
+- cash collected
+- rider screen displayed “Trip complete”
+- Receipt button was visible
+
+After logging out and logging back in as the same rider, this completed ride is missing from ride history.
+
+Do not create another ride.
+Do not delete, close, rewrite, or manually modify the existing staging ride.
+Do not clean up the rider or driver fixtures yet.
+Do not touch production.
+
+Diagnose and fix the exact root cause.
+
+Required checks:
+
+1. Locate the existing completed ride using the synthetic rider and driver accounts without printing credentials or private location coordinates.
+
+2. Confirm the persisted database state:
+- ride status
+- rider ID
+- driver ID
+- assignment
+- payment status
+- receipt row
+- ride events
+- completion timestamp
+- closed timestamp if applicable
+
+3. Inspect the API used to load rider ride history after a fresh login.
+
+Check for:
+- incorrect user ownership predicate
+- filtering only active rides
+- excluding completed or closed rides
+- payment-status filtering
+- incorrect join with assignments
+- old unified-request history conflicting with the new ride history
+- frontend using only in-memory active-ride state
+- service-worker or stale-cache behavior
+
+4. Completed rides must persist and appear after:
+- page refresh
+- logout and login
+- browser restart
+- server restart
+
+5. Rider history must show:
+- route summary
+- final status
+- final fare
+- payment method and payment status
+- driver and vehicle summary
+- completion date
+- Receipt action
+- rating state
+
+6. Driver history must show the same completed ride with:
+- rider-safe summary
+- gross fare
+- commission
+- driver earnings
+- payment status
+- receipt or earnings reference
+
+7. Keep active rides and historical rides clearly separated.
+
+8. The receipt for the existing completed ride must remain accessible to the authorized rider and driver after relogin.
+
+9. Preserve authorization:
+- unrelated riders cannot access the ride
+- unrelated drivers cannot access the ride
+- public APIs expose no trip history or exact coordinates
+- Owner access remains audited
+
+10. Prevent duplicate history cards when the same ride appears through polling, reconnects or multiple endpoints.
+
+11. Preserve cancelled, declined and no-driver records with clear statuses, but do not mix them with completed-trip totals.
+
+12. Add tests proving:
+- completed cash ride appears after logout/login
+- completed ride appears after server restart
+- closed ride remains in history
+- rider receipt remains accessible
+- driver earnings/history remains accessible
+- active and completed rides are not duplicated
+- unrelated users are blocked
+- exact coordinates do not leak
+- existing request-history functionality does not regress
+
+Run the complete test suite.
+
+If all tests pass:
+
+Commit:
+fix: persist completed rides in history
+
+Push only:
+feature/professional-public-profile
+
+Do not merge main.
+Do not deploy production.
+Allow staging to auto-deploy.
+
+Return:
+- exact root cause
+- database state of the existing ride, without sensitive data
+- files changed
+- tests passed/failed
+- commit SHA
+- staging deployment result
+- confirmation the existing ride was not manually altered

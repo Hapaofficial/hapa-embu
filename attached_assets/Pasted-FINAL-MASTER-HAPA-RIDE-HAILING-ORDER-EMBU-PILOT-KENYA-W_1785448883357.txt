@@ -1,0 +1,1583 @@
+FINAL MASTER HAPA RIDE-HAILING ORDER — EMBU PILOT, KENYA-WIDE ARCHITECTURE
+
+This is the single complete and final scope for the HAPA ride-hailing system.
+
+It replaces every earlier Driver, Uber, transport, GPS, dispatch and Kenya-expansion instruction.
+
+Do not combine it with older ride-hailing prompts.
+
+Complete the currently running responsive-layout task first. Then continue from the resulting CURRENT HEAD of:
+
+feature/professional-public-profile
+
+Repository:
+github.com/Hapaofficial/hapa-embu
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+Production:
+https://hapa-embu.onrender.com
+
+HAPA must launch first as a controlled ride-hailing pilot in Embu, Kenya.
+
+The architecture, database, dispatch, pricing, provider discovery and Owner operations must be Kenya-wide from day one so additional counties and cities can later be activated through configuration without rebuilding the core system.
+
+Initial rollout:
+
+Phase 1:
+- controlled Embu pilot
+
+Phase 2:
+- selected Kenyan cities and counties
+
+Phase 3:
+- nationwide operation across Kenya
+
+Do not describe HAPA as Embu-only.
+
+Do not claim complete Uber parity.
+
+The objective is a serious, safe and scalable local ride-hailing platform capable of competing in Kenya through reliable service, transparent pricing, local operations and professional safety controls.
+
+Do not copy Uber branding, proprietary algorithms, wording or interface.
+
+==================================================
+1. NON-NEGOTIABLE SAFETY RULES
+==================================================
+
+- Work only on feature/professional-public-profile.
+- Never merge into main.
+- Never deploy production.
+- Never access or modify the production database.
+- Never access or modify production R2 buckets.
+- Never reveal, print, log or commit credentials, JWTs, API keys, payment secrets, signed URLs or private documents.
+- Never commit .env files, customer uploads, verification documents, database dumps, keystores, Apple certificates or provisioning files.
+- Preserve existing data and working functionality.
+- Use additive, idempotent and non-destructive migrations.
+- Preserve the existing website, PWA, Android project, iOS project, Professional, Merchant, Requests, Reviews, Reports, Account, Owner and storage functionality.
+- Preserve scripts/render-build.sh, pnpm-lock.yaml and the deterministic Render build.
+- Do not push incomplete work that would trigger a broken staging deployment.
+- Local checkpoint commits are allowed.
+- Push only when the complete candidate passes all feasible local tests.
+- Use synthetic users, rides, coordinates, payments and documents for testing.
+- Clean temporary staging records and R2 objects.
+- Do not create fake integrations.
+- Do not claim Google Maps, M-Pesa, APNs, FCM, email delivery, phone masking, emergency response or payouts are active without real credentials and verification.
+- Build adapters, sandbox modes, feature flags, mocks, tests and documentation before reporting an external credential blocker.
+- Verify current Kenyan transport, privacy and marketplace requirements from official sources at implementation time.
+- Do not hardcode a legal limit from memory when it can change.
+- Encode current verified limits through centrally configurable compliance settings and tests.
+- Complete everything technically possible before returning a blocker.
+
+==================================================
+2. AUDIT THE CURRENT IMPLEMENTATION
+==================================================
+
+Inspect:
+
+- Driver application and approval
+- Driver public profile
+- vehicle information
+- Driver media
+- current ride/delivery/transport requests
+- current GPS and Google Maps preparation
+- unified request architecture
+- reviews and reports
+- Owner moderation
+- notification architecture
+- Android and iOS projects
+- database schema
+- public and private storage
+- authentication and authorization
+- staging configuration
+- all current tests and documentation
+
+Create an internal gap list.
+
+Do not return only a plan.
+
+Continue immediately to implementation.
+
+Preserve compatible existing Driver request history.
+
+Safely migrate existing passenger-ride requests into the new ride model where possible.
+
+Do not silently delete or rewrite historical requests.
+
+==================================================
+3. KENYA-WIDE GEOGRAPHIC ARCHITECTURE
+==================================================
+
+Do not hardcode Embu into:
+
+- database tables
+- dispatch logic
+- rate cards
+- Driver eligibility
+- customer onboarding
+- marketplace filters
+- URLs
+- public profiles
+- reports
+- analytics
+- Owner operations
+
+Implement a stable geographic hierarchy:
+
+- country
+- county
+- sub-county
+- town or city
+- service zone
+- zone geofence or supported boundary
+- pickup coordinates
+- destination coordinates
+
+Initial configuration:
+
+- country: Kenya
+- currency: KES
+- timezone: Africa/Nairobi
+- first active county: Embu
+- first active town/service zone: Embu pilot area
+- all other Kenyan counties and zones disabled until Owner activation
+
+Use stable location IDs.
+
+Do not rely only on free-text county or town names.
+
+Service-zone requirements:
+
+- Owner can create, edit, activate, pause and retire service zones
+- activating a new zone must not require code changes
+- zones may define geofences, radius rules or supported administrative boundaries
+- providers and drivers select approved operating zones
+- customers can search by county, town, current location and active service zone
+- cross-zone and cross-county trips are configurable
+- inactive zones reject new ride requests
+- drivers cannot go online in inactive or unauthorized zones
+- drivers from one zone must not receive offers from another zone unless explicitly permitted
+- location validation must support all of Kenya
+- county and town filters must also work for Professionals and Merchants
+- marketplace profiles must clearly show supported locations
+
+Owner operations must support filtering by:
+
+- county
+- town
+- service zone
+- Driver status
+- ride status
+- reports
+- incidents
+- revenue and payment state
+
+Test:
+
+- Embu active
+- another county configured but inactive
+- inactive area blocks ride requests
+- inactive area blocks Driver online mode
+- second county activation requires configuration only
+- separate rate cards work in two zones
+- cross-zone matching is blocked unless enabled
+- users cannot receive offers from the wrong zone
+
+==================================================
+4. RIDE-HAILING DOMAIN MODEL
+==================================================
+
+Implement a proper ride domain using additive tables or equivalent safe structures for:
+
+- service_zones
+- driver_vehicles
+- driver_document_status
+- driver_operating_zones
+- driver_availability_sessions
+- driver_presence
+- fare_rate_cards
+- fare_quotes
+- ride_requests
+- ride_offers
+- ride_assignments
+- ride_events
+- ride_location_samples
+- ride_messages
+- ride_payments
+- ride_payment_events
+- ride_receipts
+- driver_earnings_ledger
+- platform_commission_ledger
+- safety_incidents
+- trusted_contacts
+- trip_share_tokens
+- compliance_settings
+- user_agreement_acceptances
+
+Passenger-ride state machine:
+
+- draft
+- quoted
+- searching
+- offered
+- driver_assigned
+- driver_en_route
+- driver_arrived
+- pin_verified
+- in_progress
+- completed
+- rider_cancelled
+- driver_cancelled
+- declined
+- no_driver_available
+- payment_pending
+- payment_failed
+- closed
+
+Enforce transitions server-side.
+
+Use:
+
+- database transactions
+- row locking or equivalent concurrency controls
+- unique constraints
+- idempotency keys
+- append-only ride events
+- immutable fare quote snapshots
+- immutable completed-trip core records
+- timestamps for every major transition
+
+Prevent:
+
+- duplicate ride creation
+- two drivers accepting one ride
+- one driver holding two active passenger rides
+- expired offers being accepted later
+- duplicate completion
+- duplicate payment callbacks
+- duplicate charges
+- silent editing of completed trip history
+- public access to private trip data
+
+Any Owner correction must create an explicit adjustment or audit event.
+
+==================================================
+5. DRIVER VERIFICATION, VEHICLES AND ELIGIBILITY
+==================================================
+
+A Driver may go online only when:
+
+- account is active
+- Driver capability is approved
+- Driver public profile is eligible
+- required identity verification is approved
+- required licence status is valid
+- required screening is approved
+- Driver photograph is approved
+- required tax status is recorded where applicable
+- active vehicle is approved
+- vehicle registration is valid
+- required insurance is valid
+- required inspection is valid
+- mandatory documents have not expired
+- Driver is not suspended
+- no incompatible active ride exists
+- selected operating zone is active
+- Driver is approved for that zone
+
+Examples of document categories may include:
+
+- identity
+- driving licence
+- PSV or equivalent required authority
+- vehicle registration
+- insurance
+- inspection
+- tax identification
+
+Do not assume the exact list is legally final.
+
+Make required documents configurable by:
+
+- service type
+- vehicle category
+- service zone
+- effective date
+
+Support document expiry dates.
+
+Notify Drivers before expiry.
+
+Automatically prevent online status when a mandatory document expires.
+
+Assigned rider may see only necessary verified information:
+
+- Driver display name
+- approved profile photo
+- rating
+- completed trip count
+- vehicle make
+- vehicle model
+- vehicle colour
+- registration number
+- vehicle category
+
+Never expose private identity or licence files to riders.
+
+Passenger-car rides are the initial pilot category.
+
+Create motorcycle/boda passenger support only behind:
+
+BODA_PASSENGER_ENABLED=false
+
+Do not activate it until separate legal, insurance, vehicle and safety requirements are approved.
+
+==================================================
+6. DRIVER ONLINE, OFFLINE AND WORKING HOURS
+==================================================
+
+Create a dedicated Driver operating mode:
+
+- Go online
+- Go offline
+- Pause new offers
+- Resume offers
+- current zone
+- current availability
+- incoming offer
+- current ride
+- ride history
+- earnings
+- document expiry
+- safety and support
+
+Going online must create an availability session.
+
+Going offline must:
+
+- stop new offers immediately
+- stop unnecessary location collection
+- clear stale availability
+- preserve an already assigned or active ride safely
+
+Track:
+
+- online time
+- available time
+- waiting time
+- driving time
+- breaks
+- continuous service time
+
+Verify current Kenyan Driver-hour rules from official sources.
+
+Create centrally configurable limits that cannot exceed the current verified legal maximum without a future audited configuration migration.
+
+Warn the Driver before the limit.
+
+Stop new offers at the limit.
+
+Require the configured break before returning online.
+
+Do not silently reset hours through app restart or reconnect.
+
+==================================================
+7. REAL-TIME DRIVER LOCATION
+==================================================
+
+Collect Driver location only when operationally justified:
+
+- Driver is online and available
+- Driver is travelling to an assigned rider
+- Driver is waiting at pickup
+- ride is in progress
+
+Stop Driver availability tracking immediately when offline, except where needed to safely finish an active ride.
+
+Rider location should normally be foreground and transactional.
+
+Location updates must support:
+
+- latitude
+- longitude
+- timestamp
+- accuracy
+- sequence number
+- heading where safely available
+- speed where safely available
+- availability-session or ride association
+
+Use configurable intervals:
+
+- more frequent during assigned and active rides
+- less frequent while online and waiting
+- stopped when offline
+
+Reject:
+
+- invalid coordinates
+- stale updates
+- backwards sequence numbers
+- updates from the wrong Driver
+- updates for the wrong ride
+- clearly impossible jumps where safely detectable
+
+Provide bounded offline buffering and reconnect recovery.
+
+Do not write precise coordinates to normal logs.
+
+Treat precise trip location as sensitive operational data.
+
+Implement:
+
+- retention settings
+- secure deletion or aggregation
+- Owner access auditing
+- support/legal hold process
+- no use for advertising
+- no public access
+- no sale of location data
+
+==================================================
+8. REAL-TIME COMMUNICATION
+==================================================
+
+Implement authenticated real-time transport compatible with the current Render architecture.
+
+Use WebSocket, Socket.IO or an equally appropriate solution with safe fallback.
+
+Events must include:
+
+- Driver online/offline
+- ride search started
+- ride offer created
+- offer countdown
+- offer accepted
+- offer declined
+- offer expired
+- Driver assigned
+- Driver location movement
+- Driver arriving
+- Driver arrived
+- PIN verified
+- ride started
+- ride completed
+- cancellation
+- payment status
+- safety incident
+- support update
+
+Requirements:
+
+- JWT-authenticated connection
+- authorization for every room/channel
+- rider receives only their ride
+- Driver receives only offered or assigned rides
+- Owner access is justified and audited
+- stale connections expire
+- reconnect restores state
+- missed events are recoverable from database events
+- no sensitive global broadcasts
+- safe rate limits
+- safe disconnect handling
+
+Push notifications act as a fallback for backgrounded apps.
+
+Prepare FCM and APNs integration.
+
+Do not claim push delivery works without credentials.
+
+==================================================
+9. DRIVER MATCHING AND DISPATCH
+==================================================
+
+Implement a configurable dispatch engine.
+
+Eligible Drivers must be:
+
+- online
+- recently active
+- document-compliant
+- approved for requested vehicle category
+- approved for requested service zone
+- inside the configured search area
+- not suspended
+- not assigned to another active ride
+- below working-hour limits
+
+Rank candidates using transparent operational factors such as:
+
+- pickup distance
+- estimated pickup time
+- current availability
+- recent offer response
+- configurable fairness rules
+
+Do not use protected personal characteristics.
+
+Use configurable zone-specific expanding search radii.
+
+Do not hardcode Embu distances throughout the code.
+
+Offers may be:
+
+- sequential
+- safely controlled small batches
+
+Every offer must expire after a configured countdown.
+
+When an offer:
+
+- expires
+- is declined
+- reaches an unavailable Driver
+- reaches a stale Driver
+- fails safely
+
+continue to the next eligible Driver.
+
+When no Driver is available:
+
+- tell the rider clearly
+- provide Retry
+- close the search safely
+- do not fabricate an assignment
+- do not leave the ride indefinitely searching
+
+Prevent race conditions and double acceptance using database-level protections.
+
+Owner manual assignment or reassignment is allowed only:
+
+- before the ride is in progress
+- with an audit record
+- when operational policy permits it
+
+==================================================
+10. RIDER EXPERIENCE
+==================================================
+
+Create a map-first ride flow:
+
+1. Open Ride.
+2. Select pickup.
+3. Select destination.
+4. View route.
+5. Choose available vehicle category.
+6. View estimated Driver arrival.
+7. View transparent estimated fare.
+8. Confirm request.
+9. View Driver search progress.
+10. View assigned Driver and vehicle.
+11. Follow Driver approach.
+12. Contact Driver safely.
+13. Verify ride using PIN.
+14. Follow active trip.
+15. Complete payment.
+16. Receive electronic receipt.
+17. Rate Driver.
+18. Report issue or lost item.
+
+Pickup and destination must support:
+
+- current location
+- Google Places autocomplete
+- readable address
+- exact coordinates
+- reverse geocoding
+- tap map
+- draggable markers
+- pickup note
+- landmark, building, gate or roadside description
+- GPS-denied manual fallback
+- session recovery after restart
+
+When assigned, rider sees:
+
+- Driver photo
+- Driver name
+- rating
+- completed trip count
+- vehicle make/model/colour
+- registration number
+- estimated arrival
+- current ride status
+
+Never show private identity documents or personal phone numbers by default.
+
+==================================================
+11. DRIVER RIDE EXPERIENCE
+==================================================
+
+Incoming offer must show:
+
+- pickup area
+- approximate pickup distance
+- estimated pickup time
+- vehicle/service category
+- estimated trip distance or direction where operationally appropriate
+- expected Driver earnings or fare basis
+- countdown
+- Accept
+- Decline
+
+After acceptance:
+
+- lock assignment
+- show navigation to pickup
+- show pickup note and landmark
+- allow Driver to mark Arrived
+- provide safe rider communication
+- require ride PIN before Start ride
+- prevent start without valid PIN except audited emergency override
+- show navigation to destination
+- show active-trip status
+- allow Complete only near destination or through audited exception
+- show final fare
+- show Driver earnings
+- update ride history
+
+Driver cancellation requires a reason.
+
+Repeated cancellation abuse must be visible to Owner moderation.
+
+==================================================
+12. GOOGLE MAPS AND ROUTING
+==================================================
+
+Complete the Google Maps implementation for:
+
+- website staging
+- website production
+- Android staging
+- Android production
+- iOS staging
+- iOS production
+- server-side routing where required
+
+Maintain separate restricted keys.
+
+Never commit keys.
+
+Support:
+
+- map rendering
+- current location
+- Places autocomplete
+- reverse geocoding
+- route calculation
+- route polyline
+- distance
+- duration
+- pickup ETA
+- Driver navigation deep link
+- touch marker dragging
+- manual fallback
+
+Never expose secret server credentials in browser code.
+
+When credentials are absent:
+
+- use clearly labelled mock/development behavior
+- never fabricate production fares or distances
+- disable real passenger-ride activation
+- report exact required environment-variable names
+
+==================================================
+13. FARE ENGINE AND RATE CARDS
+==================================================
+
+Passenger rides must show a clear fare estimate before confirmation.
+
+“Price agreed with Driver” may remain only for appropriate specialist goods transport or custom delivery, clearly separated from passenger rides.
+
+Implement versioned rate cards configurable by:
+
+- country
+- county
+- town/service zone
+- vehicle category
+- effective date
+
+Rate cards support:
+
+- base fare
+- booking fee
+- per-kilometre rate
+- per-minute rate
+- minimum fare
+- waiting rate
+- cancellation fee
+- approved tolls
+- approved surcharge
+- tax fields where configured
+- platform commission
+- Driver earnings
+
+Create an immutable fare quote containing:
+
+- route distance
+- route duration
+- fare components
+- total estimate
+- KES currency
+- rate-card version
+- expiry time
+- active zone
+- vehicle category
+- demand-pricing status
+
+Dynamic or surge pricing:
+
+- disabled by default
+- feature-flagged
+- capped
+- transparent
+- impossible to enable silently
+
+Verify the current Kenyan platform commission rules from official sources.
+
+Make the legal maximum centrally configurable and tested.
+
+The system must not permit a passenger-ride commission above the currently verified legal maximum without an explicit future compliance migration.
+
+Different Kenyan zones may use different approved rate cards.
+
+Embu pricing must not become the permanent nationwide rate.
+
+==================================================
+14. FINAL FARE AND ELECTRONIC RECEIPT
+==================================================
+
+At completion, calculate the final fare using:
+
+- immutable rate-card version
+- permitted actual distance
+- permitted duration
+- approved waiting time
+- approved fees
+
+Store a readable reason for every difference from the estimate.
+
+Generate an electronic receipt including:
+
+- HAPA ride reference
+- date and time
+- pickup
+- destination
+- Driver name
+- vehicle make/model
+- registration number
+- trip distance
+- trip duration
+- fare components
+- fees
+- payment method
+- payment status
+- total
+- platform commission
+- Driver earnings where appropriate
+
+Provide:
+
+- in-app receipt
+- printable or downloadable receipt
+- email only when a real email provider is configured
+
+Never show a fake “email sent” message.
+
+==================================================
+15. PAYMENTS, M-PESA AND DRIVER EARNINGS
+==================================================
+
+Pilot payment methods:
+
+- Cash
+- M-Pesa
+
+Cash:
+
+- rider selects Cash before confirming
+- Driver confirms collection after completion
+- unpaid issue may be reported
+- platform commission is recorded
+- Driver earnings ledger is updated
+
+M-Pesa:
+
+Implement an official Safaricom Daraja adapter with:
+
+- sandbox mode
+- live mode
+- STK initiation where appropriate
+- callback authentication and validation
+- idempotent callback handling
+- transaction status query
+- reconciliation
+- failed/cancelled states
+- reversal/refund boundary
+- no secrets in logs
+
+Do not enable live M-Pesa without:
+
+- approved Daraja account
+- live business credentials
+- callback domain
+- approved shortcode/till/paybill arrangement
+- Owner approval
+
+Implement:
+
+- payment attempts
+- payment events
+- provider transaction references
+- reconciliation screen
+- Driver earnings ledger
+- commission ledger
+- payout status
+
+Do not create fake payouts.
+
+Prepare a payout-provider abstraction and document external payout requirements.
+
+==================================================
+16. RIDE SAFETY CENTRE
+==================================================
+
+Implement:
+
+- ride PIN
+- Share trip
+- Trusted contacts
+- Emergency action
+- report safety issue
+- verified Driver and vehicle details
+- current ride reference
+- current ride status
+- pickup and destination
+- lost-item flow
+- safety guidance
+
+Ride PIN:
+
+- unique per ride
+- securely generated
+- rate-limited
+- visible only to rider where appropriate
+- verified by assigned Driver
+- required before starting ride
+- stored safely
+
+Share trip:
+
+- expiring token
+- revocable
+- limited live trip page
+- no recipient account required
+- minimum necessary information
+- no phone numbers
+- no private documents
+- no payment data
+- expires shortly after completion
+
+Emergency action:
+
+- uses Owner-configured emergency/support contact
+- displays current coordinates, ride reference, Driver and vehicle
+- provides direct call action where available
+- never claims HAPA dispatches emergency services without a real agreement
+
+==================================================
+17. COMMUNICATION AND PRIVACY
+==================================================
+
+Provide authenticated in-app ride chat:
+
+- rider and assigned Driver only
+- Owner access only for justified support cases
+- timestamps
+- report/moderation option
+- rate limiting
+- XSS protection
+- no HTML injection
+
+Prepare a phone-masking provider adapter.
+
+Do not expose personal phone numbers as the default communication channel.
+
+Without phone masking:
+
+- rely on in-app chat
+- expose a phone number only with explicit user choice and policy approval
+- report phone masking as an external blocker
+
+==================================================
+18. TWO-WAY RATINGS
+==================================================
+
+Support:
+
+- rider rates Driver
+- Driver rates rider
+
+Requirements:
+
+- completed ride only
+- one rating per participant per ride
+- 1–5 stars
+- optional feedback
+- no self-rating
+- no unrelated-user rating
+- moderation
+- rating count
+- average rating
+- completed-trip count
+
+Do not automatically suspend a user based on one rating.
+
+Create configurable Owner review thresholds for repeated low ratings or safety incidents.
+
+==================================================
+19. SAFETY MONITORING AND DRIVER HOURS
+==================================================
+
+Create transparent operational signals for:
+
+- unusually long stop
+- major route deviation
+- loss of Driver location
+- ride duration far beyond estimate
+- repeated cancellations
+- possible account sharing
+- expiry of mandatory documents
+- working-hour limit
+
+Do not claim automatic crash detection.
+
+Do not use opaque automatic punishment.
+
+Signals may create:
+
+- rider/Driver check-in
+- support alert
+- Owner review
+- audit event
+
+==================================================
+20. OWNER RIDE OPERATIONS CENTRE
+==================================================
+
+Create an Owner operations dashboard showing:
+
+- active counties and zones
+- online Drivers by zone
+- stale Drivers
+- searching rides
+- active offers
+- assigned rides
+- Drivers en route
+- Drivers arrived
+- active trips
+- completed rides
+- cancellations
+- no-Driver failures
+- payment failures
+- safety incidents
+- expiring documents
+- Driver working hours
+- unresolved support cases
+
+Individual ride view:
+
+- complete event timeline
+- rider
+- Driver
+- vehicle
+- zone
+- quote
+- final fare
+- payment
+- receipt
+- justified support messages
+- location timeline
+- safety events
+- cancellation reason
+- audit history
+
+Allowed audited Owner actions:
+
+- cancel before ride start
+- assign/reassign before ride start
+- suspend/reactivate Driver
+- resolve incident
+- create explicit fare adjustment
+- initiate payment-provider refund/reversal workflow
+
+Never silently edit or delete ride history.
+
+==================================================
+21. COMPLIANCE AND MARKET ACTIVATION GATES
+==================================================
+
+Implement versioned acceptance for:
+
+- rider Terms
+- Driver agreement
+- vehicle-owner agreement where applicable
+- fare and commission disclosure
+- location-data disclosure
+- Privacy Policy
+- safety and community rules
+
+Store:
+
+- document version
+- user ID
+- acceptance timestamp
+- safe audit metadata
+
+Create centrally controlled launch gates such as:
+
+RIDE_HAILING_ENABLED
+COUNTRY_CODE
+DEFAULT_CURRENCY
+DEFAULT_TIMEZONE
+TNC_LICENSE_CONFIRMED
+TNC_LICENSE_REFERENCE
+GOOGLE_MAPS_BROWSER_KEY
+GOOGLE_MAPS_SERVER_KEY
+MPESA_MODE
+PHONE_MASKING_ENABLED
+DRIVER_LOCATION_ENABLED
+BODA_PASSENGER_ENABLED
+SUPPORT_EMERGENCY_PHONE
+
+Passenger rides must remain disabled for production until mandatory gates pass.
+
+Mandatory production gates must include:
+
+- active service zone
+- legally approved rate card
+- transport-platform licence confirmation where required
+- current Driver document policy
+- Driver agreement
+- rider Terms
+- Privacy review
+- emergency/support contact
+- Maps configuration
+- payment-method configuration
+- operations readiness
+
+Staging must support synthetic testing without enabling production.
+
+==================================================
+22. DATA PROTECTION
+==================================================
+
+Treat exact location and identity documents as sensitive.
+
+Requirements:
+
+- explicit location disclosure
+- separate rider and Driver explanation
+- minimum permission scope
+- rider foreground location
+- Driver location only while online or active
+- visible Driver location-sharing state
+- immediate stop when offline
+- no location-based advertising
+- no sale of location data
+- retention settings
+- access auditing
+- deletion/anonymization procedure
+- security incident procedure
+- legal hold process
+- no public coordinates
+- no precise coordinates in ordinary logs
+
+Update privacy and store-readiness documentation for:
+
+- Android location permissions
+- Android foreground service
+- iOS location modes
+- in-app prominent disclosure
+- App Store review explanation
+- Google Play review explanation
+- Kenyan data-protection review checklist
+
+==================================================
+23. NATIVE RIDER AND DRIVER EXPERIENCE
+==================================================
+
+Preserve the existing Capacitor Android and iOS projects.
+
+Create clear native modes:
+
+- HAPA Rider/Customer
+- HAPA Driver
+
+Use one shared backend.
+
+Avoid unnecessary duplication.
+
+Rider mode prioritizes:
+
+- map
+- pickup
+- destination
+- quote
+- Driver search
+- assigned Driver
+- active ride
+- payment
+- receipt
+- rating
+- safety
+
+Driver mode prioritizes:
+
+- online/offline
+- offers
+- pickup navigation
+- arrived
+- PIN
+- active ride
+- destination navigation
+- completion
+- earnings
+- documents
+- safety
+
+Use:
+
+- Android Keystore
+- iOS Keychain
+- native geolocation
+- Android foreground service where legally and operationally justified
+- appropriate iOS location modes
+- camera/gallery
+- push architecture
+- deep links
+- safe areas
+- keyboard avoidance
+- session restoration
+- offline recovery
+
+No browser chrome or development URL in release builds.
+
+Update Android and iOS permission declarations and store documentation honestly.
+
+==================================================
+24. RELIABILITY AND OBSERVABILITY
+==================================================
+
+Implement:
+
+- structured logs without secrets or precise coordinates
+- ride correlation IDs
+- payment correlation IDs
+- health checks
+- readiness checks
+- migration checks
+- realtime metrics
+- stale Driver metrics
+- ride failure metrics
+- offer acceptance metrics
+- payment failure metrics
+- safety incident metrics
+- retry policy
+- webhook replay protection
+- failed-job handling
+- backup documentation
+- rollback documentation
+
+Every critical failure must leave a recoverable database state.
+
+Do not silently swallow failures.
+
+==================================================
+25. PERFORMANCE TEST FOR CONTROLLED PILOT
+==================================================
+
+Run isolated local or safe staging tests for at least:
+
+- 100 simulated online Drivers
+- 500 simulated connected riders
+- 20 new ride requests per minute
+- concurrent Driver location updates
+- simultaneous offer acceptance
+- realtime reconnects
+- payment callbacks
+
+Acceptance:
+
+- zero double assignments
+- zero cross-user location leaks
+- zero duplicate charges
+- valid ride-state transitions
+- stable memory
+- bounded event and GPS growth
+- documented p95 API results
+- documented realtime delivery results
+
+Do not run destructive load tests against production.
+
+==================================================
+26. REQUIRED END-TO-END SCENARIOS
+==================================================
+
+Scenario 1 — successful cash ride:
+
+- approved Driver goes online
+- rider selects pickup and destination
+- quote displayed
+- rider confirms
+- eligible Driver receives offer
+- Driver accepts
+- rider sees Driver and vehicle
+- Driver approaches
+- Driver marks arrived
+- PIN verified
+- ride starts
+- live location works
+- ride completes
+- cash confirmed
+- receipt generated
+- rider rates Driver
+- Driver rates rider
+
+Scenario 2 — M-Pesa sandbox:
+
+- quote
+- assignment
+- completion
+- payment initiation
+- callback
+- paid state
+- receipt
+- earnings and commission ledger
+
+Scenario 3 — decline:
+
+- first Driver declines
+- next eligible Driver receives offer
+- no duplicate assignment
+
+Scenario 4 — expired offer:
+
+- offer expires
+- next Driver search starts
+- expired Driver cannot later accept
+
+Scenario 5 — no Driver:
+
+- safe timeout
+- clear rider message
+- Retry
+- no fake assignment
+
+Scenario 6 — rider cancellation:
+
+- valid transition
+- configured fee rule
+- Driver notified
+- audit and receipt where required
+
+Scenario 7 — Driver cancellation:
+
+- reason required
+- safe redispatch where allowed
+- Owner visibility
+
+Scenario 8 — safety:
+
+- PIN
+- Share trip
+- emergency information
+- trusted contact
+- support incident
+
+Scenario 9 — authorization:
+
+- unrelated rider blocked
+- unrelated Driver blocked
+- public APIs contain no exact coordinates
+- Owner access audited
+
+Scenario 10 — expired documents:
+
+- expired mandatory document prevents Driver going online
+
+Scenario 11 — Driver hours:
+
+- warning
+- verified legal limit
+- required break
+- no reset through reconnect
+
+Scenario 12 — race condition:
+
+- two Drivers accept simultaneously
+- exactly one succeeds
+
+Scenario 13 — zone isolation:
+
+- Embu Driver cannot receive inactive Nairobi-zone ride
+- inactive zone blocks requests
+- activating second zone requires configuration only
+- separate zone rate card works
+
+Run:
+
+- backend tests
+- frontend tests
+- authorization tests
+- realtime tests
+- dispatch tests
+- payment tests
+- privacy tests
+- Maps mocks
+- mobile tests
+- PWA tests
+- load tests
+- staging E2E
+
+==================================================
+27. EXCLUDED FROM THIS PILOT
+==================================================
+
+Do not spend time implementing:
+
+- pooled rides
+- shared passenger rides
+- multiple passenger stops
+- global dispatch
+- autonomous surge algorithms
+- incentive heat maps
+- subscriptions
+- loyalty points
+- corporate billing
+- complex fleet management
+- audio recording
+- facial recognition
+- automatic crash detection
+- global card payments
+- full call-centre telephony
+
+Create safe future extension points only where necessary.
+
+==================================================
+28. GIT, STAGING AND STOP CONDITION
+==================================================
+
+Before committing:
+
+- inspect the full diff
+- remove debug code
+- remove synthetic test records and assets
+- confirm no secrets
+- confirm no payment credentials
+- confirm no precise synthetic locations
+- confirm no native signing keys
+- run the complete existing HAPA suite
+- run the complete ride-hailing suite
+- verify deterministic Render build
+
+Create clean logical commits.
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge main.
+
+Do not deploy production.
+
+Allow staging to auto-deploy only after the complete candidate passes locally.
+
+Verify:
+
+- deployed SHA
+- health
+- migrations
+- realtime transport
+- ride feature gates
+- Maps behavior
+- synthetic E2E
+- cleanup
+
+Only these statuses are allowed:
+
+READY FOR CONTROLLED EMBU RIDE PILOT
+
+or
+
+BLOCKED BY EXTERNAL LICENCE / CREDENTIAL / ACCOUNT
+
+Do not claim nationwide public launch readiness merely because the architecture supports Kenya-wide expansion.
+
+READY FOR CONTROLLED EMBU RIDE PILOT requires:
+
+- complete ride lifecycle
+- real-time matching
+- real-time Driver location
+- fare quote
+- final fare
+- receipt
+- cash payment
+- M-Pesa sandbox or exact credential blocker
+- PIN
+- Share trip
+- two-way ratings
+- Driver-hour enforcement
+- document-expiry enforcement
+- Owner ride operations
+- location privacy
+- zone isolation
+- all feasible tests passing
+- staging E2E passing
+- main untouched
+- production untouched
+
+==================================================
+29. FINAL REPORT FORMAT
+==================================================
+
+STATUS:
+- READY FOR CONTROLLED EMBU RIDE PILOT
+or
+- BLOCKED BY EXTERNAL LICENCE / CREDENTIAL / ACCOUNT
+
+STAGING:
+- commit SHA
+- URL
+- health
+- migrations
+- realtime result
+- E2E result
+
+KENYA SCALE:
+- geographic hierarchy
+- Embu pilot configuration
+- inactive-county behavior
+- second-zone activation test
+- zone-specific dispatch
+- zone-specific rate cards
+- nationwide marketplace filtering
+
+RIDER:
+- booking
+- pickup/destination
+- quote
+- matching
+- Driver approach
+- PIN
+- active ride
+- payment
+- receipt
+- rating
+- safety
+
+DRIVER:
+- verification
+- vehicle
+- online/offline
+- offers
+- navigation
+- location
+- trip lifecycle
+- earnings
+- hours
+- document expiry
+
+DISPATCH:
+- candidate selection
+- zone isolation
+- offer timeout
+- redispatch
+- no-Driver behavior
+- concurrency test
+
+PRICING:
+- rate cards
+- fare quote
+- final fare
+- commission legal control
+- waiting and cancellation
+- receipts
+
+PAYMENTS:
+- cash
+- M-Pesa sandbox/live status
+- callback security
+- reconciliation
+- earnings ledger
+- payout blocker
+
+SAFETY:
+- PIN
+- Share trip
+- trusted contacts
+- emergency information
+- chat privacy
+- incidents
+- two-way ratings
+
+COMPLIANCE:
+- market activation gates
+- transport licence gate
+- agreements
+- Driver and vehicle documents
+- Driver-hour control
+- location privacy
+- legal blockers
+
+TESTS:
+- total passed/failed
+- backend
+- frontend
+- realtime
+- dispatch
+- privacy
+- payments
+- load
+- mobile
+- staging E2E
+
+GIT:
+- branch
+- commit SHAs
+- push result
+- main untouched
+- production untouched
+
+EXTERNAL BLOCKERS:
+- transport/TNC licence
+- Google Maps credentials and billing
+- M-Pesa/Daraja credentials
+- FCM/APNs
+- phone-masking provider
+- insurance confirmation
+- support/emergency operations
+- legal and privacy review
+- app-store signing/accounts
+- include only genuine remaining requirements
+
+PILOT AND NATIONAL EXPANSION CHECKLIST:
+- exact Owner-controlled steps
+- environment-variable names only
+- Embu zone activation
+- rate-card approval
+- Driver onboarding
+- Maps setup
+- payment setup
+- licence confirmation
+- support setup
+- production pilot deployment
+- rollback
+- second-county activation
+- nationwide rollout process
+
+Begin after the responsive-layout task completes.
+
+Continue autonomously until the valid stop condition is reached.

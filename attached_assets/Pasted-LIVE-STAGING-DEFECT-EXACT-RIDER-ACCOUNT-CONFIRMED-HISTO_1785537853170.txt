@@ -1,0 +1,190 @@
+LIVE STAGING DEFECT — EXACT RIDER ACCOUNT CONFIRMED, HISTORY STILL EMPTY
+
+Current branch:
+feature/professional-public-profile
+
+Current deployed commit:
+29861bb
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+The previous fix is not accepted.
+
+Manual verification was performed in a completely new Brave Private Window.
+
+The Account page confirms the authenticated user is exactly:
+
+pilotimpk.rider@example.com
+
+Nevertheless:
+
+Rides → Recent rides
+
+still displays:
+
+“No rides yet.”
+
+The same completed ride is confirmed elsewhere:
+
+Ride reference:
+HAPA-MS8ADAEC-2698
+
+Route:
+Embu Town CBD → Kangaru School gate
+
+Fare:
+KES 346.13
+
+Payment:
+Cash — Paid
+
+Driver history shows:
+- the ride
+- gross KES 346.13
+- HAPA fee KES 51.92
+- net Driver earnings KES 294.21
+- receipt
+
+Owner Dashboard shows:
+- the ride as closed
+- completed-ride counts
+- correct commission totals
+
+Therefore the database, receipt, payment and Driver/Owner history are working. The live defect is specifically in the Rider history path.
+
+Do not create another ride.
+Do not alter, delete, reassign or manually repair the existing ride.
+Do not clean up the Rider or Driver fixtures.
+Do not touch main or production.
+
+REPRODUCE THE EXACT FAILURE
+
+Use a real fresh browser context against live staging.
+
+1. Log in as the existing Rider:
+   pilotimpk.rider@example.com
+
+2. Open Account and verify the email.
+
+3. Open Rides.
+
+4. Capture safely:
+   - application-shell version
+   - service-worker version
+   - exact history endpoint requested
+   - HTTP status
+   - response item count
+   - returned ride references and statuses
+   - console errors
+   - JavaScript exceptions
+   - whether the Recent rides element exists
+   - whether the renderer runs
+   - whether another render overwrites it
+
+5. Inspect the actual authenticated response for:
+   HAPA-MS8ADAEC-2698
+
+6. Determine whether the failure is caused by:
+   - Rider UI calling the wrong endpoint
+   - API returning a different Rider identity
+   - login token/session race
+   - frontend filtering closed/completed rides
+   - renderer exception
+   - silent catch block
+   - duplicate or obsolete DOM container
+   - active-ride refresh overwriting history
+   - service-worker shell mismatch
+   - stale script or HTML
+   - another exact live cause
+
+REQUIRED FIX
+
+The existing ride must appear for this exact Rider after:
+
+- fresh private login
+- normal page reload
+- hard refresh
+- logout and login
+- browser restart
+- service-worker update
+- server restart
+
+The Rider history card must show:
+
+- Embu Town CBD → Kangaru School gate
+- Completed and closed
+- KES 346.13
+- Cash — Paid
+- Pilot driver
+- Toyota Vitz · Silver · KDP 100A
+- Africa/Nairobi completion date and time
+- Receipt button
+- rating status
+
+Do not display “No rides yet” before a successful authenticated zero-result response.
+
+Use:
+
+- loading state while requesting
+- visible Retry state on failure
+- no silent catch{}
+- no populated-history overwrite by polling or realtime events
+- deduplication by ride ID
+- no authenticated ride-history caching
+
+Preserve:
+
+- Driver history
+- Owner ride details
+- earnings reports
+- receipts
+- accounting CSV
+- active rides
+- cancelled and failed ride history
+- authorization and privacy
+
+LIVE ACCEPTANCE — REQUIRED BEFORE REPORTING COMPLETE
+
+After staging deploy:
+
+1. Open a new private browser context.
+2. Log in as pilotimpk.rider@example.com.
+3. Confirm Account email.
+4. Open Rides.
+5. Confirm HAPA-MS8ADAEC-2698 is visible.
+6. Open its Receipt.
+7. Reload and confirm it remains.
+8. Log out and log in again.
+9. Confirm it remains.
+10. Confirm Driver history still works.
+11. Confirm Owner history and accounting still work.
+12. Confirm unrelated users cannot access it.
+13. Confirm the existing ride was not manually changed.
+
+Add regression tests for the exact live cause.
+
+Run the complete suite.
+
+If everything passes:
+
+Commit:
+fix: show completed rides for the authenticated rider
+
+Push only:
+feature/professional-public-profile
+
+Do not merge main.
+Do not deploy production.
+
+Return:
+- exact live root cause
+- files changed
+- tests passed/failed
+- commit SHA
+- staging deployment result
+- fresh-private-window result
+- reload result
+- relogin result
+- receipt result
+- confirmation existing ride data was untouched

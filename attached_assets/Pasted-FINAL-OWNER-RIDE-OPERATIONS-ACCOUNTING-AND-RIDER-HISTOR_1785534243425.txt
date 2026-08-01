@@ -1,0 +1,911 @@
+FINAL OWNER RIDE OPERATIONS, ACCOUNTING AND RIDER-HISTORY ORDER
+
+This is one complete task. It supersedes every earlier partial prompt concerning:
+
+- missing Rider ride history
+- Owner ride details
+- Driver earnings reporting
+- receipt visual defects
+- ride status formatting
+- ride accounting exports
+
+Continue from the CURRENT HEAD of:
+
+feature/professional-public-profile
+
+Staging:
+
+https://hapa-embu-staging.onrender.com
+
+Do not create another test ride.
+Do not manually alter, delete, close or recreate any existing ride.
+Do not clean up the synthetic Rider or Driver accounts yet.
+Do not touch main, production, production database, production storage, Render configuration, R2 configuration, Maps credentials or payment credentials.
+
+Preserve the working ride lifecycle, dispatch, PIN, chat, cash payment, receipt generation, Driver history, Owner counters, fare calculation, ledgers and all existing HAPA functionality.
+
+==================================================
+1. CONFIRMED LIVE STAGING EVIDENCE
+==================================================
+
+The following real manual staging journey completed successfully:
+
+Rider:
+pilotimpk.rider@example.com
+
+Driver:
+pilotimpk.driver@example.com
+
+Route:
+Embu Town CBD → Kangaru School gate
+
+Vehicle:
+Toyota Vitz
+Silver
+KDP 100A
+
+Fare:
+KES 346.13
+
+Fare breakdown:
+- Base fare: KES 100.00
+- Distance charge: KES 196.88
+- Time charge: KES 49.25
+
+Payment:
+Cash
+Paid
+
+Receipt:
+HAPA-MS8ADAEC-2698
+
+Ledger:
+- gross fare: KES 346.13
+- HAPA commission: KES 51.92
+- Driver net earnings: KES 294.21
+
+The following functions are confirmed working:
+
+- Driver went online
+- Rider received quote
+- dispatch found Driver
+- Driver accepted
+- Driver arrived
+- PIN was verified
+- ride started
+- realtime chat worked
+- ride completed
+- cash was confirmed
+- receipt exists
+- Driver history displays the ride
+- Driver receipt opens
+- Owner Dashboard counts the ride
+- Owner Dashboard commission total is correct
+- Owner Recent rides contains the ride
+
+However:
+
+1. Rider → Rides → Recent rides still displays:
+   “No rides yet”
+   after a fresh login and hard refresh.
+
+2. Owner Dashboard shows only short ride summaries.
+   It does not provide the detailed operational and financial information required to manage a serious transport platform.
+
+3. The receipt modal contains two blank white areas in its dark header.
+   Required receipt header information is invisible or missing.
+
+4. Owner Recent rides exposes raw statuses such as:
+   rider_cancelled
+
+5. Ride dates are displayed using inconsistent browser/UTC dates instead of a consistent Kenya operational timezone.
+
+==================================================
+2. FIRST: REPRODUCE THE LIVE RIDER-HISTORY FAILURE
+==================================================
+
+Do not rely only on API unit tests, extracted functions or local fixtures.
+
+Use a genuinely fresh isolated browser context against LIVE staging.
+
+Required sequence:
+
+1. Open a fresh browser context with no existing HAPA localStorage or session state.
+2. Load staging normally.
+3. Log in normally as the existing synthetic Rider.
+4. Navigate through the UI to:
+   Rides → Recent rides
+5. Capture safely:
+   - deployed application-shell marker
+   - service-worker version
+   - exact Rider-history endpoint requested
+   - HTTP status
+   - sanitized response item count
+   - returned statuses
+   - whether the existing closed ride is returned
+   - browser console errors
+   - JavaScript exceptions
+   - whether the Recent rides DOM container exists
+   - whether the history renderer runs
+   - whether another refresh subsequently overwrites the history
+6. Reload the page.
+7. Log out and log in again.
+8. Repeat the check.
+
+Do not expose credentials, JWTs, private coordinates or signed URLs in the report.
+
+Determine the exact live cause. Investigate at minimum:
+
+- wrong endpoint in Rider UI
+- wrong rider ownership mapping
+- filtering out completed or closed rides
+- login/session restoration timing
+- history request running before authentication is ready
+- a silent catch{} swallowing rendering or request errors
+- a missing or replaced DOM element
+- duplicate DOM IDs
+- realtime polling replacing populated history
+- active-ride rendering overwriting historical rides
+- stale service worker
+- stale index.html/application shell
+- history being rendered into an obsolete or hidden element
+- multiple frontend functions controlling the same history area
+- race between login rendering and Rides initialization
+
+==================================================
+3. RIDER RIDE HISTORY — REQUIRED FINAL BEHAVIOR
+==================================================
+
+A completed ride must remain visible to the authorized Rider after:
+
+- ride completion
+- payment completion
+- page refresh
+- hard refresh
+- logout and login
+- opening a fresh private browser
+- closing and reopening the browser
+- application-shell update
+- server restart
+- Render restart
+
+Separate clearly:
+
+- active/current ride
+- historical rides
+
+Do not show “No rides yet” until an authenticated request has successfully returned exactly zero records.
+
+While loading, show a proper loading state.
+
+On transient error, show:
+
+- safe error message
+- Retry button
+
+Do not silently swallow errors.
+
+Do not erase populated history because of:
+
+- polling
+- location updates
+- realtime events
+- reconnect
+- a temporary network error
+- service-worker update
+
+Each Rider history card must show:
+
+- readable route
+- readable status
+- date and time in Africa/Nairobi
+- Driver display name
+- vehicle make, model, colour and registration
+- final fare
+- payment method
+- payment status
+- completion timestamp
+- Receipt action
+- Rider rating status
+
+Prevent duplicate cards if the same ride is received through multiple refreshes or realtime events.
+
+Preserve:
+
+- completed rides
+- closed rides
+- rider-cancelled rides
+- driver-cancelled rides
+- declined rides
+- no-driver-available rides
+
+Display each with a clear human-readable status.
+
+Cancelled and failed rides must not count as completed trips or earnings.
+
+==================================================
+4. DRIVER RIDE HISTORY AND EARNINGS
+==================================================
+
+Preserve the currently working Driver history.
+
+Every Driver completed-trip card must show:
+
+- ride reference
+- Rider-safe display name
+- route summary
+- date/time in Africa/Nairobi
+- final status
+- gross fare
+- HAPA commission
+- Driver net earnings
+- payment method
+- payment status
+- payout/settlement status
+- vehicle
+- receipt or earnings reference
+- secure Receipt action
+
+Driver totals must support:
+
+- Today
+- selected date range
+- total completed rides
+- gross fares
+- HAPA commission
+- Driver net earnings
+- cash collected
+- M-Pesa collected
+- unsettled amount
+- settled amount
+- online time
+- active driving time
+
+Use existing availability sessions, ride timestamps and ledger records.
+
+Do not invent time data when it was not recorded. Display “Not recorded” where genuinely unavailable.
+
+Do not count cancelled, declined or no-driver rides as completed earnings.
+
+==================================================
+5. OWNER RECENT RIDES — CLICKABLE OPERATIONS VIEW
+==================================================
+
+In:
+
+Owner Dashboard → Transport → Recent rides
+
+make every ride entry clickable.
+
+Open a secure Owner-only Ride details screen or modal.
+
+The Ride details view must include:
+
+IDENTIFICATION
+- HAPA ride reference
+- internal ride ID only when operationally useful
+- service zone
+- vehicle category
+- current/final ride status
+
+RIDER
+- Rider display name
+- Rider account reference
+- Rider rating summary
+- Rider contact details only when justified by support policy
+
+DRIVER
+- Driver display name
+- Driver account reference
+- Driver rating
+- completed-trip count
+- operating zone
+
+VEHICLE
+- make
+- model
+- colour
+- registration number
+- vehicle category
+
+ROUTE
+- pickup readable address
+- destination readable address
+- pickup note or landmark
+- estimated distance and duration
+- actual recorded distance and duration where available
+
+Do not reveal raw precise coordinates on the default details screen.
+
+Exact coordinate access must require a separate explicit Owner support action and create an audit entry containing:
+
+- Owner ID
+- ride ID
+- reason
+- timestamp
+
+TIMELINE
+Display the complete ride event timeline:
+
+- quote created
+- ride requested
+- search started
+- offer created
+- offer accepted or expired
+- Driver assigned
+- Driver en route
+- Driver arrived
+- PIN verified
+- ride started
+- ride completed
+- payment confirmed or failed
+- receipt created
+- ride closed
+- cancellation and reason where applicable
+- safety incident where applicable
+
+For every event show:
+
+- readable label
+- Africa/Nairobi date
+- Africa/Nairobi time
+- responsible actor where applicable
+
+FINANCIALS
+- quoted fare
+- final gross fare
+- base fare
+- booking fee
+- distance charge
+- time charge
+- waiting charge
+- cancellation fee
+- approved adjustments
+- payment method
+- payment status
+- HAPA commission
+- Driver net earnings
+- payout/settlement status
+- receipt reference
+- secure Receipt action
+
+RATINGS AND SAFETY
+- Rider-to-Driver rating status
+- Driver-to-Rider rating status
+- safety incidents
+- cancellation reason
+- support case/report references
+
+Do not expose:
+
+- private Driver verification documents
+- private Rider documents
+- JWTs
+- API keys
+- signed URLs
+- raw payment secrets
+- unnecessary exact coordinates
+
+==================================================
+6. OWNER RIDE SEARCH AND FILTERS
+==================================================
+
+Add practical Owner filters:
+
+- ride reference
+- Rider name/email
+- Driver name/email
+- vehicle registration
+- date range
+- Africa/Nairobi operational day
+- service zone
+- county
+- ride status
+- payment method
+- payment status
+- payout status
+- vehicle category
+
+Provide pagination or safe server-side result limits.
+
+Do not fetch all rides indefinitely into the browser.
+
+Filtering must be enforced on Owner-only backend routes.
+
+Prevent SQL injection and unsafe dynamic query construction.
+
+==================================================
+7. OWNER DRIVER EARNINGS REPORT
+==================================================
+
+Add an Owner-only Driver earnings report under Transport.
+
+Required columns:
+
+- Driver
+- Driver account status
+- service zone
+- vehicle
+- completed rides
+- gross fares
+- HAPA commission
+- Driver net earnings
+- cash collected
+- M-Pesa collected
+- unpaid rides
+- unsettled payout
+- settled payout
+- online time
+- active driving time
+- cancellation count
+- average Driver rating
+
+Support filters:
+
+- date range
+- Driver
+- county
+- service zone
+- vehicle category
+- payment method
+- payout status
+
+Include totals for the filtered result:
+
+- total completed rides
+- total gross fare
+- total HAPA commission
+- total Driver earnings
+- total cash
+- total M-Pesa
+- total unsettled payouts
+
+Calculations must come from persisted rides, payments and ledgers.
+
+Do not calculate accounting totals solely from frontend cards.
+
+Prevent:
+
+- double-counting one ride
+- counting cancelled rides as earnings
+- counting failed payments as collected
+- counting duplicate ledger entries
+- cross-zone leakage
+
+==================================================
+8. CSV ACCOUNTING EXPORT
+==================================================
+
+Provide an Owner-only CSV export for filtered ride accounting.
+
+CSV columns should include:
+
+- ride reference
+- operational date
+- requested time
+- accepted time
+- started time
+- completed time
+- ride duration
+- Rider display name
+- Driver display name
+- vehicle registration
+- vehicle category
+- service zone
+- pickup readable address
+- destination readable address
+- distance
+- gross fare
+- HAPA commission
+- Driver net earnings
+- payment method
+- payment status
+- payout status
+- ride status
+- receipt reference
+
+Do not export:
+
+- JWTs
+- passwords
+- private documents
+- API keys
+- signed URLs
+- raw exact coordinates
+- full private messages
+- unnecessary personal information
+
+Requirements:
+
+- Owner authorization
+- current filters applied
+- safe CSV escaping
+- prevent spreadsheet-formula injection by neutralizing dangerous values beginning with:
+  =, +, -, @
+- UTF-8 output
+- KES values with consistent two-decimal formatting
+- date/time clearly labelled as Africa/Nairobi
+
+Add an audit entry for each accounting export.
+
+==================================================
+9. OWNER DASHBOARD STATUS AND TIME FORMATTING
+==================================================
+
+Never display raw database status values directly.
+
+Examples:
+
+- rider_cancelled → Rider cancelled
+- driver_cancelled → Driver cancelled
+- no_driver_available → No driver available
+- payment_pending → Payment pending
+- payment_failed → Payment failed
+- driver_en_route → Driver on the way
+- driver_arrived → Driver arrived
+- pin_verified → PIN verified
+- in_progress → Trip in progress
+- closed → Completed and closed
+
+Store canonical machine statuses unchanged.
+
+Only change display labels.
+
+Use Africa/Nairobi consistently for:
+
+- Owner ride lists
+- Driver history
+- Rider history
+- receipt issue date
+- operational “Today”
+- reporting date ranges
+- CSV exports
+
+Do not convert calendar dates through browser UTC in a way that changes the displayed day.
+
+Store absolute timestamps normally in the database, but format operational reports consistently for Kenya.
+
+==================================================
+10. RECEIPT HEADER AND RECEIPT QUALITY
+==================================================
+
+Confirmed defect:
+
+The receipt modal displays two empty white blocks inside the dark header.
+
+Fix the real cause.
+
+The receipt header must visibly contain:
+
+- HAPA logo/name
+- “Ride receipt”
+- receipt reference
+- issue date/time in Africa/Nairobi
+- payment status
+- payment method
+
+Ensure readable contrast in:
+
+- light theme
+- modal view
+- print view
+- downloaded PDF
+
+The Rider receipt must show:
+
+- receipt reference
+- route
+- Driver
+- vehicle
+- distance
+- duration
+- base fare
+- booking fee
+- distance charge
+- time charge
+- waiting charge where applicable
+- approved adjustments where applicable
+- total paid
+- payment method
+- payment status
+
+The Rider receipt should not show Driver net earnings unless policy explicitly requires it.
+
+The Driver receipt/earnings statement may show:
+
+- gross fare
+- HAPA commission
+- Driver net earnings
+- payout status
+
+Preserve the statement:
+
+“This is a ride receipt, not a tax invoice.”
+
+Do not claim it is a tax invoice unless a legally approved tax-invoice system is implemented.
+
+Verify:
+
+- modal receipt
+- Share
+- Download PDF
+- print layout
+- authorized access after relogin
+
+==================================================
+11. SERVICE WORKER AND APPLICATION-SHELL SAFETY
+==================================================
+
+Ensure new frontend deployments reliably reach users.
+
+Requirements:
+
+- safe versioned application shell
+- obsolete caches removed
+- skipWaiting and clientsClaim only when safe
+- no reload loops
+- safe one-time refresh or update prompt
+- authenticated APIs never cached
+- receipts never cached
+- signed URLs never cached
+- JWTs never cached
+- ride history never cached
+- exact trip data never cached
+- private documents never cached
+- payment responses never cached
+
+Do not depend on users manually clearing browser storage after every release.
+
+==================================================
+12. AUTHORIZATION AND PRIVACY
+==================================================
+
+Rider:
+
+- sees only rides belonging to that Rider
+- accesses only their receipts
+- cannot see Driver private documents
+- cannot see another Rider’s history
+
+Driver:
+
+- sees only assigned/completed Driver rides
+- sees only Rider-safe information
+- cannot see unrelated rides
+
+Owner:
+
+- receives Owner-only operational access
+- exact-location access is explicitly audited
+- private support-message access requires a justified incident/report
+- accounting exports are audited
+
+Public APIs:
+
+- expose no ride histories
+- expose no precise trip coordinates
+- expose no Rider or Driver private data
+
+Use consistent 403/404 behavior that does not leak whether unrelated ride IDs exist.
+
+==================================================
+13. TEST REQUIREMENTS
+==================================================
+
+Add tests for the exact live Rider failure found.
+
+Required Rider-history tests:
+
+- existing completed cash ride appears after fresh login
+- appears after hard refresh
+- appears after browser restart simulation
+- appears after server restart
+- appears after logout/login
+- closed ride remains visible
+- Receipt remains accessible
+- loading state is shown before response
+- “No rides yet” appears only after successful zero-item response
+- transient error shows Retry
+- populated history is not overwritten by polling
+- no duplicate cards
+- unrelated Rider blocked
+- unrelated Driver blocked
+- no exact coordinates leak
+
+Required Owner-details tests:
+
+- Owner may open ride details
+- normal customer cannot open Owner ride details
+- Driver cannot open Owner ride details
+- timeline events ordered correctly
+- missing optional timestamps display safely
+- accounting values match ledger
+- completed ride counted exactly once
+- cancelled ride excluded from earnings
+- payment failure excluded from collected totals
+- exact coordinate access creates audit entry
+- default detail response omits raw coordinates
+
+Required earnings tests:
+
+- Driver gross/commission/net match the existing example:
+  346.13 / 51.92 / 294.21
+- two completed identical test rides total:
+  gross 692.26
+  commission 103.84
+  Driver net 588.42
+- cancelled ride does not affect earnings
+- payment methods separated correctly
+- date-range filtering uses Africa/Nairobi
+- zone filtering cannot leak another zone
+- no duplicate ledger counting
+
+Required CSV tests:
+
+- Owner-only
+- filters honored
+- correct totals
+- UTF-8
+- safe escaping
+- spreadsheet-formula injection prevented
+- no precise coordinates
+- no secrets or private documents
+
+Required receipt tests:
+
+- header text is visible
+- logo/title/ref/date appear
+- Rider receipt total matches immutable ride snapshot
+- PDF matches modal amounts
+- Driver earnings statement matches ledger
+- authorized receipt access after relogin
+- unrelated user blocked
+
+Run the complete existing HAPA test suite plus all new tests.
+
+==================================================
+14. LIVE STAGING ACCEPTANCE
+==================================================
+
+After local tests pass:
+
+1. Push the completed branch.
+2. Allow Render staging to auto-deploy.
+3. Verify the deployed SHA and health.
+4. Use a completely fresh browser context.
+5. Log in as the existing Rider.
+6. Open Rides.
+7. Verify the existing ride appears.
+8. Verify route, KES 346.13, CASH paid and Receipt.
+9. Open the Rider receipt.
+10. Reload.
+11. Verify the ride remains.
+12. Log out and log in again.
+13. Verify the ride remains.
+14. Log in as the existing Driver.
+15. Verify Driver history and KES 294.21 net earnings.
+16. Log in as Owner.
+17. Open the existing ride from Recent rides.
+18. Verify:
+    - Rider
+    - Driver
+    - vehicle
+    - timeline
+    - gross
+    - commission
+    - net
+    - payment
+    - receipt
+19. Verify Driver earnings report.
+20. Export a synthetic filtered CSV and inspect it.
+21. Confirm no raw coordinates or secrets appear.
+22. Confirm the existing ride was not manually altered.
+
+Do not create a new ride merely to make the acceptance test pass.
+
+==================================================
+15. GIT AND DEPLOYMENT
+==================================================
+
+Before committing:
+
+- inspect complete diff
+- remove debug logs
+- remove temporary screenshots and test files
+- confirm no credentials
+- confirm no test ride coordinates
+- confirm no exported CSV remains tracked
+- preserve deterministic Render build
+- preserve Android/iOS projects
+- preserve storage safety
+- preserve all current ride behavior
+
+If all tests pass:
+
+Create clean logical commits, preferably one commit:
+
+fix: complete rider history and owner ride accounting
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge main.
+Do not deploy production.
+Do not access production storage or database.
+Do not manually edit staging ride records.
+
+==================================================
+16. FINAL RESPONSE FORMAT
+==================================================
+
+STATUS:
+- COMPLETE
+or
+- BLOCKED
+
+LIVE ROOT CAUSE:
+- exact reason Rider history was empty
+
+RIDER HISTORY:
+- fresh login result
+- reload result
+- relogin result
+- receipt result
+- cancelled/failed status result
+
+OWNER RIDE DETAILS:
+- clickable ride result
+- timeline result
+- Rider/Driver/vehicle result
+- financial detail result
+- location-audit result
+
+DRIVER EARNINGS:
+- report result
+- date filter result
+- zone filter result
+- gross/commission/net result
+- payout result
+
+CSV:
+- export result
+- security result
+- audit result
+
+RECEIPT:
+- header result
+- modal result
+- PDF result
+- Rider/Driver separation result
+
+TESTS:
+- total passed
+- total failed
+- live-browser result
+- security result
+- accounting result
+
+GIT:
+- commit SHA
+- push result
+- branch
+- main untouched
+- production untouched
+
+STAGING:
+- deployed SHA
+- health
+- existing Rider history result
+- existing Driver history result
+- Owner details result
+
+DATA SAFETY:
+- existing ride not manually altered
+- no new ride created
+- no private data or coordinates leaked
+- no secrets committed
+
+Do not return only a plan.
+
+Implement, test, push and verify the real live staging behavior now.
