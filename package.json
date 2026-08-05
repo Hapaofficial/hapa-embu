@@ -5,6 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test": "node scripts/test/run.js all",
+    "test:syntax": "node scripts/test/run.js syntax",
+    "test:static": "node scripts/test/run.js static",
+    "test:integration": "node scripts/test/run.js integration",
     "cleanup-private-documents": "node scripts/cleanup-private-documents.js",
     "migrate-legacy-documents": "node scripts/migrate-legacy-documents.js"
   },
