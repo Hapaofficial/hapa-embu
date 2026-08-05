@@ -7,9 +7,11 @@ const crypto=require('crypto');
 const mpesa=require('../lib/mpesa');
 const {buildReceiptPdf}=require('../lib/receipt-pdf');
 const finance=require('../lib/finance');
+const maps=require('../lib/maps');
 
 module.exports=function(app,deps){
  const{q,pool,auth,active,owner,audit,writeLimiter}=deps;
+ maps.init({q});
  const SALT=String(process.env.SESSION_SECRET||process.env.JWT_SECRET||'hapa');
 
  // ── Compliance / operational configuration (seeded once, Owner-editable) ────
@@ -125,8 +127,11 @@ module.exports=function(app,deps){
   res.json({
    enabled:await rideHailingEnabled(),
    categories:cats,
-   maps_browser_key:process.env.GOOGLE_MAPS_BROWSER_KEY||null,
-   mock_routing:!process.env.GOOGLE_MAPS_SERVER_KEY,
+   maps_browser_key:maps.publicWebKey(),
+   maps_provider:maps.provider(),
+   mock_routing:maps.provider()!=='google',
+   mock_routing_label:maps.provider()!=='google'?maps.MOCK_LABEL:null,
+   map_center:{lat:-0.5310,lng:37.4575},
    mpesa:{mode:mpesa.status().mode,ready:mpesa.status().ready},
    offer_timeout_s:await cfg('offer_timeout_s'),
    location_intervals:{active_s:await cfg('location_interval_active_s'),idle_s:await cfg('location_interval_idle_s')},
@@ -318,12 +323,33 @@ module.exports=function(app,deps){
  });
 
  // ── Driver location (only while online / on active ride; validated) ────────
+ // Hardening: plausibility gates on every sample. Values are validated when
+ // present but optional fields stay optional — web clients cannot always
+ // provide accuracy/heading. Sequence monotonicity (below, in SQL) blocks
+ // replay; the in-memory pace gate bounds per-driver write rates.
+ const LOC_MAX_ACCURACY_M=Math.max(50,Number(process.env.LOC_MAX_ACCURACY_M)||250);
+ const LOC_MAX_SPEED_MPS=70;// ~250 km/h: nothing on Kenyan roads moves faster
+ const LOC_MAX_CLIENT_AGE_MS=120000;
+ const LOC_MIN_INTERVAL_MS=process.env.LOC_MIN_INTERVAL_MS!==undefined&&process.env.LOC_MIN_INTERVAL_MS!==''?Math.max(0,Number(process.env.LOC_MIN_INTERVAL_MS)||0):350;
+ const locPace=new Map();// driverId -> last accepted at (ms)
+ const locHealth={accepted:0,rejected:0,last_reject_reason:null,last_reject_at:null};
+ deps.locationHealth=()=>({...locHealth,tracked_drivers:locPace.size});
+ const locReject=(res,code,reason)=>{locHealth.rejected++;locHealth.last_reject_reason=reason;locHealth.last_reject_at=new Date().toISOString();return res.status(code).json({error:reason});};
  app.post('/api/driver/location',auth,active,dvCap,async(req,res)=>{
   try{
    const b=req.body||{};
    const lat=Number(b.lat),lng=Number(b.lng),seq=Number(b.seq);
-   if(!inKenya(lat,lng))return res.status(400).json({error:'Invalid coordinates'});
-   if(!Number.isFinite(seq)||seq<0)return res.status(400).json({error:'Invalid sequence'});
+   if(!inKenya(lat,lng))return locReject(res,400,'Invalid coordinates');
+   if(!Number.isFinite(seq)||seq<0)return locReject(res,400,'Invalid sequence');
+   if(b.accuracy!=null&&(!Number.isFinite(Number(b.accuracy))||Number(b.accuracy)<0||Number(b.accuracy)>LOC_MAX_ACCURACY_M))return locReject(res,422,'Location accuracy too low');
+   if(b.speed!=null&&Number.isFinite(Number(b.speed))&&(Number(b.speed)<0||Number(b.speed)>LOC_MAX_SPEED_MPS))return locReject(res,422,'Implausible speed');
+   if(b.heading!=null&&Number.isFinite(Number(b.heading))&&(Number(b.heading)<0||Number(b.heading)>360))return locReject(res,422,'Invalid heading');
+   if(b.recorded_at!=null){
+    const ts=new Date(b.recorded_at).getTime();
+    if(!Number.isFinite(ts)||Math.abs(Date.now()-ts)>LOC_MAX_CLIENT_AGE_MS)return locReject(res,422,'Stale location sample');
+   }
+   const lastAt=locPace.get(String(req.user.id))||0;
+   if(Date.now()-lastAt<LOC_MIN_INTERVAL_MS)return locReject(res,429,'Location updates too frequent');
    const s=(await q(`SELECT id FROM driver_availability_sessions WHERE driver_user_id=$1 AND status='online'`,[req.user.id])).rows[0];
    const ride=(await q(`SELECT * FROM ride_requests WHERE driver_user_id=$1 AND status=ANY($2)`,[req.user.id,ACTIVE_RIDE])).rows[0];
    if(!s&&!ride)return res.status(409).json({error:'Location updates are only accepted while online or on an active ride'});
@@ -332,8 +358,10 @@ module.exports=function(app,deps){
     WHERE driver_user_id=$1 AND seq<$7 RETURNING driver_user_id`,[req.user.id,lat,lng,Number(b.accuracy)||null,Number(b.heading)||null,Number(b.speed)||null,seq,s?s.id:null]);
    if(!up.rowCount){
     const exists=await q(`INSERT INTO driver_presence(driver_user_id,session_id,lat,lng,seq) VALUES($1,$2,$3,$4,$5) ON CONFLICT(driver_user_id) DO NOTHING RETURNING driver_user_id`,[req.user.id,s?s.id:null,lat,lng,seq]);
-    if(!exists.rowCount)return res.status(409).json({error:'Stale or out-of-order location update'});
+    if(!exists.rowCount)return locReject(res,409,'Stale or out-of-order location update');
    }
+   locPace.set(String(req.user.id),Date.now());locHealth.accepted++;
+   if(locPace.size>5000)for(const[k,v]of locPace){if(Date.now()-v>600000)locPace.delete(k);}
    if(ride){
     await q(`INSERT INTO ride_location_samples(ride_id,session_id,driver_user_id,lat,lng,accuracy_m,heading,speed_mps,seq) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
      [ride.id,s?s.id:null,req.user.id,lat,lng,Number(b.accuracy)||null,Number(b.heading)||null,Number(b.speed)||null,seq]);
@@ -364,19 +392,15 @@ module.exports=function(app,deps){
   return rows.find(f=>normCat(f.vehicle_category)===want);
  }
  async function routeEstimate(pLat,pLng,dLat,dLng,given){
-  if(process.env.GOOGLE_MAPS_SERVER_KEY){
-   try{
-    const r=await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${pLat},${pLng}&destination=${dLat},${dLng}&key=${process.env.GOOGLE_MAPS_SERVER_KEY}`);
-    const d=await r.json();
-    const leg=d.routes?.[0]?.legs?.[0];
-    if(leg)return{distance_m:leg.distance.value,duration_s:leg.duration.value,polyline:d.routes[0].overview_polyline?.points||null,source:'google'};
-   }catch(e){console.error('directions error:',e.message);}
-  }
-  if(given&&Number(given.distance_m)>0&&Number(given.duration_s)>0)
-   return{distance_m:Math.round(Number(given.distance_m)),duration_s:Math.round(Number(given.duration_s)),polyline:null,source:'client'};
-  const straight=havM(pLat,pLng,dLat,dLng);
-  const distance_m=Math.round(straight*1.4);// road-factor heuristic, clearly labelled mock
-  return{distance_m,duration_s:Math.round(distance_m/(30/3.6)),polyline:null,source:'mock_estimate'};
+  // Server-authoritative routing through the maps provider abstraction.
+  // Client-supplied distances are honoured ONLY under the explicit dev/test
+  // flag, never in production and never when real Google routing is active —
+  // fares must come from server-computed routes.
+  if(String(process.env.MAPS_ALLOW_CLIENT_DISTANCE)==='true'&&process.env.NODE_ENV!=='production'
+     &&maps.provider()!=='google'&&given&&Number(given.distance_m)>0&&Number(given.duration_s)>0)
+   return{distance_m:Math.round(Number(given.distance_m)),duration_s:Math.round(Number(given.duration_s)),polyline:null,source:'client',provider:'mock',routing_preference:'CLIENT_TEST_FIXTURE'};
+  const r=await maps.computeRoute({origin:{lat:pLat,lng:pLng},dest:{lat:dLat,lng:dLng}});
+  return{...r,source:r.provider==='google'?'google':'mock_estimate'};
  }
  app.post('/api/rides/quote',auth,active,writeLimiter,async(req,res)=>{
   try{
@@ -391,7 +415,14 @@ module.exports=function(app,deps){
    if(!cats.some(c=>c.toLowerCase()===category.toLowerCase()))return res.status(400).json({error:'This ride category is not available'});
    const card=await findCard(zone.id,category);
    if(!card)return res.status(404).json({error:'No rate card configured for this area yet'});
-   const route=await routeEstimate(pLat,pLng,dLat,dLng,b);
+   let route;
+   try{route=await routeEstimate(pLat,pLng,dLat,dLng,b);}
+   catch(e){
+    // Real-provider failures NEVER silently fall back to estimates for real
+    // fares — the rider is asked to retry instead of getting a wrong price.
+    if(e instanceof maps.MapsError)return res.status(503).json({error:'Route calculation is temporarily unavailable — please try again in a moment.'});
+    throw e;
+   }
    const km=route.distance_m/1000,min=route.duration_s/60;
    const maxPct=Number(await cfg('commission_max_pct'));
    const commissionPct=Math.min(Number(card.commission_pct),maxPct);
@@ -408,11 +439,22 @@ module.exports=function(app,deps){
    // quote's category, so an alias card name would strand rides in search.
    const catCanonical=cats.find(c=>c.toLowerCase()===category.toLowerCase())||category;
    const qref=await finance.nextRef({query:q},'quote');
-   const r=(await q(`INSERT INTO fare_quotes(rider_id,zone_id,rate_card_id,vehicle_category,currency,distance_m,duration_s,components,total,route_source,expires_at,reference)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+make_interval(secs=>$11),$12) RETURNING *`,
-    [req.user.id,zone.id,card.id,catCanonical,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl,qref])).rows[0];
+   // Immutable route snapshot bound to the quote: inserted once, never
+   // updated; the keyed integrity hash makes any later tampering detectable.
+   const snapBase={provider:route.provider||'mock',origin_lat:pLat,origin_lng:pLng,dest_lat:dLat,dest_lng:dLng,
+    distance_m:route.distance_m,duration_s:route.duration_s,polyline:route.polyline||null};
+   const snap=(await q(`INSERT INTO route_snapshots(rider_id,provider,origin_lat,origin_lng,dest_lat,dest_lng,origin_place_id,dest_place_id,distance_m,duration_s,polyline,travel_mode,routing_preference,zone_slug,integrity_hash,expires_at)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW()+make_interval(secs=>$16)) RETURNING id,correlation_id,computed_at`,
+    [req.user.id,snapBase.provider,pLat,pLng,dLat,dLng,
+     String(b.pickup_place_id||'').slice(0,256)||null,String(b.dest_place_id||'').slice(0,256)||null,
+     route.distance_m,route.duration_s,route.polyline||null,route.travel_mode||'DRIVE',route.routing_preference||null,
+     String(b.zone||'zone-embu-pilot'),maps.snapshotHash(snapBase),ttl])).rows[0];
+   const r=(await q(`INSERT INTO fare_quotes(rider_id,zone_id,rate_card_id,vehicle_category,currency,distance_m,duration_s,components,total,route_source,expires_at,reference,route_snapshot_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()+make_interval(secs=>$11),$12,$13) RETURNING *`,
+    [req.user.id,zone.id,card.id,catCanonical,card.currency,route.distance_m,route.duration_s,JSON.stringify(comp),total,route.source,ttl,qref,snap.id])).rows[0];
    res.status(201).json({quote:r,polyline:route.polyline,zone_name:zone.name,mock_routing:route.source!=='google',
-    note:route.source==='google'?null:'Route estimated without Google Maps — development estimate only.'});
+    route:{provider:snapBase.provider,distance_m:route.distance_m,duration_s:route.duration_s,polyline:route.polyline||null,snapshot_id:snap.id},
+    note:route.source==='google'?null:maps.MOCK_LABEL});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
 
@@ -432,6 +474,19 @@ module.exports=function(app,deps){
    const pin=String(crypto.randomInt(0,10000)).padStart(4,'0');
    const pLat=Number(b.pickup_lat),pLng=Number(b.pickup_lng),dLat=Number(b.dest_lat),dLng=Number(b.dest_lng);
    if(!inKenya(pLat,pLng)||!inKenya(dLat,dLng))return res.status(400).json({error:'Locations must be within Kenya'});
+   // Route-snapshot tamper checks: the ride must be created on the exact
+   // route the fare was quoted for. Snapshot rows are immutable; the keyed
+   // hash detects any DB-level edit, the coordinate check any client swap.
+   if(quote.route_snapshot_id){
+    const snap=(await q(`SELECT * FROM route_snapshots WHERE id=$1 AND rider_id=$2`,[quote.route_snapshot_id,req.user.id])).rows[0];
+    if(!snap)return res.status(409).json({error:'Quote route record missing — request a new estimate'});
+    const expect=maps.snapshotHash({provider:snap.provider,origin_lat:snap.origin_lat,origin_lng:snap.origin_lng,
+     dest_lat:snap.dest_lat,dest_lng:snap.dest_lng,distance_m:snap.distance_m,duration_s:snap.duration_s,polyline:snap.polyline||null});
+    if(expect!==snap.integrity_hash)return res.status(409).json({error:'Quote route failed verification — request a new estimate'});
+    const TOL_M=150;// GPS jitter allowance; anything larger is a different trip
+    if(havM(pLat,pLng,snap.origin_lat,snap.origin_lng)>TOL_M||havM(dLat,dLng,snap.dest_lat,snap.dest_lng)>TOL_M)
+     return res.status(409).json({error:'Pickup or destination changed since the quote — request a new estimate'});
+   }
    let r;
    try{
     const rref=await finance.nextRef({query:q},'ride');
@@ -484,6 +539,44 @@ module.exports=function(app,deps){
     ORDER BY dist_m ASC LIMIT 5`,
    [ride.id,ride.vehicle_category,ride.zone_id,ride.pickup_lat,ride.pickup_lng,staleS,required,maxMin,ride.rider_id,ACTIVE_RIDE,required.length])).rows;
  }
+ // Road-network pickup ETAs via Compute Route Matrix, on top of the cheap
+ // haversine pre-filter. Bounded candidate count, short-TTL cache keyed on
+ // rounded positions (cost control), and explicit degraded-mode recording:
+ // matrix failure NEVER blocks dispatch — ranking falls back to haversine.
+ const etaCache=new Map();// key -> {t,eta_s,distance_m}
+ const ETA_CACHE_TTL_MS=30000;
+ let matrixDegraded=null;// {at,category} — surfaced on the Owner panel
+ deps.mapsDispatchState=()=>({degraded:matrixDegraded,cache_size:etaCache.size});
+ async function rankByEta(cands,ride){
+  if(cands.length<=0)return cands;
+  const dest={lat:Number(ride.pickup_lat),lng:Number(ride.pickup_lng)};
+  const key=p=>`${p.lat.toFixed(3)},${p.lng.toFixed(3)}`;
+  const now=Date.now();
+  for(const[k,v]of etaCache)if(now-v.t>ETA_CACHE_TTL_MS)etaCache.delete(k);
+  const need=[],out=[];
+  for(const c of cands){
+   const ck=key({lat:Number(c.lat),lng:Number(c.lng)})+'|'+key(dest);
+   const hit=etaCache.get(ck);
+   if(hit)out.push({...c,pickup_eta_s:hit.eta_s,eta_source:'matrix_cache'});
+   else need.push({...c,_ck:ck});
+  }
+  if(need.length){
+   try{
+    const m=await maps.computeRouteMatrix({origins:need.map(c=>({id:c.driver_user_id,lat:Number(c.lat),lng:Number(c.lng)})),dest});
+    for(const c of need){
+     const r=(m.results||[]).find(x=>x.id===c.driver_user_id);
+     if(r&&r.ok){etaCache.set(c._ck,{t:now,eta_s:r.eta_s,distance_m:r.distance_m});out.push({...c,pickup_eta_s:r.eta_s,eta_source:m.provider==='google'?'matrix':'matrix_mock'});}
+     else out.push({...c,pickup_eta_s:null,eta_source:'haversine_degraded'});
+    }
+    if(m.results&&m.results.every(x=>x.ok))matrixDegraded=null;
+   }catch(e){
+    matrixDegraded={at:new Date().toISOString(),category:e.category||'provider_error'};
+    for(const c of need)out.push({...c,pickup_eta_s:null,eta_source:'haversine_degraded'});
+   }
+  }
+  out.sort((a,b)=>(a.pickup_eta_s??1e9)-(b.pickup_eta_s??1e9)||a.dist_m-b.dist_m);
+  return out;
+ }
  async function dispatchNext(rideId){
   const ride=(await q(`SELECT * FROM ride_requests WHERE id=$1`,[rideId])).rows[0];
   if(!ride||!['searching','offered'].includes(ride.status))return;
@@ -497,14 +590,15 @@ module.exports=function(app,deps){
    if(done)await rideEvent(done,null,'no_driver_available',{offers_made:nOffers});
    return;
   }
-  const c=cands[0];
+  const ranked=await rankByEta(cands,ride);
+  const c=ranked[0];
   const ttl=Number(await cfg('offer_timeout_s'));
   try{
-   const o=(await q(`INSERT INTO ride_offers(ride_id,driver_user_id,round,pickup_distance_m,expires_at) VALUES($1,$2,$3,$4,NOW()+make_interval(secs=>$5)) RETURNING *`,
-    [rideId,c.driver_user_id,nOffers+1,c.dist_m<1e8?c.dist_m:null,ttl])).rows[0];
+   const o=(await q(`INSERT INTO ride_offers(ride_id,driver_user_id,round,pickup_distance_m,expires_at,pickup_eta_s,eta_source) VALUES($1,$2,$3,$4,NOW()+make_interval(secs=>$5),$6,$7) RETURNING *`,
+    [rideId,c.driver_user_id,nOffers+1,c.dist_m<1e8?c.dist_m:null,ttl,c.pickup_eta_s??null,c.eta_source||null])).rows[0];
    await q(`UPDATE ride_requests SET status='offered',updated_at=NOW() WHERE id=$1 AND status='searching'`,[rideId]);
    await addEvent(rideId,null,'offer_created',{driver_id:c.driver_user_id,round:o.round,expires_at:o.expires_at});
-   push(c.driver_user_id,{type:'offer',offer_id:o.id,ride_id:rideId,pickup_distance_m:o.pickup_distance_m,expires_at:o.expires_at,countdown_s:ttl,ts:Date.now()});
+   push(c.driver_user_id,{type:'offer',offer_id:o.id,ride_id:rideId,pickup_distance_m:o.pickup_distance_m,pickup_eta_s:o.pickup_eta_s,expires_at:o.expires_at,countdown_s:ttl,ts:Date.now()});
    push(ride.rider_id,{type:'searching_update',ride_id:rideId,round:o.round,ts:Date.now()});
    pushOwner({type:'offer_created',ride_id:rideId,ts:Date.now()});
   }catch(e){
@@ -1309,8 +1403,8 @@ module.exports=function(app,deps){
     g('TNC_LICENSE_CONFIRMED',true,String(process.env.TNC_LICENSE_CONFIRMED||'')==='true',
      process.env.TNC_LICENSE_REFERENCE?'Licence confirmed, reference on file':'Licence confirmed (add TNC_LICENSE_REFERENCE)',
      'NTSA TNC licence not confirmed — set TNC_LICENSE_CONFIRMED and TNC_LICENSE_REFERENCE'),
-    g('GOOGLE_MAPS_BROWSER_KEY',true,!!process.env.GOOGLE_MAPS_BROWSER_KEY,'Browser Maps key configured','Browser Maps key missing — pickup/destination map UX unavailable'),
-    g('GOOGLE_MAPS_SERVER_KEY',true,!!process.env.GOOGLE_MAPS_SERVER_KEY,'Server routing key configured','Server routing key missing — fares use labelled estimates, not real routes'),
+    g('GOOGLE_MAPS_WEB_KEY',true,maps.publicWebKey(),'Browser Maps key configured (referrer-restricted)','Browser Maps key missing — set GOOGLE_MAPS_WEB_KEY (referrer-restricted); pickup/destination map UX unavailable'),
+    g('GOOGLE_MAPS_SERVER_KEY',true,maps.serverKeyConfigured(),'Server routing key configured — provider: '+maps.provider(),'Server routing key missing — provider runs in labelled development-estimate mode, never real routing'),
     g('SUPPORT_EMERGENCY_PHONE',true,!!process.env.SUPPORT_EMERGENCY_PHONE,'Emergency/support line configured','Emergency/support phone not set — Safety Centre has no live line'),
     g('RATE_CARD',true,!!card,
      card?`Active card resolved: ${card.vehicle_category} from ${String(card.effective_from).slice(0,10)}`:'',

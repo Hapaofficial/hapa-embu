@@ -9,6 +9,15 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Google Maps Android key: injected at build time from the untracked
+             local.properties (MAPS_API_KEY) via a manifest placeholder.
+             The key is Android-restricted (package name + SHA-1) and never
+             committed to source control. Empty value = native maps disabled;
+             the WebView UI keeps working with the referrer-restricted web key. -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"
@@ -42,6 +51,13 @@
          location" while booking transport. No background location. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Preparation for driver live tracking while the app is foregrounded as a
+         service (Android 14+ requires the typed foreground-service permission).
+         The background-location permission is intentionally NOT requested —
+         driver tracking runs only while the driver is online with the app
+         open, matching the store data-safety disclosures. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Camera/photos for profile, shop, portfolio and verification uploads -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />

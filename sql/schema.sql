@@ -915,3 +915,29 @@ CREATE TABLE IF NOT EXISTS finance_alert_events(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS finance_alert_events_idx ON finance_alert_events(alert_id,id);
+
+-- ── Google Maps / GPS stage: immutable route snapshots ───────────────────────
+-- One row per computed route quote. Never updated after insert; the integrity
+-- hash (HMAC over provider+coords+distance+duration+polyline+computed_at)
+-- makes tampering with quoted routes detectable at ride creation.
+CREATE TABLE IF NOT EXISTS route_snapshots(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ rider_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ provider TEXT NOT NULL CHECK(provider IN('google','mock')),
+ origin_lat DOUBLE PRECISION NOT NULL, origin_lng DOUBLE PRECISION NOT NULL,
+ dest_lat DOUBLE PRECISION NOT NULL, dest_lng DOUBLE PRECISION NOT NULL,
+ origin_place_id TEXT, dest_place_id TEXT,
+ distance_m INTEGER NOT NULL, duration_s INTEGER NOT NULL,
+ polyline TEXT,
+ travel_mode TEXT NOT NULL DEFAULT 'DRIVE',
+ routing_preference TEXT,
+ zone_slug TEXT,
+ correlation_id UUID NOT NULL DEFAULT gen_random_uuid(),
+ integrity_hash TEXT NOT NULL,
+ computed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS route_snapshots_rider_idx ON route_snapshots(rider_id,computed_at DESC);
+ALTER TABLE fare_quotes ADD COLUMN IF NOT EXISTS route_snapshot_id UUID REFERENCES route_snapshots(id) ON DELETE SET NULL;
+ALTER TABLE ride_offers ADD COLUMN IF NOT EXISTS pickup_eta_s INTEGER;
+ALTER TABLE ride_offers ADD COLUMN IF NOT EXISTS eta_source TEXT;

@@ -15,6 +15,17 @@ android {
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+        // Google Maps Android key from the untracked local.properties
+        // (MAPS_API_KEY=...). Never hardcode or commit keys; an empty value
+        // simply disables native map views while the WebView UI keeps working.
+        def mapsKey = ""
+        def lp = rootProject.file("local.properties")
+        if (lp.exists()) {
+            def props = new Properties()
+            lp.withInputStream { props.load(it) }
+            mapsKey = props.getProperty("MAPS_API_KEY", "")
+        }
+        manifestPlaceholders = [MAPS_API_KEY: mapsKey]
     }
     buildTypes {
         release {

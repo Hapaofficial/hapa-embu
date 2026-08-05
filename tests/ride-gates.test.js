@@ -116,7 +116,7 @@ async function main() {
     ok('M-Pesa is optional and does not block a cash pilot', byName.MPESA && byName.MPESA.required === false && (byName.MPESA.pass || byName.MPESA.status === 'OPTIONAL — NOT CONFIGURED'), byName.MPESA);
     ok('phone masking is optional with in-app chat fallback', byName.PHONE_MASKING && byName.PHONE_MASKING.required === false, byName.PHONE_MASKING);
     ok('production readiness computed from mandatory gates only', full.production_ready === full.gates.filter(x => x.required).every(x => x.pass), full);
-    const mandatory = ['RIDE_HAILING_ENABLED', 'TNC_LICENSE_CONFIRMED', 'GOOGLE_MAPS_BROWSER_KEY', 'GOOGLE_MAPS_SERVER_KEY', 'SUPPORT_EMERGENCY_PHONE', 'RATE_CARD'];
+    const mandatory = ['RIDE_HAILING_ENABLED', 'TNC_LICENSE_CONFIRMED', 'GOOGLE_MAPS_WEB_KEY', 'GOOGLE_MAPS_SERVER_KEY', 'SUPPORT_EMERGENCY_PHONE', 'RATE_CARD'];
     ok('mandatory gate set is exactly the cash-pilot list', mandatory.every(m => byName[m] && byName[m].required === true) && full.gates.filter(x => x.required).length === mandatory.length, full.gates.map(x => x.gate + ':' + x.required));
     ok('unmet mandatory gates block production readiness', full.production_ready === false, full);
     ok('every blocked gate has a readable reason', full.gates.filter(x => !x.pass).every(x => typeof x.detail === 'string' && x.detail.length > 10), full.gates);

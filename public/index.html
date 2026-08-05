@@ -632,8 +632,9 @@ h1,h2,h3,h4{color:var(--hapa-text)}
  <div class="card hidden" id="rdGuestNotice"><p style="margin:0" class="muted">Please log in to book rides and see your trip history.</p></div>
  <div class="card" id="rdBookCard">
   <h3 style="margin-top:0">Where to?</h3>
-  <div class="field"><label>Pickup</label><input id="rdPickA" maxlength="200" placeholder="e.g. Embu Town CBD, near Tuskys"><button class="btn" style="margin-top:6px" onclick="rdUseGps()">📍 Use my location</button><small class="muted" id="rdGpsNote"></small></div>
-  <div class="field"><label>Destination</label><input id="rdDestA" maxlength="200" placeholder="e.g. Kangaru School gate"></div>
+  <div class="field"><label>Pickup</label><div style="position:relative"><input id="rdPickA" maxlength="200" autocomplete="off" placeholder="e.g. Embu Town CBD, near Tuskys" oninput="acInput('pick')" onkeydown="acKey(event,'pick')" onblur="setTimeout(()=>acHide('pick'),200)"><div id="rdPickSug" class="hidden" role="listbox" style="position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:220px;overflow:auto"></div></div><button class="btn" style="margin-top:6px" onclick="rdUseGps()">📍 Use my location</button><small class="muted" id="rdGpsNote"></small></div>
+  <div class="field"><label>Destination</label><div style="position:relative"><input id="rdDestA" maxlength="200" autocomplete="off" placeholder="e.g. Kangaru School gate" oninput="acInput('dest')" onkeydown="acKey(event,'dest')" onblur="setTimeout(()=>acHide('dest'),200)"><div id="rdDestSug" class="hidden" role="listbox" style="position:absolute;left:0;right:0;top:100%;z-index:30;background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);max-height:220px;overflow:auto"></div></div></div>
+  <div id="rdMapWrap" class="hidden" style="margin:8px 0"><div id="rdMap" style="height:220px;border-radius:12px;border:1px solid var(--line)"></div><small class="muted" id="rdMapNote"></small></div>
   <div class="field"><label>Note for driver (optional)</label><input id="rdNote" maxlength="200" placeholder="Landmark, gate colour…"></div>
   <div class="field"><label>Payment</label><select id="rdPay"><option value="cash">Cash</option><option value="mpesa">M-Pesa</option></select></div>
   <button class="btn primary" id="rdEstBtn" onclick="rdEstimate()">Get fare estimate</button>
@@ -764,6 +765,7 @@ h1,h2,h3,h4{color:var(--hapa-text)}
 <div id="ownerTransportPanel" class="hidden" style="margin-top:14px">
  <div class="card"><h3 style="margin-top:0">Live operations</h3><div id="otStats" class="stats"></div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Launch gates</h3><div id="otGates" class="muted" style="font-size:13px">—</div></div>
+<div class="card" style="margin-top:14px"><h3 style="margin-top:0">Maps &amp; GPS health</h3><div id="otMaps" class="muted" style="font-size:13px">—</div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Pending vehicles &amp; documents</h3><div id="otApprovals" class="muted" style="font-size:13px">—</div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Incidents</h3><div id="otIncidents" class="muted" style="font-size:13px">—</div></div>
  <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Recent rides</h3>
@@ -903,7 +905,7 @@ function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
 function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s!=='undefined')?s:PH_IMG;}
 
 // ── State ────────────────────────────────────────────────────────────────────
-const HAPA_SHELL='1.9.9';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
+const HAPA_SHELL='1.9.10';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
 let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
 // ── Native (Capacitor) bridge: Keystore/Keychain-backed token storage when the
 // SecureStoragePlugin is present. On native builds the token is mirrored to
@@ -3372,6 +3374,115 @@ let rdState={cfg:null,quote:null,rideId:localStorage.getItem('hapa_ride')||null,
 let drvState={seq:Number(localStorage.getItem('hapa_drv_seq')||0),locTimer:null,poll:null,offerTimer:null};
 const rdStatusCopy={searching:'Looking for a driver near you…',offered:'Contacting a nearby driver…',driver_assigned:'Driver confirmed — heading your way',driver_en_route:'Driver is on the way',driver_arrived:'Your driver has arrived',pin_verified:'PIN verified — ready to go',in_progress:'Trip in progress',payment_pending:'Trip finished — payment due',payment_failed:'Payment failed — try again',completed:'Trip complete',closed:'Trip complete',rider_cancelled:'You cancelled this trip',driver_cancelled:'Driver cancelled — you can request again',no_driver_available:'No drivers available right now'};
 const RD_OPEN=['searching','offered','driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress','payment_pending','payment_failed'];
+// ── Server-proxied place autocomplete (debounced, stale-guarded, escaped) ──
+// The browser never talks to Google Places directly: the server holds the
+// key, enforces Kenya restriction and rate caps, and passes session tokens.
+const acState={pick:{items:[],hi:-1,seq:0,timer:null},dest:{items:[],hi:-1,seq:0,timer:null},session:null};
+function acSession(){if(!acState.session)acState.session=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2));return acState.session;}
+function acBox(k){return $(k==='pick'?'rdPickSug':'rdDestSug');}
+function acHide(k){const b=acBox(k);if(b){b.classList.add('hidden');b.innerHTML='';}acState[k].items=[];acState[k].hi=-1;}
+function acInput(k){
+ const st=acState[k];clearTimeout(st.timer);
+ if(k==='pick')rdState.pickup=null;else rdState.dest=null;// typing invalidates prior selection
+ const v=$(k==='pick'?'rdPickA':'rdDestA').value.trim();
+ if(v.length<3)return acHide(k);
+ st.timer=setTimeout(()=>acFetch(k,v),300);
+}
+async function acFetch(k,v){
+ const st=acState[k],seq=++st.seq;
+ try{
+  const bias=rdState.pickup||RD_EMBU;
+  const r=await api('/api/maps/autocomplete',{method:'POST',body:JSON.stringify({input:v,session_token:acSession(),bias_lat:bias.lat,bias_lng:bias.lng})});
+  if(seq!==st.seq)return;// stale response — a newer query is in flight
+  st.items=r.suggestions||[];st.hi=-1;acRender(k,r.note);
+ }catch(e){if(seq===st.seq)acHide(k);}
+}
+function acRender(k,note){
+ const b=acBox(k);if(!b)return;
+ if(!acState[k].items.length)return acHide(k);
+ b.innerHTML=acState[k].items.map((s,i)=>`<div class="ac-item" role="option" data-i="${i}" onmousedown="acPick('${k}',${i})" style="padding:9px 12px;cursor:pointer;${i===acState[k].hi?'background:var(--line);':''}"><b style="font-size:13px">${esc(s.text)}</b>${s.secondary?`<br><small class="muted">${esc(s.secondary)}</small>`:''}</div>`).join('')
+  +(note?`<div style="padding:6px 12px;border-top:1px solid var(--line)"><small class="muted">${esc(note)}</small></div>`:'');
+ b.classList.remove('hidden');
+}
+function acKey(ev,k){
+ const st=acState[k];if(!st.items.length)return;
+ if(ev.key==='ArrowDown'){ev.preventDefault();st.hi=(st.hi+1)%st.items.length;acRender(k);}
+ else if(ev.key==='ArrowUp'){ev.preventDefault();st.hi=(st.hi-1+st.items.length)%st.items.length;acRender(k);}
+ else if(ev.key==='Enter'&&st.hi>=0){ev.preventDefault();acPick(k,st.hi);}
+ else if(ev.key==='Escape')acHide(k);
+}
+async function acPick(k,i){
+ const s=acState[k].items[i];if(!s)return;
+ $(k==='pick'?'rdPickA':'rdDestA').value=s.text;acHide(k);
+ try{
+  const r=await api('/api/maps/place-details',{method:'POST',body:JSON.stringify({place_id:s.place_id,session_token:acSession()})});
+  acState.session=null;// session token is consumed by the details call
+  const p=r.place,sel={lat:p.lat,lng:p.lng,place_id:p.place_id,address:p.formatted_address||s.text};
+  if(k==='pick'){rdState.pickup=sel;$('rdGpsNote').textContent='Pickup set: '+(p.formatted_address||s.text);}
+  else rdState.dest=sel;
+  rdMapPreview();
+ }catch(e){$('rdGpsNote').textContent='Could not load that place — try another suggestion.';}
+}
+// ── Booking map preview + rider live map (Google JS only with a web key) ──
+function rdDecodePolyline(str){
+ let idx=0,lat=0,lng=0;const pts=[];
+ while(idx<str.length){
+  for(const which of[0,1]){
+   let sh=0,result=0,b;
+   do{b=str.charCodeAt(idx++)-63;result|=(b&0x1f)<<sh;sh+=5;}while(b>=0x20);
+   const d=(result&1)?~(result>>1):(result>>1);
+   if(which===0)lat+=d;else lng+=d;
+  }
+  pts.push({lat:lat/1e5,lng:lng/1e5});
+ }
+ return pts;
+}
+const rdMapState={map:null,markers:[],line:null,liveMap:null,liveMarker:null,livePath:null};
+async function rdEnsureMap(divId,slot){
+ const key=rdState.cfg&&rdState.cfg.maps_browser_key;if(!key||!$(divId))return null;
+ try{await gmLoadScript(key);}catch(e){return null;}
+ if(!rdMapState[slot])rdMapState[slot]=new google.maps.Map($(divId),{center:rdState.cfg.map_center||RD_EMBU,zoom:14,mapTypeControl:false,streetViewControl:false,fullscreenControl:false});
+ return rdMapState[slot];
+}
+async function rdMapPreview(polyline){
+ const p=rdState.pickup,d=rdState.dest;
+ if(!p&&!d)return;
+ const map=await rdEnsureMap('rdMap','map');
+ if(!map){if($('rdMapNote')&&rdState.cfg&&rdState.cfg.mock_routing)$('rdMapNote').textContent=rdState.cfg.mock_routing_label||'';return;}
+ $('rdMapWrap').classList.remove('hidden');
+ rdMapState.markers.forEach(m=>m.setMap(null));rdMapState.markers=[];
+ if(rdMapState.line){rdMapState.line.setMap(null);rdMapState.line=null;}
+ const bounds=new google.maps.LatLngBounds();
+ for(const[pt,label]of[[p,'P'],[d,'D']])if(pt){rdMapState.markers.push(new google.maps.Marker({position:pt,map,label}));bounds.extend(pt);}
+ if(polyline){
+  const path=rdDecodePolyline(polyline);
+  rdMapState.line=new google.maps.Polyline({path,map,strokeColor:'#1a73e8',strokeWeight:4});
+  path.forEach(pt=>bounds.extend(pt));
+ }
+ if(!bounds.isEmpty())map.fitBounds(bounds,40);
+ if($('rdMapNote'))$('rdMapNote').textContent=rdState.cfg.mock_routing?(rdState.cfg.mock_routing_label||''):'';
+}
+function rdStalenessLabel(pos){
+ if(!pos)return{text:'Driver location unavailable',color:'var(--muted)'};
+ const age=(Date.now()-new Date(pos.updated_at).getTime())/1000;
+ if(age<15)return{text:'● Live',color:'var(--ok)'};
+ if(age<90)return{text:`Updated ${Math.round(age)}s ago`,color:'var(--hapa-warning)'};
+ return{text:'Driver location stale — reconnecting…',color:'var(--bad)'};
+}
+async function rdLiveMapUpdate(ride){
+ const wrap=$('rdLiveMapWrap');if(!wrap)return;
+ const show=['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(ride.status)&&rdState.cfg&&rdState.cfg.maps_browser_key;
+ wrap.classList.toggle('hidden',!show);
+ if(!show)return;
+ const map=await rdEnsureMap('rdLiveMap','liveMap');if(!map)return;
+ const pos=ride.driver_position;
+ if(pos&&pos.lat!=null){
+  const ll={lat:Number(pos.lat),lng:Number(pos.lng)};
+  if(!rdMapState.liveMarker)rdMapState.liveMarker=new google.maps.Marker({position:ll,map,title:'Your driver'});
+  else rdMapState.liveMarker.setPosition(ll);
+  map.panTo(ll);
+ }
+}
 
 async function ridesInit(){
  // Never replace rdRiderPanel.innerHTML: that would destroy rdBookCard /
@@ -3382,7 +3493,7 @@ async function ridesInit(){
  $('rdGuestNotice').classList.add('hidden');$('rdBookCard').classList.remove('hidden');
  try{rdState.cfg=await api('/api/rides/config');}catch(e){$('rdIntro').textContent=e.message;return;}
  if(!rdState.cfg.enabled){$('rdIntro').textContent='Ride-hailing is not switched on yet. Check back soon.';return;}
- if(rdState.cfg.mock_routing)$('rdGpsNote').textContent='Map routing runs in estimate mode during the pilot.';
+ if(rdState.cfg.mock_routing)$('rdGpsNote').textContent=rdState.cfg.mock_routing_label||'Development route estimate — Google Maps not configured';
  $('rdTabDriver').classList.toggle('hidden',!(me&&me.capabilities&&me.capabilities.driver===true));
  rdConnect();rdRefresh();rdLoadContacts();rdLoadHistory();
 }
@@ -3415,17 +3526,33 @@ async function rdConnect(){
  rdState.es=null;setTimeout(rdConnect,5000);
 }
 async function rdUseGps(){
- if(!navigator.geolocation){$('rdGpsNote').textContent='Location not available on this device.';return;}
- navigator.geolocation.getCurrentPosition(p=>{rdState.pickup={lat:p.coords.latitude,lng:p.coords.longitude};$('rdGpsNote').textContent='Pickup set from your location ✓';},()=>{$('rdGpsNote').textContent='Could not read location — using Embu town centre.';});
+ if(!navigator.geolocation){$('rdGpsNote').textContent='Location not available on this device — search for a place instead.';return;}
+ $('rdGpsNote').textContent='Getting your location…';
+ navigator.geolocation.getCurrentPosition(async p=>{
+  rdState.pickup={lat:p.coords.latitude,lng:p.coords.longitude};
+  $('rdGpsNote').textContent='Pickup set from your location ✓';
+  rdMapPreview();
+  try{
+   const r=await api('/api/maps/reverse-geocode',{method:'POST',body:JSON.stringify({lat:p.coords.latitude,lng:p.coords.longitude})});
+   if(r.formatted_address){$('rdPickA').value=r.formatted_address;rdState.pickup.address=r.formatted_address;}
+  }catch(e){}
+ },err=>{
+  $('rdGpsNote').textContent=err&&err.code===1?'Location permission denied — allow location access in your browser, or search for your pickup point.':'Could not read location — search for your pickup point instead.';
+ },{enableHighAccuracy:true,timeout:10000});
 }
 async function rdEstimate(){
  const pick=$('rdPickA').value.trim(),dest=$('rdDestA').value.trim();
  if(!pick||!dest)return alert('Enter pickup and destination');
- const p=rdState.pickup||RD_EMBU,d={lat:RD_EMBU.lat+0.03,lng:RD_EMBU.lng+0.01};
+ // Never quote against guessed coordinates: both points must come from
+ // autocomplete selection, GPS, or reverse geocoding.
+ if(!rdState.pickup)return alert('Pick your pickup point from the suggestions, or tap "Use my current location".');
+ if(!rdState.dest)return alert('Pick your destination from the suggestions list.');
+ const p=rdState.pickup,d=rdState.dest;
  $('rdEstBtn').disabled=true;
  try{
-  const r=await api('/api/rides/quote',{method:'POST',body:JSON.stringify({pickup_lat:p.lat,pickup_lng:p.lng,dest_lat:d.lat,dest_lng:d.lng,zone:'zone-embu-pilot',vehicle_category:(rdState.cfg.categories||[])[0]})});
+  const r=await api('/api/rides/quote',{method:'POST',body:JSON.stringify({pickup_lat:p.lat,pickup_lng:p.lng,dest_lat:d.lat,dest_lng:d.lng,pickup_place_id:p.place_id||null,dest_place_id:d.place_id||null,zone:'zone-embu-pilot',vehicle_category:(rdState.cfg.categories||[])[0]})});
   rdState.quote=r.quote;rdState.dest=d;
+  if(r.route&&r.route.polyline)rdMapPreview(r.route.polyline);
   const c=r.quote.components;
   $('rdQuoteBox').classList.remove('hidden');
   $('rdQuoteBox').innerHTML=`<div class="row"><span>Estimated fare</span><b style="font-size:20px">KES ${Number(r.quote.total).toLocaleString()}</b></div>
@@ -3438,7 +3565,8 @@ async function rdEstimate(){
 async function rdRequest(){
  if(!rdState.quote)return;
  try{
-  const p=rdState.pickup||RD_EMBU,d=rdState.dest;
+  const p=rdState.pickup,d=rdState.dest;
+  if(!p||!d)return alert('Pickup or destination missing — get a new estimate first.');
   const body={quote_id:rdState.quote.id,payment_method:$('rdPay').value,pickup_lat:p.lat,pickup_lng:p.lng,dest_lat:d.lat,dest_lng:d.lng,pickup_address:$('rdPickA').value.trim(),dest_address:$('rdDestA').value.trim(),pickup_note:$('rdNote').value.trim()};
   let r;
   try{r=await api('/api/rides',{method:'POST',body:JSON.stringify(body)});}
@@ -3490,7 +3618,10 @@ function rdRenderActive(ride){
   h+=`<div style="text-align:center;margin:10px 0;padding:10px;border:2px dashed var(--hapa-primary);border-radius:10px"><small class="muted">Show this PIN to your driver at pickup</small><div style="font-size:32px;font-weight:800;letter-spacing:8px">${esc(rdState.pin)}</div></div>`;
  if(ride.quote)h+=`<div class="row"><span>Fare (fixed)</span><b>KES ${Number(ride.final_fare||ride.quote.total).toLocaleString()}</b></div>`;
  if(ride.fare_difference_note)h+=`<small class="muted">${esc(ride.fare_difference_note)}</small>`;
- if(ride.driver_position)h+=`<small class="muted">Driver location updated ${new Date(ride.driver_position.updated_at).toLocaleTimeString()}</small>`;
+ if(['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(st)){
+  const lbl=rdStalenessLabel(ride.driver_position);
+  h+=`<small style="color:${lbl.color}">${esc(lbl.text)}</small>`;
+ }
  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">`;
  if(['searching','offered','driver_assigned','driver_en_route','driver_arrived'].includes(st))h+=`<button class="btn" onclick="rdCancel()">Cancel</button>`;
  if(['driver_assigned','driver_en_route','driver_arrived','pin_verified','in_progress'].includes(st))h+=`<button class="btn" onclick="rdShare()">Share trip</button><button class="btn" style="color:var(--bad)" onclick="rdEmergency()">Emergency</button>`;
@@ -3504,8 +3635,9 @@ function rdRenderActive(ride){
  // Persistent skeleton: only the status area is re-rendered on realtime
  // refreshes; the chat composer DOM element is never recreated while open,
  // so drafts, focus and caret survive location/status/poll updates.
- if(!$('rdStatusArea'))$('rdActiveBody').innerHTML='<div id="rdStatusArea"></div><div id="rdChatArea"></div>';
+ if(!$('rdStatusArea'))$('rdActiveBody').innerHTML='<div id="rdStatusArea"></div><div id="rdLiveMapWrap" class="hidden" style="margin-top:10px"><div id="rdLiveMap" style="height:220px;border-radius:12px;border:1px solid var(--line)"></div></div><div id="rdChatArea"></div>';
  $('rdStatusArea').innerHTML=h;
+ rdLiveMapUpdate(ride);
  if(CHAT_OPEN.includes(st))chatMount('rdChatArea',ride.id,'Message driver…');
  else chatUnmount('rdChatArea',RD_OPEN.includes(st)?null:ride.id);
 }
@@ -3740,7 +3872,7 @@ async function drvLoad(){
  try{
   const h=await api('/api/driver/hub');
   const s=h.session;
-  $('drvStatusBody').innerHTML=s?`<div class="row"><span><b style="color:var(--ok)">● Online</b> in ${esc(s.zone_name)}<br><small class="muted">${esc(`${s.make} ${s.model} · ${s.registration_number}`)} · ${h.hours.online_min} min online${h.hours.online_min>=h.hours.warn_after_min?' — <b style=\'color:var(--hapa-warning)\'>take a break soon</b>':''}</small></span><button class="btn" onclick="drvOffline()">Go offline</button></div>`
+  $('drvStatusBody').innerHTML=s?`<div class="row"><span><b style="color:var(--ok)">● Online</b> in ${esc(s.zone_name)}<br><small class="muted">${esc(`${s.make} ${s.model} · ${s.registration_number}`)} · ${h.hours.online_min} min online${h.hours.online_min>=h.hours.warn_after_min?' — <b style=\'color:var(--hapa-warning)\'>take a break soon</b>':''}</small><br><small style="color:var(--ok)">📡 Location sharing active — stops when you go offline</small></span><button class="btn" onclick="drvOffline()">Go offline</button></div>`
    :`<div class="row"><span class="muted">You are offline.</span><span></span></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><select id="drvVehSel"></select><button class="btn primary" onclick="drvOnline()">Go online in Embu</button></div>`;
   if(!s){const vs=await api('/api/me/vehicles');$('drvVehSel').innerHTML=vs.filter(v=>v.status==='approved').map(v=>`<option value="${v.id}">${esc(`${v.make} ${v.model} · ${v.registration_number}`)}</option>`).join('')||'<option value="">No approved vehicle yet</option>';}
@@ -3771,6 +3903,8 @@ async function drvLoad(){
    $('drvRideStatus').innerHTML=`<h3 style="margin-top:0">${esc(rdStatusCopy[st]||st)}</h3>
     <p style="margin:6px 0">${esc(r.pickup_address||'')} → ${esc(r.dest_address||'')}${r.pickup_note?`<br><small class="muted">Note: ${esc(r.pickup_note)}</small>`:''}</p>
     <div class="row"><span>Fare (fixed)</span><b>KES ${Number(r.final_fare||r.quote.total).toLocaleString()}</b></div>
+    ${['driver_assigned','driver_en_route'].includes(st)&&r.pickup_lat!=null?`<a class="btn" style="display:inline-block;margin-top:6px" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${Number(r.pickup_lat).toFixed(6)},${Number(r.pickup_lng).toFixed(6)}&travelmode=driving">🧭 Navigate to pickup</a>`:''}
+    ${['pin_verified','in_progress'].includes(st)&&r.dest_lat!=null?`<a class="btn" style="display:inline-block;margin-top:6px" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${Number(r.dest_lat).toFixed(6)},${Number(r.dest_lng).toFixed(6)}&travelmode=driving">🧭 Navigate to destination</a>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${st==='driver_arrived'?'':act}
      ${['driver_assigned','driver_en_route','driver_arrived','pin_verified'].includes(st)?`<button class="btn" onclick="drvCancel()">Cancel</button>`:''}</div>`;
    if(st==='driver_arrived'){if(!$('drvPinIn'))$('drvPinArea').innerHTML=`<div style="display:flex;gap:8px;margin-top:8px"><input id="drvPinIn" placeholder="Rider PIN" maxlength="4" inputmode="numeric" style="width:110px;font-size:20px;text-align:center"><button class="btn primary" onclick="drvVerifyPin()">Verify PIN</button></div>`;}
@@ -3797,17 +3931,37 @@ async function drvLoad(){
    const payout=r.payout_status?` · payout ${r.payout_status}`:'';
    return `<div class="row" style="padding:6px 0;gap:8px"><span>${esc(r.pickup_address||'Trip')} → ${esc(r.dest_address||'')}<br><small class="muted">${esc(bits)}${who?'<br>'+esc(who):''}${r.receipt_reference?`<br>Ref: ${esc(r.receipt_reference)}${esc(payout)}`:''}</small></span><span style="text-align:right">${hasEarn?`<b>${esc(kesFmt(r.net))}</b><br><small class="muted">fare ${esc(kesFmt(r.gross))} − fee ${esc(kesFmt(r.commission))}</small>`:r.final_fare!=null?`<b>${esc(kesFmt(r.final_fare))}</b>`:''}${paid?`<br><button class="btn" style="padding:6px 12px;min-height:44px;font-size:12px" onclick="rdReceipt('${esc(r.id)}',this)">Receipt</button>`:''}</span></div>`;
   }).join('')||'No trips yet.';
-  // Location heartbeat while online or on a ride
-  if((s||h.ride)&&!drvState.locTimer)drvState.locTimer=setInterval(drvSendLoc,8000);
-  if(!s&&!h.ride&&drvState.locTimer){clearInterval(drvState.locTimer);drvState.locTimer=null;}
+  // Adaptive location heartbeat: fast during an assigned/active ride, slow
+  // while idling online — intervals come from server config, not the client.
+  const iv=(h.ride?Number(rdState.cfg?.location_intervals?.active_s)||5:Number(rdState.cfg?.location_intervals?.idle_s)||30)*1000;
+  if((s||h.ride)&&drvState.locIv!==iv){clearInterval(drvState.locTimer);drvState.locTimer=setInterval(drvSendLoc,iv);drvState.locIv=iv;}
+  if(!s&&!h.ride&&drvState.locTimer){clearInterval(drvState.locTimer);drvState.locTimer=null;drvState.locIv=null;drvState.locBuf=[];}
   if((s||h.ride)&&!drvState.poll)drvState.poll=setInterval(()=>{if(!$('rdDriverPanel').classList.contains('hidden'))drvLoad();},5000);
  }catch(e){$('drvStatusBody').innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
 }
 function drvSendLoc(){
- drvState.seq++;localStorage.setItem('hapa_drv_seq',drvState.seq);
- const send=(lat,lng)=>api('/api/driver/location',{method:'POST',body:JSON.stringify({lat,lng,seq:drvState.seq})}).catch(()=>{});
- if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>send(p.coords.latitude,p.coords.longitude),()=>send(RD_EMBU.lat,RD_EMBU.lng),{maximumAge:5000,timeout:4000});
- else send(RD_EMBU.lat,RD_EMBU.lng);
+ // Bounded offline buffer: failed sends are queued (newest 20) and flushed
+ // in order on recovery so sequence numbers stay monotonic server-side.
+ if(!drvState.locBuf)drvState.locBuf=[];
+ const send=async sample=>{
+  try{await api('/api/driver/location',{method:'POST',body:JSON.stringify(sample)});}
+  catch(e){
+   if(e.status===422||e.status===429||e.status===409)return;// rejected sample: drop, never retry
+   drvState.locBuf.push(sample);if(drvState.locBuf.length>20)drvState.locBuf.shift();
+  }
+ };
+ const capture=async(lat,lng,c)=>{
+  // flush buffered samples first (in order), then the fresh one
+  const buf=drvState.locBuf;drvState.locBuf=[];
+  for(const b of buf)await send(b);
+  drvState.seq++;localStorage.setItem('hapa_drv_seq',drvState.seq);
+  await send({lat,lng,seq:drvState.seq,accuracy:c&&Number.isFinite(c.accuracy)?Math.round(c.accuracy):null,
+   heading:c&&Number.isFinite(c.heading)?Math.round(c.heading):null,speed:c&&Number.isFinite(c.speed)?Math.round(c.speed*10)/10:null,
+   recorded_at:new Date().toISOString()});
+ };
+ // No fabricated positions: if geolocation is unavailable or denied, skip
+ // this tick entirely — server-side staleness handling covers the gap.
+ if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>capture(p.coords.latitude,p.coords.longitude,p.coords),()=>{},{maximumAge:5000,timeout:4000});
 }
 async function drvOnline(){
  const veh=$('drvVehSel')?.value;
@@ -3826,7 +3980,7 @@ async function drvOnline(){
   drvSendLoc();drvLoad();
  }catch(e){alert(e.message);}
 }
-async function drvOffline(){try{await api('/api/driver/offline',{method:'POST'});clearInterval(drvState.locTimer);drvState.locTimer=null;drvLoad();}catch(e){alert(e.message);}}
+async function drvOffline(){try{await api('/api/driver/offline',{method:'POST'});clearInterval(drvState.locTimer);drvState.locTimer=null;drvState.locIv=null;drvState.locBuf=[];drvLoad();}catch(e){alert(e.message);}}
 async function drvOfferAct(id,act){try{await api('/api/offers/'+id+'/'+act,{method:'POST'});drvLoad();}catch(e){alert(e.message);drvLoad();}}
 async function drvStep(step){try{await api('/api/rides/'+drvState.rideId+'/'+step,{method:'POST'});drvLoad();}catch(e){alert(e.message);}}
 async function drvVerifyPin(){try{await api('/api/rides/'+drvState.rideId+'/verify-pin',{method:'POST',body:JSON.stringify({pin:$('drvPinIn').value.trim()})});drvLoad();}catch(e){alert(e.message);}}
@@ -3847,7 +4001,30 @@ async function loadOwnerTransport(){
    t.pending_documents.map(d=>`<div class="row" style="padding:4px 0"><span>📄 ${esc(d.driver_name)} · ${esc(d.doc_type.replace(/_/g,' '))}${d.expires_on?` · exp ${String(d.expires_on).slice(0,10)}`:''}</span><span><button class="btn" onclick="otDoc('${d.id}','approved')">Approve</button> <button class="btn" onclick="otDoc('${d.id}','rejected')">Reject</button></span></div>`).join(''))||'Nothing pending.';
   $('otIncidents').innerHTML=t.incidents.map(i=>`<div class="row" style="padding:4px 0"><span><b>${esc(i.kind)}</b> · ${esc(i.reporter_name)} · ${esc(i.description||'')}<br><small class="muted">${esc(nrbDate(i.created_at))} · ${esc(i.status)}</small></span>${i.status!=='resolved'?`<button class="btn" onclick="otIncident('${i.id}')">Resolve</button>`:''}</div>`).join('')||'No incidents.';
   otSearch(1);
+  otMapsHealth().catch(()=>{});
  }catch(e){$('otStats').innerHTML=`<p class="muted">${esc(e.message)}</p>`;}
+}
+// Maps configuration + live-location health. Shows booleans and health only —
+// key values never leave the server environment.
+async function otMapsHealth(){
+ try{
+  const[m,l]=await Promise.all([api('/api/owner/maps/status'),api('/api/owner/location/health')]);
+  const caps=Object.entries(m.capabilities||{}).map(([k,v])=>`<div class="row" style="padding:3px 0"><span>${esc(k)}<br><small class="muted">${v.calls} calls · ${v.errors} errors${v.last_error_category?` · last error: ${esc(v.last_error_category)}`:''}</small></span><b style="color:${v.last_ok_at&&(!v.last_error_at||v.last_ok_at>v.last_error_at)?'var(--ok)':'var(--hapa-warning)'}">${v.last_ok_at?'OK '+esc(nrbDate(v.last_ok_at)):(v.last_error_at?'ERROR':'—')}</b></div>`).join('')||'<small class="muted">No provider calls yet.</small>';
+  const deg=m.dispatch&&m.dispatch.degraded;
+  $('otMaps').innerHTML=`
+   <div class="row" style="padding:3px 0"><span>Routing provider</span><b style="color:${m.provider==='google'?'var(--ok)':'var(--hapa-warning)'}">${esc(m.provider)}${m.provider!=='google'?' (development estimates — clearly labelled)':''}</b></div>
+   <div class="row" style="padding:3px 0"><span>Browser (web) key</span><b style="color:${m.keys.web?'var(--ok)':'var(--bad)'}">${m.keys.web?'configured':'missing'}</b></div>
+   <div class="row" style="padding:3px 0"><span>Server routing key</span><b style="color:${m.keys.server?'var(--ok)':'var(--bad)'}">${m.keys.server?'configured':'missing'}</b></div>
+   <div class="row" style="padding:3px 0"><span>Dispatch ETA (route matrix)</span><b style="color:${deg?'var(--bad)':'var(--ok)'}">${deg?'DEGRADED — haversine fallback ('+esc(deg.category)+' at '+esc(nrbDate(deg.at))+')':'normal'}</b></div>
+   <div class="row" style="padding:3px 0"><span>Route snapshots</span><b>${m.route_snapshots.total} total · ${m.route_snapshots.last_24h} in 24h · ${m.route_snapshots.google} google / ${m.route_snapshots.mock} mock</b></div>
+   <div style="margin-top:8px"><b style="font-size:13px">Provider calls</b>${caps}</div>
+   <div style="margin-top:8px"><b style="font-size:13px">Live driver location</b>
+    <div class="row" style="padding:3px 0"><span>Drivers tracked</span><b>${l.presence.drivers_tracked} (${l.presence.fresh} fresh · ${l.presence.stale} stale)</b></div>
+    <div class="row" style="padding:3px 0"><span>Samples accepted / rejected</span><b>${l.ingest?l.ingest.accepted+' / '+l.ingest.rejected:'—'}</b></div>
+    ${l.ingest&&l.ingest.last_reject_reason?`<small class="muted">Last rejection: ${esc(l.ingest.last_reject_reason)} at ${esc(nrbDate(l.ingest.last_reject_at))}</small>`:''}
+    <div class="row" style="padding:3px 0"><span>Ride samples (last hour)</span><b>${l.ride_samples.last_hour} of ${l.ride_samples.total}</b></div>
+   </div>`;
+ }catch(e){$('otMaps').innerHTML=`<small class="muted">${esc(e.message)}</small>`;}
 }
 // Owner-facing status labels — canonical machine statuses stay in the DB.
 const opsStatusCopy={searching:'Searching for driver',offered:'Offer with driver',driver_assigned:'Driver assigned',driver_en_route:'Driver on the way',driver_arrived:'Driver arrived',pin_verified:'PIN verified',in_progress:'Trip in progress',completed:'Completed',payment_pending:'Payment pending',payment_failed:'Payment failed',closed:'Completed and closed',rider_cancelled:'Rider cancelled',driver_cancelled:'Driver cancelled',declined:'Declined',no_driver_available:'No driver available'};

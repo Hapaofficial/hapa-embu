@@ -46,7 +46,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>HAPA uses your location only when you choose "Use my current location" to set a transport pickup point. Your exact location is shared only with the driver you contact.</string>
+	<string>HAPA uses your location to set your pickup point and, if you drive with HAPA, to share your live position with your rider during an active trip. Location is used only while the app is open — never in the background — and precise ride locations are deleted automatically after the retention period.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>HAPA uses the camera only when you choose to take a photo for your profile, shop, portfolio or verification documents.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

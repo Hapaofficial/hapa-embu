@@ -1,5 +1,13 @@
 # Google Maps Integration
 
+> **Superseded:** the ride-hailing maps/GPS stage moved to a full provider
+> abstraction with server-authoritative routing. See
+> [`docs/maps-gps-setup.md`](../maps-gps-setup.md) for the current key matrix
+> (`GOOGLE_MAPS_WEB_KEY` + `GOOGLE_MAPS_SERVER_KEY`; the old
+> `GOOGLE_MAPS_BROWSER_KEY` remains a read fallback), endpoints, cost controls
+> and native key injection. This file documents the earlier driver-request
+> form integration, which still works unchanged.
+
 ## What is implemented
 
 The driver/Uber-style booking flow has full Google Maps support in the shared

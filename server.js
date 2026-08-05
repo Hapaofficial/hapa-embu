@@ -1112,6 +1112,7 @@ pm.registerRoutes(app);
 const moduleDeps={q,pool,auth,active,owner,docUpload,pm,audit,isVerifiedExpr,bcrypt,tok,safe,email,phone,strong,uploadLimiter,writeLimiter};
 require('./routes/geo')(app,moduleDeps);
 require('./routes/rides')(app,moduleDeps);
+require('./routes/maps')(app,moduleDeps);
 require('./routes/finance')(app,moduleDeps);
 require('./routes/account')(app,moduleDeps);
 require('./routes/merchant')(app,moduleDeps);
