@@ -1,0 +1,640 @@
+FINAL PRE-PRODUCTION FINANCE HARDENING — ALERTS, UNICODE PDF AND CROSS-MONTH SETTLEMENTS
+
+Continue from the CURRENT HEAD of:
+
+feature/professional-public-profile
+
+Current finance-stage baseline:
+- staging live
+- latest accepted finance commit: 6ea7a48
+- 654/654 tests passed
+- statement HAPA-STMT-DRV-2026-07-000001 reconciles correctly
+- existing rides, receipts, references and balances must remain unchanged
+
+Staging:
+https://hapa-embu-staging.onrender.com
+
+This task closes the three hardening items identified by the architect review:
+
+1. Alert when a Driver statement fails to balance.
+2. Make statement PDFs safe for Swahili, Kenyan names and Unicode.
+3. Guarantee correct accounting when rides and settlements fall in different calendar months.
+
+Do not expand product scope.
+Do not rebuild the finance system.
+Do not create new staging rides.
+Do not manually edit existing financial records.
+Do not touch main or production.
+
+==================================================
+1. SAFETY RULES
+==================================================
+
+- Work only on feature/professional-public-profile.
+- Never merge main.
+- Never deploy production.
+- Never access production database or production storage.
+- Use additive, idempotent migrations only.
+- Preserve all existing references, rides, receipts, statements and ledgers.
+- Never print or commit credentials, JWTs, signed URLs, private documents or exact GPS coordinates.
+- Use isolated synthetic local fixtures for all new scenarios.
+- Preserve the deterministic pnpm Render build.
+- Preserve Android/iOS projects.
+- Preserve all current Rider, Driver, Owner, finance, statement, settlement, Reserve and tip functionality.
+
+==================================================
+2. STATEMENT RECONCILIATION ALERTS
+==================================================
+
+Current behavior correctly refuses to generate an unbalanced statement.
+
+Now add a complete operational alert workflow.
+
+When statement reconciliation fails:
+
+- do not generate a misleading PDF or CSV
+- do not move the statement to Ready for review
+- do not finalize it
+- preserve the previous valid statement snapshot
+- create one deduplicated finance alert
+- create a structured log event
+- display the alert in Owner Dashboard → Finance/Transport
+- record:
+  - statement reference
+  - Driver reference
+  - statement period
+  - expected balance
+  - calculated balance
+  - difference in KES
+  - reconciliation stage
+  - created time
+  - current status
+  - correlation ID
+
+Do not include:
+- passwords
+- JWTs
+- private documents
+- raw payment credentials
+- exact coordinates
+
+Alert statuses:
+
+- Open
+- Acknowledged
+- Investigating
+- Resolved
+- Dismissed as false positive
+
+Owner actions must be audited:
+
+- acknowledge
+- add internal note
+- mark investigating
+- resolve
+- reopen
+
+Repeated generation attempts for the same unresolved imbalance must update the existing alert rather than create unlimited duplicates.
+
+When a later regeneration succeeds:
+
+- keep the historical alert
+- mark it resolved automatically or require an audited Owner resolution, according to a clear documented policy
+- link the successful statement regeneration event
+
+Prepare an external notification adapter for future email/Slack/SMS delivery.
+
+Do not claim an external alert was sent unless a real provider is configured.
+
+Use environment/configuration names only, such as:
+
+FINANCE_ALERTS_ENABLED
+FINANCE_ALERT_EMAIL
+FINANCE_ALERT_WEBHOOK_ENABLED
+
+No real secret values may be committed.
+
+==================================================
+3. OWNER FINANCE ALERT UI
+==================================================
+
+Add an Owner-only alert panel showing:
+
+- open reconciliation alerts
+- severity
+- Driver
+- statement month
+- difference
+- age
+- status
+- last attempt
+- Details action
+
+Alert details must show:
+
+- statement reference
+- Driver reference
+- accounting period
+- reconciliation equation
+- expected and actual values
+- difference
+- related regeneration attempts
+- audit timeline
+- safe internal notes
+
+Do not expose private Driver documents or payment credentials.
+
+Provide filters:
+
+- status
+- Driver
+- statement period
+- severity
+- date range
+
+==================================================
+4. UNICODE AND SWAHILI-SAFE PDF GENERATION
+==================================================
+
+The statement and ride-receipt PDF generators must safely support Kenyan names, routes and text.
+
+Required support:
+
+- normal English
+- Swahili words
+- Latin Extended characters
+- apostrophes and curly quotes
+- en dash / em dash
+- accented names
+- long Kenyan place names
+- long vehicle descriptions
+
+Test examples may include synthetic values such as:
+
+- Mũthatari
+- Kĩrĩnyaga
+- Njukĩrĩ
+- “Mtaa wa Soko”
+- “Kituo cha mabasi — Embu”
+- O’Connor
+- long service-zone and route names
+
+Do not allow:
+
+- blank text
+- missing glyphs for supported Latin/Swahili content
+- broken PDF structure
+- overlapping text
+- clipped names
+- layout overflow
+- unreadable fallback boxes where a supported glyph should exist
+
+Use a properly licensed Unicode-capable font or PDF rendering solution.
+
+Requirements:
+
+- include the applicable font/software licence where required
+- embed or subset fonts correctly
+- keep PDF file sizes reasonable
+- do not rely on fonts installed only on the developer machine
+- produce deterministic output on Render
+
+Emoji handling:
+
+- the PDF must never crash
+- unsupported emoji may be removed or replaced with a deterministic safe placeholder
+- normal Kenyan/Swahili text must remain intact
+- document the behavior clearly
+
+Preserve:
+
+- A4 layout
+- readable 100% zoom
+- repeating page headers
+- page numbers
+- correct money formatting
+- current statement reference
+- no overlapping bounding boxes
+- no out-of-page content
+
+Apply the same Unicode-safety principles to:
+
+- monthly Driver statement PDF
+- ride receipt PDF
+- any accounting PDF export
+
+==================================================
+5. CROSS-MONTH ACCOUNTING RULES
+==================================================
+
+Implement and prove correct month-boundary behavior.
+
+Core rule:
+
+- ride revenue, commission, Driver earnings and tips accrue in the month of the underlying ride/payment event
+- settlements and payouts occur in the month they are completed
+- finalized prior statements must never be rewritten because a later settlement occurred
+
+Required example:
+
+July:
+
+- two cash rides
+- Driver owes HAPA: KES 103.84
+- no settlement in July
+
+July closing:
+
+- Driver owes HAPA: KES 103.84
+- HAPA owes Driver: KES 0.00
+- Reserve: KES 0.00
+
+August opening:
+
+- Driver owes HAPA: KES 103.84
+- HAPA owes Driver: KES 0.00
+- Reserve: KES 0.00
+
+If the Driver pays HAPA KES 50.00 in August:
+
+August movements:
+
+- Driver-to-HAPA settlement: KES 50.00
+
+August closing:
+
+- Driver owes HAPA: KES 53.84
+
+The July finalized statement must remain unchanged.
+
+If the remaining KES 53.84 is paid later:
+
+- the settlement appears in the later month
+- Driver owes HAPA becomes KES 0.00
+- no previous finalized statement is edited
+
+Apply equivalent rules to:
+
+- HAPA-to-Driver payouts
+- partial settlements
+- full settlements
+- Reserve offsets
+- settlement reversals
+- refunds
+- adjustments
+- M-Pesa payables
+- tips
+- credit notes
+- debit notes
+
+==================================================
+6. PERIOD AND TIMEZONE RULES
+==================================================
+
+Use Africa/Nairobi consistently.
+
+Statement month boundaries must be calendar boundaries in Africa/Nairobi.
+
+Do not classify a transaction into the wrong month because of UTC conversion.
+
+Store absolute timestamps appropriately, but determine accounting periods using Nairobi operational time.
+
+Test boundary examples:
+
+- 31 July 23:59:59 EAT
+- 1 August 00:00:00 EAT
+- UTC timestamps that map to a different Nairobi calendar day
+- leap year February
+- year boundary December → January
+
+==================================================
+7. FINALIZED STATEMENT IMMUTABILITY
+==================================================
+
+Finalized statements must remain immutable.
+
+A later settlement may affect:
+
+- the next month’s opening balance
+- the next month’s settlement activity
+- the next month’s closing balance
+
+It must not change:
+
+- previous finalized statement line items
+- previous finalized closing balances
+- previous PDF
+- previous CSV
+- previous statement reference
+
+Late corrections require:
+
+- adjustment
+- credit note
+- debit note
+
+Every correction must have:
+
+- unique HAPA reference
+- related original transaction
+- reason
+- actor
+- timestamp
+- audit history
+
+==================================================
+8. REGENERATION AND IDEMPOTENCY
+==================================================
+
+Open and Ready-for-review statements may be regenerated.
+
+Regeneration must:
+
+- reuse the same statement reference
+- include each eligible transaction exactly once
+- update calculated draft lines
+- update reconciliation metadata
+- not duplicate settlements
+- not duplicate tips
+- not duplicate Reserve entries
+- not duplicate alerts
+- remain safe after server restart
+- remain safe under concurrent requests
+
+Use database-level protections where appropriate.
+
+==================================================
+9. REPORTING CONSISTENCY
+==================================================
+
+The following must agree:
+
+- Owner Driver finance modal
+- Driver earnings report
+- platform finance summary
+- statement API
+- statement PDF
+- statement CSV
+- settlement register
+- Reserve ledger
+- finance alert reconciliation values
+
+For cross-month activity, reports must clearly separate:
+
+- accrued this period
+- settled this period
+- opening balance
+- closing balance
+
+Never mix an old ride accrual with a later settlement as if both occurred in the same month.
+
+==================================================
+10. REQUIRED TESTS — RECONCILIATION ALERTS
+==================================================
+
+Test:
+
+- an intentionally unbalanced synthetic statement fails safely
+- no misleading PDF generated
+- no misleading CSV generated
+- statement status does not advance
+- one alert is created
+- repeated attempts deduplicate
+- alert contains correct difference
+- alert contains no secrets
+- Owner can acknowledge
+- Owner can resolve
+- non-Owner access blocked
+- successful later regeneration links to/resolves the alert
+- audit history recorded
+- external notification is not falsely reported without provider configuration
+
+==================================================
+11. REQUIRED TESTS — UNICODE PDF
+==================================================
+
+Generate statement and receipt PDFs with:
+
+- Swahili text
+- Latin Extended Kenyan names
+- long place names
+- apostrophes
+- en/em dashes
+- accented characters
+- unsupported emoji
+
+Verify:
+
+- PDF opens
+- required supported text extracts correctly
+- no rendering crash
+- no overlapping bounding boxes
+- no out-of-bounds text
+- no clipping
+- page breaks remain correct
+- money values remain readable
+- statement balances remain correct
+- output works in a clean environment without system fonts
+- font/software licence requirements are satisfied
+
+Render the PDF to images or use an equivalent visual check.
+
+==================================================
+12. REQUIRED TESTS — CROSS-MONTH SETTLEMENTS
+==================================================
+
+Test at minimum:
+
+A. July cash accrual, August partial settlement:
+
+- July closing Driver owes HAPA 103.84
+- August opening 103.84
+- August settlement 50.00
+- August closing 53.84
+- July finalized statement unchanged
+
+B. Later full settlement:
+
+- later period settles 53.84
+- closing balance zero
+- no double settlement
+
+C. HAPA-to-Driver payable:
+
+- July M-Pesa ride creates payable
+- August payout reduces payable
+- July statement unchanged
+
+D. Reserve:
+
+- July commission receivable
+- August Reserve offset
+- correct August movement
+- previous finalized statement unchanged
+
+E. Reversal:
+
+- settlement reversed in later month
+- outstanding balance restored in reversal month
+- previous finalized statements unchanged
+
+F. Boundary timestamps:
+
+- Nairobi month classification correct
+- UTC conversion does not move transaction to wrong period
+
+G. Concurrent generation:
+
+- no duplicate statements
+- no duplicate lines
+- no duplicate alerts
+- one statement per Driver/month
+
+==================================================
+13. FULL REGRESSION
+==================================================
+
+Run the complete existing HAPA suite.
+
+Confirm no regression in:
+
+- Rider history
+- Driver history
+- Owner ride details
+- ride receipts
+- monthly statements
+- cash accounting
+- M-Pesa accounting
+- tips
+- Commission Reserve
+- settlement reversal
+- PDF downloads
+- CSV exports
+- dispatch
+- PIN
+- chat
+- Google Maps feature boundaries
+- PWA
+- Android/iOS projects
+- deterministic Render build
+
+==================================================
+14. STAGING ACCEPTANCE
+==================================================
+
+After local tests pass:
+
+- push only feature/professional-public-profile
+- allow staging to auto-deploy
+- verify deployed SHA and health
+
+Do not create a new staging ride.
+
+Use existing staging finance data read-only for normal verification.
+
+For cross-month and imbalance scenarios, use isolated synthetic test data that is cleaned afterward and excluded from normal Owner reports.
+
+Verify on staging:
+
+- existing July statement still has reference HAPA-STMT-DRV-2026-07-000001
+- closing Driver owes HAPA remains KES 103.84
+- existing PDF remains readable
+- Unicode synthetic statement PDF renders correctly
+- finance alert appears for an intentionally isolated unbalanced fixture
+- alert disappears/resolves according to policy after corrected regeneration
+- cross-month synthetic statements reconcile
+- no test artifacts remain in normal reports
+- no existing completed rides are modified
+
+==================================================
+15. GIT
+==================================================
+
+Before committing:
+
+- inspect full diff
+- remove debug output
+- remove generated PDFs/images/CSVs
+- remove synthetic fixtures
+- confirm no credentials
+- confirm no private documents
+- confirm no exact coordinates
+- confirm no test alerts remain in production-facing staging data
+- preserve existing statement and receipt references
+- preserve deterministic build
+
+Commit:
+
+fix: harden finance statements for production
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge main.
+Do not deploy production.
+
+==================================================
+16. FINAL RESPONSE
+==================================================
+
+STATUS:
+- PRE-PRODUCTION FINANCE HARDENING COMPLETE
+or
+- BLOCKED — HARDENING ACCEPTANCE FAILED
+
+ALERTS:
+- failure detection
+- deduplication
+- Owner UI
+- audit
+- external notifier status
+
+UNICODE PDF:
+- rendering solution
+- supported text result
+- emoji fallback
+- visual result
+- licence result
+
+CROSS-MONTH:
+- July closing
+- August opening
+- partial settlement
+- later settlement
+- reversal
+- finalized-statement immutability
+
+TESTS:
+- passed
+- failed
+- finance
+- PDF
+- alerts
+- month boundaries
+- regression
+
+STAGING:
+- deployed SHA
+- health
+- existing July statement result
+- isolated alert result
+- cross-month result
+- cleanup result
+
+GIT:
+- commit SHA
+- push result
+- branch
+- main untouched
+- production untouched
+
+DATA SAFETY:
+- existing rides unchanged
+- existing references unchanged
+- no secrets committed
+- no synthetic artifacts left behind
+
+Do not return another plan.
+
+Implement, test, deploy staging and verify the complete hardening now.
