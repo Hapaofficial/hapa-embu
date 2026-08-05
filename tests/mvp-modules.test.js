@@ -65,6 +65,8 @@ async function makeUser(ownerTok, label, capType, details) {
   ok('nosniff header', hr.headers.get('x-content-type-options') === 'nosniff');
   ok('frame-options header', hr.headers.get('x-frame-options') === 'DENY');
   ok('CSP header present', (hr.headers.get('content-security-policy') || '').includes("default-src 'self'"));
+  const permissionsPolicy = hr.headers.get('permissions-policy') || '';
+  ok('first-party GPS allowed by Permissions-Policy', permissionsPolicy.includes('geolocation=(self)') && !permissionsPolicy.includes('geolocation=()'), permissionsPolicy);
 
   // ── synthetic users ──
   const cust = await makeUser(ownerTok, 'customer', null);

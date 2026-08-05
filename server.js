@@ -32,12 +32,14 @@ app.use((req,res,next)=>{
  next();
 });
 // ── Security headers (CSP allows the inline-script SPA; no external origins
-// except https images/signed-URL fetches) ─────────────────────────────────────
+// except Maps, fonts and https images/signed-URL fetches). First-party
+// geolocation is required for rider pickup and live Driver GPS; embedded
+// third-party frames remain unable to request it. ─────────────────────────────
 app.use((req,res,next)=>{
  res.setHeader('X-Content-Type-Options','nosniff');
  res.setHeader('X-Frame-Options','DENY');
  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
- res.setHeader('Permissions-Policy','geolocation=(), microphone=(), payment=()');
+ res.setHeader('Permissions-Policy','geolocation=(self), microphone=(), payment=()');
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
  if(process.env.NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
  next();
