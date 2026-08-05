@@ -1,0 +1,107 @@
+CONTINUE HAPA DEVELOPMENT — FIX GOOGLE MAPS WEB KEY CONFIGURATION CONSISTENCY
+
+Repository: Hapaofficial/hapa-embu
+Required branch: feature/professional-public-profile
+Expected current HEAD: 6c2d8e6defa715d9cdf9e2f3c0b2f4b89d14d641
+
+Before changing anything:
+
+1. Fetch the remote branch.
+2. Confirm that `feature/professional-public-profile` is currently at commit `6c2d8e6`.
+3. Confirm the working tree is clean.
+4. If the remote HEAD is different, STOP and report the difference. Do not overwrite or discard anything.
+
+STRICT SAFETY RULES
+
+* Do not touch `main`.
+* Do not merge into `main`.
+* Do not use force push.
+* Do not deploy or modify production.
+* Do not access production databases, storage or secrets.
+* Work only on `feature/professional-public-profile`.
+* Do not configure or invent Google credentials.
+* Do not make unrelated design or application changes.
+
+CONFIRMED DEFECT
+
+HAPA currently has inconsistent Google Maps browser-key handling:
+
+* `lib/maps.js` correctly prefers `GOOGLE_MAPS_WEB_KEY` and supports legacy `GOOGLE_MAPS_BROWSER_KEY`.
+* `/api/rides/config` correctly uses `maps.publicWebKey()`.
+* The older driver/service map picker in `public/index.html` still calls `/api/public/config` and expects `mapsBrowserKey`.
+* `/api/public/config` in `routes/account.js` reads only `process.env.GOOGLE_MAPS_BROWSER_KEY`.
+* Some documentation still instructs the Owner to use only the legacy key.
+
+Therefore, configuring the preferred `GOOGLE_MAPS_WEB_KEY` may leave the older map picker disabled even though the new Maps system recognizes the key.
+
+REQUIRED IMPLEMENTATION
+
+1. Make `/api/public/config` use the same centralized Maps source of truth as the rest of HAPA.
+2. Preserve the existing public response field `mapsBrowserKey` so the current frontend remains compatible.
+3. Preferred key order must be:
+
+   * `GOOGLE_MAPS_WEB_KEY`
+   * legacy fallback: `GOOGLE_MAPS_BROWSER_KEY`
+   * otherwise `null`
+4. Never expose `GOOGLE_MAPS_SERVER_KEY`.
+5. Never print or log any key.
+6. Keep the browser key public-by-design and protected through Google HTTP-referrer restrictions.
+7. Update relevant comments and documentation so `GOOGLE_MAPS_WEB_KEY` is the preferred name and `GOOGLE_MAPS_BROWSER_KEY` is clearly marked as a legacy fallback.
+8. Update at least:
+
+   * `routes/account.js`
+   * relevant comment in `public/index.html`
+   * `docs/store/ACCOUNT_AND_CREDENTIAL_BLOCKERS.md`
+   * `docs/mobile/GOOGLE_MAPS.md`
+9. Do not replace or redesign the newer server-proxied ride autocomplete flow.
+
+TEST REQUIREMENTS
+
+Add regression coverage proving:
+
+* `GOOGLE_MAPS_WEB_KEY` is returned as `mapsBrowserKey`.
+* The legacy `GOOGLE_MAPS_BROWSER_KEY` still works when the new key is absent.
+* The new key takes precedence when both exist.
+* No configured web key returns `null`.
+* `GOOGLE_MAPS_SERVER_KEY` is never returned.
+* The public response contains no unrelated secrets.
+
+Run:
+
+* all relevant Google Maps tests;
+* all frontend/static regression tests that do not require PostgreSQL;
+* JavaScript syntax validation;
+* the Render build command;
+* any available integration tests on an isolated local/test database only.
+
+If PostgreSQL or required test credentials are unavailable, report that honestly. Do not run destructive tests against staging or production.
+
+PUBLICATION
+
+After the implementation and tests are clean:
+
+1. Review the complete diff for unrelated changes.
+2. Create one focused commit.
+3. Push normally to `feature/professional-public-profile`.
+4. Do not force push.
+5. Wait for the Render staging deployment.
+6. Verify staging health and `/api/public/config`.
+7. Do not claim real Google Maps is active unless real staging keys are actually configured and verified.
+
+FINAL REPORT FORMAT
+
+STATUS
+CURRENT HEAD BEFORE WORK
+FILES CHANGED
+EXACT FIX
+TEST RESULTS
+BUILD RESULT
+COMMIT
+PUSH
+STAGING DEPLOYMENT
+STAGING VERIFICATION
+GOOGLE MAPS CREDENTIAL STATUS
+BLOCKERS
+MAIN/PRODUCTION CONFIRMATION
+
+Do not stop after editing. Complete testing, commit, push and staging verification unless a real blocker prevents it.
