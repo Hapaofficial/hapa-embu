@@ -2825,6 +2825,8 @@ function gmLoadScript(key){
 async function gmInit(){
  gmState={pickup:null,destination:null,distance:null,duration:null,mode:'pickup'};gmMarkers={};
  const cfg=await gmConfig();
+ // mapsBrowserKey comes from /api/public/config via lib/maps.publicWebKey():
+ // GOOGLE_MAPS_WEB_KEY preferred, legacy GOOGLE_MAPS_BROWSER_KEY fallback.
  if(!cfg.mapsBrowserKey||!$('gmapWrap'))return; // manual entry fallback stays visible
  try{
   await gmLoadScript(cfg.mapsBrowserKey);

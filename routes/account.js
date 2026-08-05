@@ -115,11 +115,13 @@ module.exports=function(app,deps){
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
 
- // Public runtime configuration for the frontend. The Google Maps browser key
- // is designed to be referrer-restricted and embedded in pages; absent = maps
- // UI falls back to manual location entry.
+ // Public runtime configuration for the frontend. The Google Maps web key is
+ // referrer-restricted and public-by-design; absent = maps UI falls back to
+ // manual location entry. Single source of truth: lib/maps.publicWebKey()
+ // (prefers GOOGLE_MAPS_WEB_KEY, legacy fallback GOOGLE_MAPS_BROWSER_KEY,
+ // else null). The server routing key is never exposed here or anywhere.
  app.get('/api/public/config',(req,res)=>{
-  res.json({mapsBrowserKey:process.env.GOOGLE_MAPS_BROWSER_KEY||null});
+  res.json({mapsBrowserKey:require('../lib/maps').publicWebKey()});
  });
 
  // ── Deep-link association files. Served only when the deployment provides

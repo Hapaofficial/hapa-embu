@@ -5,7 +5,7 @@ the Owner. Each item lists exactly what unblocks.
 
 | # | Item | Unblocks | Notes |
 |---|---|---|---|
-| 1 | Google Cloud project + billing, `GOOGLE_MAPS_BROWSER_KEY` per environment | Live map pickup/destination UI (code is complete; manual entry works today) | Referrer-restrict each key |
+| 1 | Google Cloud project + billing, `GOOGLE_MAPS_WEB_KEY` per environment (legacy name `GOOGLE_MAPS_BROWSER_KEY` still accepted as a fallback) | Live map pickup/destination UI (code is complete; manual entry works today) | Referrer-restrict each key. Server routing additionally needs `GOOGLE_MAPS_SERVER_KEY` — see `docs/maps-gps-setup.md` |
 | 2 | Firebase project (FCM) + APNs key | Push notification delivery (token lifecycle already live) | google-services.json / GoogleService-Info.plist never committed |
 | 3 | Transactional email provider (e.g. env-configured SMTP/API) | Password recovery emails (UI currently shows a truthful unavailable message) | |
 | 4 | Apple Developer Program account | TestFlight, App Store submission, Universal Links | Requires Mac + Xcode for archive |

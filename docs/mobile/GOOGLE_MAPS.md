@@ -43,7 +43,7 @@ frontend (used identically by website, PWA, Android and iOS shells):
 
 | Env var | Where | Notes |
 |---|---|---|
-| `GOOGLE_MAPS_BROWSER_KEY` | website staging / website production (separate keys) | Maps JavaScript API + Places API + Directions (JS). Restrict by HTTP referrer to the exact domain. Served to the page via `/api/public/config`. |
+| `GOOGLE_MAPS_WEB_KEY` (preferred; legacy fallback: `GOOGLE_MAPS_BROWSER_KEY`) | website staging / website production (separate keys) | Maps JavaScript API + Places API + Directions (JS). Restrict by HTTP referrer to the exact domain. Served to the page as `mapsBrowserKey` via `/api/public/config`, resolved through the central `lib/maps.publicWebKey()`. |
 
 Because the native apps load the website remotely, the same referrer-restricted
 browser key covers Android and iOS WebViews. If the apps are later migrated to
@@ -56,7 +56,8 @@ iOS-restricted (bundle ID) keys.
    **Places API** → attach billing.
 2. Create one API key per environment; apply referrer restrictions
    (`https://hapa-embu-staging.onrender.com/*`, production domain).
-3. Set `GOOGLE_MAPS_BROWSER_KEY` in the Render environment for each service.
+3. Set `GOOGLE_MAPS_WEB_KEY` in the Render environment for each service
+   (the legacy `GOOGLE_MAPS_BROWSER_KEY` name still works as a fallback).
 
 ## Current credential status
 
