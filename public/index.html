@@ -3381,15 +3381,21 @@ const acState={pick:{items:[],hi:-1,seq:0,timer:null},dest:{items:[],hi:-1,seq:0
 function acSession(){if(!acState.session)acState.session=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2));return acState.session;}
 function acBox(k){return $(k==='pick'?'rdPickSug':'rdDestSug');}
 function acHide(k){const b=acBox(k);if(b){b.classList.add('hidden');b.innerHTML='';}acState[k].items=[];acState[k].hi=-1;}
+function rdInvalidateQuote(){
+ rdState.quote=null;
+ const b=$('rdQuoteBox');if(b){b.classList.add('hidden');b.innerHTML='';}
+}
 function acInput(k){
  const st=acState[k];clearTimeout(st.timer);
+ const seq=++st.seq;// invalidate in-flight search/details immediately on every edit
  if(k==='pick')rdState.pickup=null;else rdState.dest=null;// typing invalidates prior selection
+ rdInvalidateQuote();
  const v=$(k==='pick'?'rdPickA':'rdDestA').value.trim();
  if(v.length<3)return acHide(k);
- st.timer=setTimeout(()=>acFetch(k,v),300);
+ st.timer=setTimeout(()=>acFetch(k,v,seq),300);
 }
-async function acFetch(k,v){
- const st=acState[k],seq=++st.seq;
+async function acFetch(k,v,seq){
+ const st=acState[k];if(seq==null)seq=++st.seq;
  try{
   const bias=rdState.pickup||RD_EMBU;
   const r=await api('/api/maps/autocomplete',{method:'POST',body:JSON.stringify({input:v,session_token:acSession(),bias_lat:bias.lat,bias_lng:bias.lng})});
@@ -3412,16 +3418,20 @@ function acKey(ev,k){
  else if(ev.key==='Escape')acHide(k);
 }
 async function acPick(k,i){
- const s=acState[k].items[i];if(!s)return;
- $(k==='pick'?'rdPickA':'rdDestA').value=s.text;acHide(k);
+ const st=acState[k],s=st.items[i];if(!s)return;
+ const input=$(k==='pick'?'rdPickA':'rdDestA'),expected=s.text,seq=++st.seq,session=acSession();
+ clearTimeout(st.timer);input.value=expected;acHide(k);rdInvalidateQuote();
  try{
-  const r=await api('/api/maps/place-details',{method:'POST',body:JSON.stringify({place_id:s.place_id,session_token:acSession()})});
-  acState.session=null;// session token is consumed by the details call
+  const r=await api('/api/maps/place-details',{method:'POST',body:JSON.stringify({place_id:s.place_id,session_token:session})});
+  if(acState.session===session)acState.session=null;// consumed by the details call
+  // A user may type a new address while place details are still in flight.
+  // Never bind old coordinates to the new visible text.
+  if(seq!==st.seq||input.value!==expected)return;
   const p=r.place,sel={lat:p.lat,lng:p.lng,place_id:p.place_id,address:p.formatted_address||s.text};
   if(k==='pick'){rdState.pickup=sel;$('rdGpsNote').textContent='Pickup set: '+(p.formatted_address||s.text);}
   else rdState.dest=sel;
   rdMapPreview();
- }catch(e){$('rdGpsNote').textContent='Could not load that place — try another suggestion.';}
+ }catch(e){if(seq===st.seq)$('rdGpsNote').textContent='Could not load that place — try another suggestion.';}
 }
 // ── Booking map preview + rider live map (Google JS only with a web key) ──
 function rdDecodePolyline(str){
@@ -3527,16 +3537,23 @@ async function rdConnect(){
 }
 async function rdUseGps(){
  if(!navigator.geolocation){$('rdGpsNote').textContent='Location not available on this device — search for a place instead.';return;}
+ const st=acState.pick,seq=++st.seq;clearTimeout(st.timer);acHide('pick');rdInvalidateQuote();
  $('rdGpsNote').textContent='Getting your location…';
  navigator.geolocation.getCurrentPosition(async p=>{
-  rdState.pickup={lat:p.coords.latitude,lng:p.coords.longitude};
+  if(seq!==st.seq)return;// the rider typed or requested GPS again while waiting
+  const lat=p.coords.latitude,lng=p.coords.longitude;
+  rdState.pickup={lat,lng};
+  // Keep booking usable if reverse geocoding is unavailable: the private
+  // coordinate label is replaced with a street address when lookup succeeds.
+  $('rdPickA').value=lat.toFixed(5)+', '+lng.toFixed(5);
   $('rdGpsNote').textContent='Pickup set from your location ✓';
   rdMapPreview();
   try{
-   const r=await api('/api/maps/reverse-geocode',{method:'POST',body:JSON.stringify({lat:p.coords.latitude,lng:p.coords.longitude})});
-   if(r.formatted_address){$('rdPickA').value=r.formatted_address;rdState.pickup.address=r.formatted_address;}
+   const r=await api('/api/maps/reverse-geocode',{method:'POST',body:JSON.stringify({lat,lng})});
+   if(seq===st.seq&&r.formatted_address){$('rdPickA').value=r.formatted_address;rdState.pickup.address=r.formatted_address;}
   }catch(e){}
  },err=>{
+  if(seq!==st.seq)return;
   $('rdGpsNote').textContent=err&&err.code===1?'Location permission denied — allow location access in your browser, or search for your pickup point.':'Could not read location — search for your pickup point instead.';
  },{enableHighAccuracy:true,timeout:10000});
 }

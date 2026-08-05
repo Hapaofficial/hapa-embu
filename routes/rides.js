@@ -60,7 +60,10 @@ module.exports=function(app,deps){
  const ownerSubs=new Set();
  function push(userId,ev){const s=subs.get(String(userId));if(s)for(const r of s){try{r.write(`data: ${JSON.stringify(ev)}\n\n`)}catch(e){}}}
  function pushOwner(ev){for(const r of ownerSubs){try{r.write(`data: ${JSON.stringify(ev)}\n\n`)}catch(e){}}}
- app.get('/api/rides/stream',(req,res,next)=>{if(req.query.token&&!req.headers.authorization)req.headers.authorization='Bearer '+String(req.query.token);next();},auth,active,(req,res)=>{
+ // Authorization is header-only. Bearer tokens in query strings leak into
+ // browser history, proxy/access logs and copied URLs; the web/native client
+ // uses fetch streaming specifically so it can send the normal auth header.
+ app.get('/api/rides/stream',auth,active,(req,res)=>{
   res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache',Connection:'keep-alive','X-Accel-Buffering':'no'});
   res.write(`data: ${JSON.stringify({type:'connected',ts:Date.now()})}\n\n`);
   const uid=String(req.user.id);
