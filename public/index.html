@@ -809,6 +809,17 @@ h1,h2,h3,h4{color:var(--hapa-text)}
   <div id="otStatements" class="muted" style="font-size:13px">—</div>
   <small class="muted">Driver earnings statements — not tax invoices. Months use Africa/Nairobi bounds; finalized statements are immutable.</small>
  </div>
+ <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Finance alerts</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;font-size:12px">
+   <select id="faStatus"><option value="">All statuses</option><option value="open">Open</option><option value="acknowledged">Acknowledged</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option><option value="dismissed">Dismissed</option></select>
+   <select id="faSeverity"><option value="">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select>
+   <input id="faYear" type="number" placeholder="Year" style="width:80px"><input id="faMonth" type="number" min="1" max="12" placeholder="Month" style="width:70px">
+   <label>From <input id="faFrom" type="date"></label><label>To <input id="faTo" type="date"></label>
+   <button class="btn primary" onclick="otFinAlerts()">Load alerts</button>
+  </div>
+  <div id="otFinAlerts" class="muted" style="font-size:13px">—</div>
+  <small class="muted">Raised when a statement fails reconciliation. A successful regeneration for the same driver and month auto-resolves the alert; history is kept.</small>
+ </div>
 </div>
 
 <div id="ownerAreasPanel" class="hidden" style="margin-top:14px">
@@ -892,7 +903,7 @@ function mpImgError(img){img.onerror=null;img.src=PH_IMG;}
 function mpSafeImg(src){const s=String(src||'');return(s.length>8&&s!=='null'&&s!=='undefined')?s:PH_IMG;}
 
 // ── State ────────────────────────────────────────────────────────────────────
-const HAPA_SHELL='1.9.8';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
+const HAPA_SHELL='1.9.9';console.log('HAPA shell',HAPA_SHELL);// version marker for live diagnosis of stale-shell reports
 let token=localStorage.getItem('hapa_token'),me=null,verifyChannel=null,resetIdentifier='';
 // ── Native (Capacitor) bridge: Keystore/Keychain-backed token storage when the
 // SecureStoragePlugin is present. On native builds the token is mirrored to
@@ -4063,6 +4074,56 @@ async function finDownload(url,name){
   const blob=await r.blob(),u=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
  }catch(e){alert(e.message);}
+}
+async function otFinAlerts(){
+ const qs=[['status',$('faStatus').value],['severity',$('faSeverity').value],['year',$('faYear').value],['month',$('faMonth').value],['from',$('faFrom').value],['to',$('faTo').value]]
+  .filter(([,v])=>v).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+ $('otFinAlerts').textContent='Loading…';
+ try{
+  const d=await api('/api/owner/finance/alerts'+(qs?'?'+qs:''));
+  const age=s=>{s=Number(s||0);return s<3600?Math.round(s/60)+'m':s<86400?Math.round(s/3600)+'h':Math.round(s/86400)+'d'};
+  $('otFinAlerts').innerHTML=(d.alerts.length?d.alerts.map(a=>{
+   const diff=a.detail&&a.detail.difference_kes?Object.values(a.detail.difference_kes).find(v=>Number(v)!==0)||'0.00':'—';
+   return `<div class="row" style="padding:5px 0"><span>${a.is_drill?'<b style="color:var(--hapa-primary)">[DRILL]</b> ':''}<b>${esc(finLabel(a.status))}</b> · ${esc(a.severity)} · ${esc(a.driver_name||a.driver_account_reference||'—')} · ${a.period_year?a.period_year+'-'+String(a.period_month).padStart(2,'0'):'—'} · Diff KES ${esc(String(diff))} · ${esc(age(a.age_seconds))} old · ${a.attempts} attempt(s)</span>
+    <button class="btn" style="padding:3px 8px" onclick="otFinAlertDetail('${a.id}')">Details</button></div>`;
+  }).join(''):'No finance alerts. All statements reconcile.')+`<div class="muted" style="margin-top:6px;font-size:12px">External notifications: ${esc(d.notifier.enabled?'enabled (no provider wired — nothing sent externally)':'not configured')}</div>`;
+ }catch(e){$('otFinAlerts').textContent=e.message;}
+}
+async function otFinAlertDetail(id){
+ let d;try{d=await api('/api/owner/finance/alerts/'+id);}catch(e){alert(e.message);return;}
+ const a=d.alert,det=a.detail||{};
+ const ov=document.createElement('div');ov.id='otFaOverlay';
+ ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow:auto';
+ const kv=(k,v)=>`<div class="row" style="padding:3px 0;background:transparent;border:0"><span class="muted">${esc(k)}</span><b>${esc(String(v==null?'—':v))}</b></div>`;
+ const money=o=>o?Object.entries(o).map(([k,v])=>`${finLabel(k)}: KES ${v}`).join(' · '):'—';
+ ov.innerHTML=`<div class="card" style="max-width:720px;width:100%;margin:0">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">${a.is_drill?'[DRILL] ':''}Finance alert</h3><button class="btn" onclick="otFaClose()">Close</button></div>
+  ${kv('Status',finLabel(a.status))}${kv('Severity',a.severity)}${kv('Correlation ID',a.correlation_id)}
+  ${kv('Statement reference',a.statement_reference)}${kv('Driver account',a.driver_account_reference)}${kv('Driver',a.driver_name)}
+  ${kv('Accounting period',a.period_year?a.period_year+'-'+String(a.period_month).padStart(2,'0')+' (Africa/Nairobi)':'—')}
+  ${kv('Reconciliation equation',det.equation)}${kv('Stage',det.stage)}
+  ${kv('Expected',money(det.expected))}${kv('Actual',money(det.actual))}${kv('Difference (KES)',money(det.difference_kes))}
+  ${kv('Generation attempts',a.attempts)}${kv('First seen',new Date(a.first_seen_at).toLocaleString())}${kv('Last attempt',new Date(a.last_attempt_at).toLocaleString())}
+  ${a.resolution?kv('Resolution',finLabel(a.resolution)):''}
+  <h4 style="margin:12px 0 6px">Timeline</h4>
+  <div style="font-size:12px;max-height:220px;overflow:auto">${d.events.map(e=>`<div class="row" style="padding:3px 0">${esc(new Date(e.created_at).toLocaleString())} · <b>${esc(finLabel(e.event))}</b>${e.actor_name?' · '+esc(e.actor_name):''}${e.note?' · '+esc(e.note):''}</div>`).join('')}</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+   ${['acknowledge','investigate','resolve','dismiss','reopen','note'].map(x=>`<button class="btn" onclick="otFaAction('${a.id}','${x}')">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}
+   ${a.is_drill?`<button class="btn" style="color:var(--bad)" onclick="otFaDelete('${a.id}')">Delete drill</button>`:''}
+  </div></div>`;
+ document.body.appendChild(ov);document.body.style.overflow='hidden';
+ ov.addEventListener('click',e=>{if(e.target===ov)otFaClose();});
+}
+function otFaClose(){const ov=$('otFaOverlay');if(ov)ov.remove();document.body.style.overflow='';}
+async function otFaAction(id,action){
+ let note='';
+ if(['note','dismiss','resolve','reopen'].includes(action)){note=prompt('Note (required, audited):')||'';if(note.trim().length<3)return;}
+ else note=prompt('Optional note (audited):')||'';
+ try{await api('/api/owner/finance/alerts/'+id+'/action',{method:'POST',body:JSON.stringify({action,note})});otFaClose();otFinAlerts();}catch(e){alert(e.message);}
+}
+async function otFaDelete(id){
+ if(!confirm('Delete this DRILL alert? (Real alerts cannot be deleted.)'))return;
+ try{await api('/api/owner/finance/alerts/'+id,{method:'DELETE'});otFaClose();otFinAlerts();}catch(e){alert(e.message);}
 }
 async function otVeh(id,st){try{await api('/api/owner/vehicles/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}
 async function otDoc(id,st){try{await api('/api/owner/driver-documents/'+id,{method:'PATCH',body:JSON.stringify({status:st})});loadOwnerTransport();}catch(e){alert(e.message);}}

@@ -2,6 +2,7 @@
 // owner financial summary, session hygiene endpoints. Money math lives in
 // lib/finance.js (integer cents); this module is auth + validation + views.
 const finance=require('../lib/finance');
+const alerts=require('../lib/finance-alerts');
 const mpesa=require('../lib/mpesa');
 const {buildStatementPdf,human:humanize}=require('../lib/statement-pdf');
 
@@ -270,16 +271,107 @@ module.exports=function(app,deps){
     const{start,end}=finance.monthBounds(y,m);
     driverIds=(await q(`SELECT DISTINCT driver_user_id FROM ride_requests WHERE driver_user_id IS NOT NULL AND completed_at>=$1 AND completed_at<$2`,[start,end])).rows.map(r=>r.driver_user_id);
    }
-   const out=[];
+   const out=[],failures=[];
    for(const id of driverIds){
     await client.query('BEGIN');
-    try{const st=await finance.generateStatement(client,id,y,m);await client.query('COMMIT');out.push({id:st.id,driver_id:id,reference:st.reference,status:st.status});}
-    catch(e){await client.query('ROLLBACK');throw e}
+    try{
+     const st=await finance.generateStatement(client,id,y,m);
+     await client.query('COMMIT');
+     out.push({id:st.id,driver_id:id,reference:st.reference,status:st.status});
+     // Documented policy: a successful regeneration auto-resolves the
+     // unresolved reconciliation alert for this driver/period (history kept).
+     await alerts.resolveOnSuccessfulRegeneration(q,{driverId:id,periodYear:y,periodMonth:m,statementId:st.id,statementReference:st.reference});
+    }catch(e){
+     await client.query('ROLLBACK');
+     if(!e.reconciliation)throw e;
+     // Reconciliation failure: no PDF/CSV, status not advanced (txn rolled
+     // back), previous valid statement snapshot preserved. Raise/bump the
+     // deduplicated alert OUTSIDE the rolled-back transaction.
+     const prev=(await q(`SELECT id,reference FROM driver_monthly_statements WHERE driver_user_id=$1 AND period_year=$2 AND period_month=$3`,[id,y,m])).rows[0];
+     const raised=await alerts.raiseReconciliationAlert(q,{driverId:id,statementId:prev?prev.id:null,statementReference:prev?prev.reference:e.statementReference,periodYear:y,periodMonth:m,detail:e.detail});
+     console.error(JSON.stringify({event:'finance.statement_reconciliation_failed',correlation_id:raised.correlationId,alert_id:raised.alert.id,driver_account:'DRV-'+String(id).slice(0,8).toUpperCase(),period:`${y}-${String(m).padStart(2,'0')}`,difference_kes:e.detail&&e.detail.difference_kes,attempt:raised.alert.attempts}));
+     failures.push({driver_id:id,correlation_id:raised.correlationId,alert_id:raised.alert.id,error:'Statement reconciliation failed. No statement was issued; a finance alert was raised.'});
+    }
    }
-   await audit(req.user.id,'statement.generated','driver_monthly_statements',null,`period=${y}-${m} drivers=${out.length}`);
+   await audit(req.user.id,'statement.generated','driver_monthly_statements',null,`period=${y}-${m} drivers=${out.length} failed=${failures.length}`);
+   if(failures.length)return res.status(500).json({error:`Statement reconciliation failed for ${failures.length} driver(s). No statement was issued for them; finance alerts were raised.`,generated:out,failures});
    res.json({generated:out});
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
   finally{client.release()}
+ });
+
+ // ── Owner: finance reconciliation alerts ────────────────────────────────────
+ app.get('/api/owner/finance/alerts',auth,owner,async(req,res)=>{
+  try{
+   const vals=[];let w='';
+   const add=(cond,v)=>{vals.push(v);w+=` AND ${cond.replace('$$','$'+vals.length)}`};
+   if(req.query.status&&['open','acknowledged','investigating','resolved','dismissed'].includes(req.query.status))add('a.status=$$',req.query.status);
+   if(req.query.driver_id)add('a.driver_user_id::text=$$',String(req.query.driver_id));
+   if(req.query.severity&&['critical','warning','info'].includes(req.query.severity))add('a.severity=$$',req.query.severity);
+   const y=Number(req.query.year),m=Number(req.query.month);
+   if(Number.isInteger(y)&&y>2000)add('a.period_year=$$',y);
+   if(Number.isInteger(m)&&m>=1&&m<=12)add('a.period_month=$$',m);
+   if(req.query.from&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.from))add(`(a.created_at AT TIME ZONE 'Africa/Nairobi')::date>=$$::date`,req.query.from);
+   if(req.query.to&&/^\d{4}-\d{2}-\d{2}$/.test(req.query.to))add(`(a.created_at AT TIME ZONE 'Africa/Nairobi')::date<=$$::date`,req.query.to);
+   const rows=(await q(`SELECT a.id,a.alert_type,a.severity,a.status,a.driver_user_id,u.name AS driver_name,a.driver_account_reference,
+     a.statement_reference,a.period_year,a.period_month,a.correlation_id,a.detail,a.attempts,a.is_drill,
+     a.first_seen_at,a.last_attempt_at,a.resolved_at,a.resolution,a.created_at,
+     EXTRACT(EPOCH FROM NOW()-a.first_seen_at)::bigint AS age_seconds
+    FROM finance_alerts a LEFT JOIN users u ON u.id=a.driver_user_id WHERE true${w}
+    ORDER BY (a.status IN('open','acknowledged','investigating')) DESC,a.last_attempt_at DESC LIMIT 200`,vals)).rows;
+   res.json({alerts:rows,notifier:alerts.notifierStatus(),timezone:'Africa/Nairobi',
+    resolution_policy:'A successful regeneration for the same driver and period auto-resolves the alert and links the regeneration event. History is always kept.'});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ app.get('/api/owner/finance/alerts/:id',auth,owner,async(req,res)=>{
+  try{
+   const a=(await q(`SELECT a.*,u.name AS driver_name FROM finance_alerts a LEFT JOIN users u ON u.id=a.driver_user_id WHERE a.id::text=$1`,[String(req.params.id)])).rows[0];
+   if(!a)return res.status(404).json({error:'Alert not found'});
+   const events=(await q(`SELECT e.id,e.event,e.note,e.data,e.created_at,u.name AS actor_name FROM finance_alert_events e LEFT JOIN users u ON u.id=e.actor_user_id WHERE e.alert_id=$1 ORDER BY e.id`,[a.id])).rows;
+   res.json({alert:a,events,notifier:alerts.notifierStatus()});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ app.post('/api/owner/finance/alerts/:id/action',auth,owner,writeLimiter,async(req,res)=>{
+  try{
+   const action=String(req.body?.action||''),note=String(req.body?.note||'').trim().slice(0,500);
+   const MAP={acknowledge:'acknowledged',investigate:'investigating',resolve:'resolved',dismiss:'dismissed',reopen:'open'};
+   if(!MAP[action]&&action!=='note')return res.status(400).json({error:'Invalid action'});
+   if((action==='note'||action==='dismiss'||action==='resolve'||action==='reopen')&&note.length<3)return res.status(400).json({error:'A note is required for this action'});
+   const a=(await q(`SELECT * FROM finance_alerts WHERE id::text=$1`,[String(req.params.id)])).rows[0];
+   if(!a)return res.status(404).json({error:'Alert not found'});
+   let upd=a;
+   if(action!=='note'){
+    if(action==='reopen'&&!['resolved','dismissed'].includes(a.status))return res.status(409).json({error:'Only resolved or dismissed alerts can be reopened'});
+    if(action!=='reopen'&&['resolved','dismissed'].includes(a.status))return res.status(409).json({error:'Alert is already closed; reopen it first'});
+    upd=(await q(`UPDATE finance_alerts SET status=$2,updated_at=NOW(),
+      resolved_at=CASE WHEN $2 IN('resolved','dismissed') THEN NOW() ELSE NULL END,
+      resolution=CASE WHEN $2='resolved' THEN 'manually_resolved_by_owner' WHEN $2='dismissed' THEN 'dismissed_as_false_positive' ELSE NULL END
+     WHERE id=$1 RETURNING *`,[a.id,MAP[action]])).rows[0];
+   }
+   await q(`INSERT INTO finance_alert_events(alert_id,event,actor_user_id,note) VALUES($1,$2,$3,$4)`,[a.id,action==='note'?'note_added':action,req.user.id,note]);
+   await audit(req.user.id,'finance_alert.'+action,'finance_alerts',a.id,(a.correlation_id+' '+note).slice(0,300));
+   res.json({alert:upd});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ // Drill: owner-only synthetic alert to verify the workflow end-to-end without
+ // touching real financial data. Clearly flagged is_drill and deletable.
+ app.post('/api/owner/finance/alerts/drill',auth,owner,writeLimiter,async(req,res)=>{
+  try{
+   const raised=await alerts.raiseReconciliationAlert(q,{driverId:req.user.id,periodYear:1970,periodMonth:1,
+    detail:{equation:'opening balance + period movements = closing balance',stage:'owner_drill',
+     expected:{driver_owes_hapa:'1.00'},actual:{driver_owes_hapa:'0.00'},difference_kes:{driver_owes_hapa:'1.00'},
+     note:'DRILL — synthetic alert created by the Owner to verify the alert workflow. Not real financial data.'},isDrill:true});
+   await audit(req.user.id,'finance_alert.drill_created','finance_alerts',raised.alert.id,raised.correlationId);
+   res.status(201).json({alert:raised.alert,correlation_id:raised.correlationId,delivery:raised.delivery});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
+ });
+ app.delete('/api/owner/finance/alerts/:id',auth,owner,writeLimiter,async(req,res)=>{
+  try{
+   const del=(await q(`DELETE FROM finance_alerts WHERE id::text=$1 AND is_drill=true RETURNING id,correlation_id`,[String(req.params.id)])).rows[0];
+   if(!del)return res.status(404).json({error:'Drill alert not found (real alerts cannot be deleted)'});
+   await audit(req.user.id,'finance_alert.drill_deleted','finance_alerts',del.id,del.correlation_id);
+   res.json({ok:true});
+  }catch(e){console.error(e);res.status(500).json({error:'Server error'})}
  });
  app.get('/api/owner/statements',auth,owner,async(req,res)=>{
   try{
@@ -327,7 +419,7 @@ module.exports=function(app,deps){
   try{
    const st=await loadStatementFor(req,res);if(!st)return;
    const items=(await q(`SELECT item_type,ref_id,reference,data FROM driver_monthly_statement_items WHERE statement_id=$1 ORDER BY created_at,id`,[st.id])).rows;
-   const pdf=buildStatementPdf(st,st.driver_name,items,st.meta||{});
+   const pdf=await buildStatementPdf(st,st.driver_name,items,st.meta||{});
    res.set({'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${String(st.reference).replace(/[^A-Za-z0-9-]/g,'')}.pdf"`,'Cache-Control':'private, no-store'});
    res.send(pdf);
   }catch(e){console.error(e);res.status(500).json({error:'Server error'})}

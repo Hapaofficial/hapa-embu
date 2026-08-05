@@ -877,7 +877,7 @@ module.exports=function(app,deps){
    const ctx=await loadRideFor(req,res);if(!ctx)return;
    const rec=(await q(`SELECT reference,body,created_at FROM ride_receipts WHERE ride_id=$1`,[ctx.r.id])).rows[0];
    if(!rec)return res.status(404).json({error:'No receipt yet'});
-   const pdf=buildReceiptPdf(rec.reference,rec.body,rec.created_at);
+   const pdf=await buildReceiptPdf(rec.reference,rec.body,rec.created_at);
    const safeRef=String(rec.reference).replace(/[^A-Za-z0-9-]/g,'');
    res.set({'Content-Type':'application/pdf',
     'Content-Disposition':`attachment; filename="HAPA-Receipt-${safeRef}.pdf"`,

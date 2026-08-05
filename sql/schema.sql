@@ -876,3 +876,42 @@ CREATE TABLE IF NOT EXISTS driver_session_events(
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS session_events_idx ON driver_session_events(session_id,id);
+
+-- Finance reconciliation alerts (deduplicated while unresolved) + audit timeline
+CREATE TABLE IF NOT EXISTS finance_alerts(
+ id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+ alert_type TEXT NOT NULL DEFAULT 'statement_reconciliation',
+ severity TEXT NOT NULL DEFAULT 'critical' CHECK(severity IN('critical','warning','info')),
+ status TEXT NOT NULL DEFAULT 'open' CHECK(status IN('open','acknowledged','investigating','resolved','dismissed')),
+ driver_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+ statement_id UUID REFERENCES driver_monthly_statements(id) ON DELETE SET NULL,
+ statement_reference TEXT,
+ driver_account_reference TEXT,
+ period_year INT,
+ period_month INT,
+ correlation_id TEXT NOT NULL,
+ detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+ attempts INT NOT NULL DEFAULT 1,
+ is_drill BOOLEAN NOT NULL DEFAULT FALSE,
+ first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ resolved_at TIMESTAMPTZ,
+ resolution TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- One unresolved alert per driver/period/type: repeated failures update it.
+CREATE UNIQUE INDEX IF NOT EXISTS finance_alerts_dedup
+ ON finance_alerts(alert_type,driver_user_id,period_year,period_month)
+ WHERE status IN('open','acknowledged','investigating');
+CREATE INDEX IF NOT EXISTS finance_alerts_status_idx ON finance_alerts(status,created_at DESC);
+CREATE TABLE IF NOT EXISTS finance_alert_events(
+ id BIGSERIAL PRIMARY KEY,
+ alert_id UUID NOT NULL REFERENCES finance_alerts(id) ON DELETE CASCADE,
+ event TEXT NOT NULL,
+ actor_user_id UUID REFERENCES users(id),
+ note TEXT NOT NULL DEFAULT '',
+ data JSONB NOT NULL DEFAULT '{}'::jsonb,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS finance_alert_events_idx ON finance_alert_events(alert_id,id);

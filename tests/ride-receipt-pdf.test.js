@@ -121,8 +121,12 @@ const ping = (drv, lat, lng, seq) => j('POST', '/api/driver/location', drv.tok, 
   const dPdf = await raw(`/api/rides/${rideId}/receipt.pdf`, drv.tok);
   ok('assigned driver downloads PDF (200)', dPdf.s === 200 && dPdf.buf.slice(0, 5).toString() === '%PDF-', dPdf.s);
 
-  // Customer PDF must not leak internal accounting
-  const txt = rPdf.buf.toString('latin1');
+  // Customer PDF must not leak internal accounting. pdfkit streams are
+  // compressed, so inspect the EXTRACTED text (poppler), not raw bytes.
+  const { execFileSync } = require('child_process');
+  const fs = require('fs');
+  const extract = buf => { fs.writeFileSync('/tmp/rp-receipt.pdf', buf); return execFileSync('pdftotext', ['/tmp/rp-receipt.pdf', '-']).toString(); };
+  const txt = extract(rPdf.buf);
   const fmt = n => 'KES ' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const commission = fmt(rec.d.body.commission), earnings = fmt(rec.d.body.driver_earnings);
   ok('PDF has no commission/earnings labels', !/commission|earnings|payment_mode|internal/i.test(txt));
@@ -132,21 +136,17 @@ const ping = (drv, lat, lng, seq) => j('POST', '/api/driver/location', drv.tok, 
   ok('PDF marked as receipt, not tax invoice', txt.includes('not a tax invoice') && !/VAT|KRA/i.test(txt));
   ok('PDF shows PAID status and route', txt.includes('PAID') && txt.includes('Embu CBD') && txt.includes('Kangaru'));
 
-  // PDF structural integrity with non-ASCII (accented) customer fields:
-  // /Length and xref offsets must both be Latin-1 byte counts.
+  // PDF structural integrity with non-ASCII (accented + Swahili) customer
+  // fields: the embedded DejaVu font must render them; extracted text must
+  // keep the exact characters (no '?' fallbacks); emoji removed, no crash.
   const { buildReceiptPdf } = require('../lib/receipt-pdf');
-  const accented = buildReceiptPdf('HAPA-ACCENT-01', { ...rec.d.body, driver: 'Ngugî wa Thiong\u2019o Ünïté', pickup: 'Caf\u00e9 \u00c9mbu \u2192 R\u00fcta', destination: 'M\u00fcller\u2019s pla\u00e7e' }, rec.d.created_at);
+  const accented = await buildReceiptPdf('HAPA-ACCENT-01', { ...rec.d.body, driver: 'Ngugî wa Thiong\u2019o Ünïté', pickup: 'Caf\u00e9 \u00c9mbu \u2192 R\u00fcta 🚕', destination: 'M\u00fcller\u2019s pla\u00e7e — Kĩrĩnyaga' }, rec.d.created_at);
   ok('non-ASCII PDF keeps valid signature + EOF', accented.slice(0, 5).toString() === '%PDF-' && accented.toString('latin1').trimEnd().endsWith('%%EOF'));
   {
-    const s = accented.toString('latin1');
-    const lenM = s.match(/\/Length (\d+) >>\nstream\n/);
-    const streamStart = s.indexOf('stream\n', s.indexOf('/Length')) + 'stream\n'.length;
-    const streamEnd = s.indexOf('\nendstream', streamStart);
-    ok('/Length matches actual Latin-1 stream bytes', lenM && Number(lenM[1]) === Buffer.byteLength(s.slice(streamStart, streamEnd), 'latin1'), lenM && lenM[1]);
-    const xrefPos = Number(s.match(/startxref\n(\d+)\n/)[1]);
-    ok('xref offset points at the xref table', s.slice(xrefPos, xrefPos + 4) === 'xref', s.slice(xrefPos, xrefPos + 8));
-    const off3 = Number(s.match(/xref\n0 \d+\n0000000000 65535 f \n(\d{10})/)[1]);
-    ok('first object offset lands on its header', s.slice(off3, off3 + 7) === '1 0 obj', s.slice(off3, off3 + 10));
+    const atxt = extract(accented);
+    ok('accented/Swahili text extracts intact', ['Ngugî', 'Thiong\u2019o', 'Ünïté', 'Caf\u00e9', 'M\u00fcller\u2019s', 'Kĩrĩnyaga'].every(s => atxt.includes(s)), atxt.slice(0, 200));
+    ok('em dash renders', atxt.includes('\u2014'));
+    ok('emoji removed deterministically (no crash, no tofu)', !atxt.includes('🚕') && !atxt.includes('\uFFFD'));
   }
 
   // Random ride id cannot bypass authorization
