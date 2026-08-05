@@ -1,0 +1,1367 @@
+FINAL GOOGLE MAPS, GPS AND LIVE DRIVER TRACKING STAGE
+
+This is one complete stage-closure order.
+
+It supersedes every earlier partial instruction concerning:
+
+- Google Maps
+- pickup and destination selection
+- address autocomplete
+- precise GPS
+- route calculation
+- ETA and distance
+- Driver live location
+- location permissions
+- native Android/iOS map configuration
+- mock-routing replacement
+- Maps key security
+- map-related ride pricing
+- weak-network and reconnect behavior
+
+Continue from the CURRENT HEAD of:
+
+feature/professional-public-profile
+
+Accepted baseline:
+
+- finance hardening commit: 760a5a9
+- staging: https://hapa-embu-staging.onrender.com
+- finance and Driver statement stage closed
+- 775 tests previously passing
+- existing rides, receipts, statements, references and accounting data must remain unchanged
+
+Do not return only a plan.
+
+Implement everything technically feasible, test it, push the feature branch and verify staging.
+
+If real Google credentials are the only remaining blocker, complete all provider abstractions, mocks, tests, UI, native configuration and security controls first, then request only the exact staging credentials required.
+
+==================================================
+1. NON-NEGOTIABLE SAFETY RULES
+==================================================
+
+- Work only on feature/professional-public-profile.
+- Never merge main.
+- Never deploy production.
+- Never access or modify production database or production storage.
+- Never change production Render configuration.
+- Never print or commit API keys, JWTs, signed URLs, private documents, exact trip coordinates or payment credentials.
+- Preserve current Rider, Driver, Owner, Marketplace, Professional, Merchant, Requests, finance, receipts, statements, settlement and accounting functionality.
+- Preserve deterministic pnpm Render build.
+- Preserve Android and iOS Capacitor projects.
+- Use additive, idempotent and non-destructive migrations.
+- Do not create unnecessary staging rides.
+- Use isolated synthetic coordinates and fixtures for automated testing.
+- Clean synthetic fixtures and location records after staging acceptance.
+- Do not claim real Google Maps, route accuracy, live GPS or background tracking is operational without valid restricted credentials and real verification.
+- Do not hardcode Embu as the only supported location.
+- Preserve Kenya-wide geo_areas, active service zones and area-specific rate cards.
+- Verify current Google Maps, Android and Apple requirements from official primary documentation during implementation.
+
+==================================================
+2. TARGET RESULT
+==================================================
+
+Close this stage only when HAPA supports a professional map-first ride experience.
+
+Rider:
+
+1. Opens Rides.
+2. Sees a real map when Google Maps is configured.
+3. Selects pickup using:
+   - current location
+   - autocomplete
+   - map tap
+   - draggable marker
+   - manual text and landmark fallback
+4. Selects destination using the same methods.
+5. Sees:
+   - route polyline
+   - distance
+   - duration
+   - estimated Driver pickup time
+   - transparent fixed fare quote
+6. Requests the ride using a server-authoritative route snapshot.
+7. Sees the assigned Driver approaching on the map.
+8. Sees the active trip position and route progress.
+9. Retains a safe manual fallback when GPS or Maps is unavailable.
+
+Driver:
+
+1. Selects an approved vehicle and active operating zone.
+2. Goes online.
+3. Shares location only while operationally justified.
+4. Receives offers based on real pickup ETA/distance.
+5. Navigates to pickup.
+6. Marks arrival.
+7. Verifies PIN.
+8. Navigates to destination.
+9. Shares live trip progress.
+10. Stops operational tracking immediately after going offline, except where an active trip must safely finish.
+
+Owner:
+
+- sees map configuration health
+- sees active Drivers by zone
+- sees stale-location warnings
+- sees ride route and location status
+- accesses exact coordinates only through audited Owner actions
+- sees no raw Maps credentials
+
+==================================================
+3. PROVIDER ARCHITECTURE
+==================================================
+
+Implement a clean Maps provider abstraction.
+
+Required modes:
+
+MAPS_PROVIDER=mock
+MAPS_PROVIDER=google
+
+Mock mode:
+
+- remains available for tests and local development
+- is visibly labelled:
+  “Development route estimate — Google Maps not configured”
+- must never claim real distance, traffic or ETA
+- must not silently operate as production routing
+- may support synthetic staging walkthroughs only
+
+Google mode:
+
+- uses Google Maps Platform through the correct client/server boundaries
+- becomes active only when the required keys and APIs are configured
+- fails safely and clearly when configuration is incomplete
+- never falls back silently to fake routing for a real production ride
+
+Create provider interfaces for:
+
+- place autocomplete
+- place details
+- forward/reverse geocoding
+- route computation
+- route matrix / Driver pickup ETA
+- map display configuration
+- navigation links
+
+Do not spread Google-specific calls throughout unrelated ride code.
+
+==================================================
+4. GOOGLE CLOUD KEY MATRIX
+==================================================
+
+Prepare separate configuration for:
+
+WEB STAGING
+
+- GOOGLE_MAPS_WEB_STAGING_KEY
+- restricted to:
+  https://hapa-embu-staging.onrender.com/*
+- API restrictions limited to required browser APIs
+
+WEB PRODUCTION
+
+- GOOGLE_MAPS_WEB_PRODUCTION_KEY
+- restricted to the final production domains only
+- do not request or configure it in this staging task
+
+SERVER STAGING
+
+- GOOGLE_MAPS_SERVER_STAGING_KEY
+- server-side only
+- never returned to browser or native clients
+- API restricted to required server APIs
+- use IP restrictions only where the hosting architecture makes them reliable; otherwise document the secure alternative and use the strongest supported restriction
+
+SERVER PRODUCTION
+
+- GOOGLE_MAPS_SERVER_PRODUCTION_KEY
+- do not request or configure it now
+
+ANDROID STAGING / PRODUCTION
+
+- GOOGLE_MAPS_ANDROID_STAGING_KEY
+- GOOGLE_MAPS_ANDROID_PRODUCTION_KEY
+- Android application restriction:
+  - package name
+  - signing certificate SHA-1/SHA-256 as required
+- API restriction to Maps/Places SDKs actually used
+
+IOS STAGING / PRODUCTION
+
+- GOOGLE_MAPS_IOS_STAGING_KEY
+- GOOGLE_MAPS_IOS_PRODUCTION_KEY
+- iOS application restriction:
+  - exact Bundle ID
+- API restriction to Maps/Places SDKs actually used
+
+Requirements:
+
+- do not reuse one unrestricted key for every platform
+- do not put server keys into frontend JavaScript
+- do not commit keys
+- do not expose server keys through public config endpoints
+- the public runtime config endpoint may expose only the properly restricted web key
+- native keys must not be stored in tracked source files
+- provide exact secure setup instructions for Render, Android and Xcode
+- add boot/configuration validation without printing key values
+- add a key-health status to Owner launch gates without revealing secrets
+
+==================================================
+5. REQUIRED GOOGLE SERVICES
+==================================================
+
+Audit current official Google documentation and enable/use only what is necessary.
+
+Expected services:
+
+Web:
+
+- Maps JavaScript API
+- Places API (New)
+- Routes API
+
+Server:
+
+- Routes API:
+  - Compute Routes
+  - Compute Route Matrix where required for dispatch ETA
+- Geocoding API only if the selected architecture genuinely requires it
+
+Android:
+
+- Maps SDK for Android
+- Places SDK for Android where a native Places implementation is used
+
+iOS:
+
+- Maps SDK for iOS
+- Places SDK for iOS where a native Places implementation is used
+
+Do not enable obsolete legacy services merely because old code examples use them.
+
+Use response field masks for route and place detail requests.
+
+Do not request unnecessary fields.
+
+==================================================
+6. WEB MAP IMPLEMENTATION
+==================================================
+
+Replace the current text-only/mock booking appearance with a professional map-first layout when Google mode is active.
+
+Required map behavior:
+
+- map centered on the active service zone
+- Rider pickup marker
+- destination marker
+- route polyline
+- Driver marker after assignment
+- pickup and destination markers visually distinct
+- marker dragging
+- tap-to-select
+- camera fit to relevant route/markers
+- zoom controls and gesture handling appropriate for mobile
+- accessible non-map text summary of the selected route
+- visible Google attribution preserved
+
+Do not create a map instance repeatedly on polling refreshes.
+
+The map DOM and instance must remain stable during:
+
+- autocomplete
+- route refresh
+- realtime Driver movement
+- chat updates
+- ride status changes
+- reconnect
+
+Prevent memory leaks from abandoned map listeners, markers and polylines.
+
+==================================================
+7. PLACE AUTOCOMPLETE
+==================================================
+
+Use the current Places API (New) approach.
+
+Support:
+
+- pickup autocomplete
+- destination autocomplete
+- place names
+- street addresses
+- businesses/landmarks
+- plus codes where returned
+- Kenya-wide locations
+- bias toward the active service zone
+- restriction to Kenya where appropriate
+- rural manual fallback
+
+Use a new autocomplete session token for each logical search session.
+
+Reset/end the token correctly after a place selection.
+
+Requirements:
+
+- debounce input
+- cancel or ignore stale responses
+- do not send uncontrolled requests on every keystroke
+- display a loading state
+- keyboard navigation
+- screen-reader labels
+- touch-friendly results
+- no raw HTML injection
+- Google attribution displayed according to current policy
+- safe zero-results state
+- safe API error state
+- manual entry remains available
+
+On selection store the operational fields needed by HAPA:
+
+- place ID where available
+- formatted address
+- display name
+- latitude
+- longitude
+- source/provider
+- selection timestamp
+- active service-zone relationship
+
+Do not trust free-text address alone for a ride with real routing.
+
+==================================================
+8. CURRENT LOCATION AND PERMISSION FLOW
+==================================================
+
+Rider location:
+
+- request foreground location only when Rider taps “Use my location” or performs an action that clearly requires it
+- do not request location immediately on every page load
+- explain why the location is needed before the system permission prompt where appropriate
+- accept approximate location but show its limitations
+- when accuracy is insufficient, ask the Rider to confirm or drag the pickup marker
+- foreground-only Rider tracking
+- stop the location watcher after pickup is selected unless an active safety feature requires it
+- provide manual address/pin fallback if denied, unavailable or timed out
+
+Driver location:
+
+- collect only while:
+  - online and available
+  - offered/assigned
+  - travelling to pickup
+  - waiting at pickup
+  - ride in progress
+- stop when offline
+- preserve safe active-trip recovery
+- show a clear in-app indicator:
+  “Location sharing active”
+- do not request normal Rider background location
+
+Permission states:
+
+- not requested
+- granted approximate
+- granted precise
+- denied
+- denied permanently / settings required
+- location services disabled
+- timeout
+- unavailable
+
+Each state must have a clear UI and recovery path.
+
+==================================================
+9. SERVER-AUTHORITATIVE ROUTING
+==================================================
+
+Real ride distance, duration and fare input must be computed server-side.
+
+Use Google Routes API Compute Routes for the Rider route.
+
+The browser may display a preview, but it must not be the accounting source of truth.
+
+Store an immutable route snapshot containing:
+
+- provider
+- origin coordinates
+- destination coordinates
+- origin place ID where available
+- destination place ID where available
+- formatted addresses
+- distance meters
+- duration seconds
+- encoded polyline or approved route representation
+- travel mode
+- routing preference
+- computed timestamp
+- expiry timestamp
+- response/version metadata
+- service zone
+- request correlation ID
+- integrity hash or equivalent tamper-evidence
+
+Use field masks and retrieve only needed fields.
+
+Do not store the complete raw Google response unless genuinely required and permitted.
+
+The fare quote must reference the exact route snapshot.
+
+The Rider cannot modify:
+
+- distance
+- duration
+- price components
+- service zone
+- provider result
+- route snapshot ID
+
+On Request ride:
+
+- validate the quote belongs to the Rider
+- validate it is unexpired
+- validate origin/destination match
+- validate service zone is active
+- validate rate card remains applicable
+- reject client-tampered values
+
+Preserve the existing immutable quote and receipt architecture.
+
+==================================================
+10. SERVICE-ZONE VALIDATION
+==================================================
+
+Use existing geo_areas/service zones.
+
+Validate:
+
+- pickup belongs to an active permitted service zone
+- Driver is approved for that zone
+- destination is permitted by the zone/cross-zone policy
+- an inactive county or zone cannot accept a new ride
+- a paused parent area invalidates child zones
+- cross-county rides follow explicit configuration
+- a Driver from another zone does not receive the offer unless allowed
+
+Use geofence/polygon/radius logic suitable for the current zone representation.
+
+Do not rely only on address text such as “Embu”.
+
+Owner must be able to see why a point failed validation:
+
+- outside active service area
+- cross-zone disabled
+- inactive destination area
+- unable to validate location
+
+Do not reveal internal database geometry publicly.
+
+==================================================
+11. DISPATCH ETA AND ROUTE MATRIX
+==================================================
+
+Upgrade Driver candidate ranking from straight-line-only/mock distance to real pickup ETA when Google mode is active.
+
+Use Compute Route Matrix or an equally current supported Google mechanism.
+
+Requirements:
+
+- only evaluate eligible Drivers
+- limit candidate batch size
+- configurable maximum candidates
+- configurable short cache TTL
+- avoid recalculating every Driver on every second
+- field masks
+- timeouts
+- cancellation
+- safe provider failure behavior
+- no unlimited cost growth
+
+Ranking may use:
+
+- real pickup ETA
+- real pickup distance
+- current freshness
+- zone eligibility
+- existing fairness rules
+
+Do not use Maps failure as a reason to fabricate an assignment.
+
+If route matrix fails:
+
+- retry safely where appropriate
+- optionally fall back to transparent geometric ranking only in explicitly allowed staging/degraded mode
+- production behavior must be clearly controlled by configuration
+- record degraded dispatch mode for Owner visibility
+
+==================================================
+12. DRIVER NAVIGATION
+==================================================
+
+Provide Driver navigation actions:
+
+- Navigate to pickup
+- Navigate to destination
+
+For web/PWA:
+
+- open a Google Maps navigation deep link in a safe new context
+
+For native:
+
+- prefer platform/native navigation integration where practical
+- provide fallback deep link
+
+Requirements:
+
+- no Rider name, phone or private note in the URL
+- only necessary destination coordinates/address
+- no JWTs
+- no internal ride IDs unless non-sensitive and necessary
+- no server key
+- external navigation action recorded as a ride event without storing sensitive URL query data
+
+==================================================
+13. LIVE DRIVER LOCATION
+==================================================
+
+Use the existing authenticated ride/location architecture and complete the client integration.
+
+Driver update payload:
+
+- latitude
+- longitude
+- accuracy
+- timestamp
+- monotonic sequence number
+- heading where available
+- speed where available
+- ride ID or availability-session ID
+- source platform
+- foreground/background state where legally appropriate
+
+Server validation:
+
+- authenticated Driver
+- correct active session
+- correct assigned ride
+- valid coordinates
+- accuracy threshold policy
+- timestamp freshness
+- increasing sequence
+- speed/jump sanity checks
+- zone/service relationship
+- rate limits
+
+Reject:
+
+- unrelated Driver
+- wrong ride
+- stale replay
+- backwards sequence
+- impossible coordinates
+- excessive frequency
+- unauthorized offline update
+
+Location intervals must be configurable.
+
+Example operational policy:
+
+- online/waiting: slower interval
+- assigned/en route: faster interval
+- in trip: faster interval
+- stationary/background: adaptive interval
+- offline: stopped
+
+Do not hardcode one aggressive frequency everywhere.
+
+Use bounded offline buffering:
+
+- maximum item count
+- maximum age
+- sequence preservation
+- discard obsolete samples
+- no unbounded local storage growth
+- no duplicate upload after acknowledgement
+
+==================================================
+14. RIDER LIVE MAP
+==================================================
+
+After Driver assignment, Rider sees:
+
+- Driver name/photo
+- vehicle
+- registration
+- Driver marker
+- pickup marker
+- destination marker
+- Driver approach route where available
+- Driver ETA
+- last updated time
+- current ride status
+
+Handle:
+
+- Driver temporarily offline
+- stale location
+- reconnect
+- Driver location unavailable
+- ride reassignment
+- cancellation
+- trip completion
+
+Do not keep showing an old Driver location as current.
+
+Use labels such as:
+
+- Live
+- Updated 10 seconds ago
+- Location temporarily unavailable
+- Driver connection lost
+- Reconnecting
+
+Do not expose another ride’s location.
+
+==================================================
+15. ACTIVE TRIP MAP
+==================================================
+
+During the ride:
+
+- show current Driver position
+- show destination
+- show original planned route
+- show route progress where supported
+- display status and last update
+- preserve PIN, safety and chat functionality
+- map updates must not reset chat, forms or focus
+- no full-panel innerHTML replacement during location polling
+
+At completion:
+
+- stop live updates
+- preserve final trip summary
+- retain permitted route/distance/duration data
+- do not continue tracking Driver or Rider
+
+==================================================
+16. NATIVE ANDROID INTEGRATION
+==================================================
+
+Audit the existing Capacitor Android project.
+
+Implement or prepare the correct native integration for:
+
+- secure Maps key injection
+- native geolocation
+- precise/approximate permission handling
+- foreground location service for Driver operational tracking where required
+- persistent notification while Driver location sharing is active
+- app background/foreground transitions
+- process recreation
+- network changes
+- session recovery
+
+Android requirements:
+
+- ACCESS_COARSE_LOCATION
+- ACCESS_FINE_LOCATION only where needed
+- foregroundServiceType="location" where required
+- request ACCESS_BACKGROUND_LOCATION only if genuinely required beyond the foreground-service model and after confirming current Play policy
+- educational disclosure before any background-location settings flow
+- the app must remain usable after Rider declines location
+- normal customers must not be asked for background location
+- Driver must be able to stop tracking visibly
+- location notification must not falsely imply an active ride when only online
+
+Do not commit Android API keys or signing materials.
+
+Use the appropriate Gradle secrets mechanism and document the exact local/CI variables.
+
+Prepare store-review location disclosure materials.
+
+==================================================
+17. NATIVE IOS INTEGRATION
+==================================================
+
+Audit the existing Capacitor iOS project.
+
+Implement or prepare:
+
+- secure Maps key injection
+- native Core Location bridge
+- When In Use authorization for Rider
+- appropriate Driver authorization strategy based on actual operational needs
+- clear usage descriptions
+- app background/foreground transitions
+- session restoration
+- network loss handling
+- Driver operational location indicator
+- stop tracking when offline
+
+Use correct Info.plist descriptions such as:
+
+- why Rider location is used
+- why Driver operational location is used
+- when continuous location may be active
+
+Do not request Always authorization for normal Riders.
+
+Do not request broader authorization before it is needed.
+
+Do not commit iOS API keys, certificates or provisioning profiles.
+
+Document required Bundle ID restrictions and Xcode configuration.
+
+==================================================
+18. WEB/PWA AND NATIVE ARCHITECTURE DECISION
+==================================================
+
+Use the shared web application where it is reliable.
+
+Use native capabilities where required for:
+
+- location accuracy
+- app lifecycle
+- background/foreground Driver tracking
+- secure key restriction
+- store-policy compliance
+
+Do not duplicate the full ride UI unnecessarily.
+
+Document:
+
+- which map UI is shared
+- which location source is native
+- which APIs are web-only
+- which APIs are native-only
+- how environment/platform detection works
+- how browser fallback works
+
+No development URL or browser chrome in release builds.
+
+==================================================
+19. PRIVACY AND DATA MINIMIZATION
+==================================================
+
+Treat exact coordinates as sensitive operational data.
+
+Requirements:
+
+- no precise coordinates in public APIs
+- no coordinates in ordinary logs
+- no location-based advertising
+- no sale of location data
+- no location in analytics payloads
+- no coordinates in CSV accounting exports
+- no coordinates in receipt PDFs
+- no coordinates in URLs except necessary Driver navigation actions
+- Owner exact-location access remains audited
+- share-trip behavior remains minimum-necessary
+- configurable retention
+- pruning/aggregation job
+- legal-hold exception
+- deletion/anonymization procedure
+
+Update:
+
+- Privacy documentation
+- Rider location disclosure
+- Driver location disclosure
+- Android store declaration notes
+- iOS review notes
+- data-safety worksheet
+
+Do not claim legal approval.
+
+Mark legal/privacy review as an external launch requirement.
+
+==================================================
+20. CACHE, SERVICE WORKER AND API SAFETY
+==================================================
+
+Never cache:
+
+- Maps keys returned through config beyond appropriate application-shell handling
+- route snapshots containing coordinates
+- ride history
+- live Driver locations
+- signed URLs
+- receipts
+- private documents
+- authenticated Maps proxy responses
+- JWTs
+- trip data
+
+Service worker must not intercept/copy personal live location data into offline caches.
+
+Static map application code may be cached according to the existing safe versioned shell.
+
+Map failure must not cause a reload loop.
+
+==================================================
+21. WEAK NETWORK AND OFFLINE UX
+==================================================
+
+Test and support:
+
+- slow 3G
+- intermittent connection
+- offline during autocomplete
+- offline during route calculation
+- offline after quote
+- Driver connection loss before offer
+- Driver connection loss during approach
+- Driver connection loss during trip
+- Rider reconnect
+- server restart
+- websocket reconnect
+- Maps API timeout
+- quota error
+- denied permission
+
+Required UI states:
+
+- Checking location
+- Loading map
+- Searching for address
+- Calculating route
+- Reconnecting
+- Location unavailable
+- Maps temporarily unavailable
+- Retry
+- Use manual location
+
+Do not leave indefinite spinners.
+
+Do not silently erase typed addresses or selected markers.
+
+==================================================
+22. COST AND ABUSE CONTROLS
+==================================================
+
+Implement cost protections:
+
+- Places session tokens
+- autocomplete debounce
+- request cancellation
+- minimum useful input length
+- restricted prediction region
+- Routes field masks
+- Route Matrix candidate limits
+- route snapshot caching with safe short TTL where permitted
+- no route recomputation on every animation frame
+- marker drag routes only after drag end or sensible debounce
+- server rate limits
+- per-user and per-IP abuse protection
+- Owner usage metrics without addresses/coordinates
+
+Document Google Cloud actions:
+
+- billing enabled
+- budget
+- alerts at defined thresholds
+- quotas per API
+- usage monitoring
+- key restriction review
+- key rotation process
+
+Do not fabricate Cloud budgets from code.
+
+==================================================
+23. OWNER MAPS/GPS OPERATIONS
+==================================================
+
+Add Owner status panels:
+
+MAPS CONFIGURATION
+
+- Web Maps
+- Server Routes
+- Places
+- Route Matrix
+- Android Maps
+- iOS Maps
+- mock vs google provider
+- last successful provider call
+- last provider error category
+- degraded-mode status
+
+Do not display keys.
+
+LIVE LOCATION HEALTH
+
+- online Drivers
+- Drivers with fresh location
+- stale Drivers
+- Drivers with poor accuracy
+- Drivers in active rides
+- last location age
+- zone
+- platform
+- foreground/background state
+
+Owner actions:
+
+- Force Driver offline
+- inspect audited exact location
+- view route snapshot
+- view provider/degraded state
+- no silent editing of coordinates
+
+Every exact-location access remains audited.
+
+==================================================
+24. LAUNCH GATES
+==================================================
+
+Separate readiness levels.
+
+WEB CONTROLLED PILOT:
+
+Mandatory:
+
+- MAPS_PROVIDER=google
+- valid restricted staging web key
+- valid staging server key
+- Places operational
+- Compute Routes operational
+- real service-zone validation
+- Rider foreground GPS operational
+- Driver live GPS operational
+- support/emergency gate from existing launch rules
+
+NATIVE ANDROID STORE READINESS:
+
+- Android key configured and restricted
+- Android location permission flow complete
+- Driver foreground-service behavior verified
+- real Android device test complete
+- store disclosure prepared
+
+NATIVE IOS STORE READINESS:
+
+- iOS key configured and restricted
+- iOS location permission flow complete
+- real iPhone test complete
+- usage descriptions/review notes prepared
+
+Do not block web staging development because native store keys are absent.
+
+Do not report full Maps/GPS stage closed until web staging is verified with real Google credentials and native source/configuration is complete.
+
+==================================================
+25. TEST PROVIDERS
+==================================================
+
+Create deterministic fake provider implementations.
+
+Tests must not call real Google APIs by default.
+
+Provide fixtures for:
+
+- autocomplete results
+- no autocomplete results
+- place details
+- route success
+- route timeout
+- route quota error
+- route matrix success
+- partial route matrix failure
+- geocoding failure
+- invalid service zone
+- long rural route
+- zero-length route
+- duplicate coordinates
+- provider malformed response
+
+Real Google smoke tests must be opt-in and credential-gated.
+
+Never run uncontrolled billable tests.
+
+==================================================
+26. REQUIRED AUTOMATED TESTS
+==================================================
+
+AUTOCOMPLETE
+
+- session token lifecycle
+- Kenya restriction/bias
+- debounce
+- stale response ignored
+- keyboard and selection
+- safe HTML escaping
+- manual fallback
+- provider error
+- selected place stores required fields
+
+ROUTING
+
+- server-authoritative route
+- client distance ignored
+- field mask used
+- route snapshot immutable
+- quote bound to snapshot
+- expired route/quote rejected
+- tampered coordinates rejected
+- service-zone validation
+- correct distance/duration in fare
+- provider failure cannot produce fake production quote
+
+DISPATCH
+
+- real/mocked route matrix ranks candidates
+- wrong zone excluded
+- stale Driver excluded
+- candidate limit enforced
+- matrix timeout safe
+- no double assignment
+- degraded mode clearly recorded
+
+RIDER LOCATION
+
+- permission granted
+- approximate location
+- precise location
+- denied
+- timeout
+- services disabled
+- manual marker fallback
+- dragging pickup updates route
+- no background Rider tracking
+
+DRIVER LOCATION
+
+- online updates accepted
+- offline updates rejected
+- assigned/in-trip updates accepted
+- stale sequence rejected
+- replay rejected
+- wrong Driver/ride rejected
+- impossible jump flagged/rejected according to policy
+- rate limit
+- bounded offline queue
+- reconnect preserves sequence
+- logout/offline stops collection
+
+LIVE MAP
+
+- Driver marker updates
+- stale label appears
+- unrelated Rider blocked
+- chat draft not reset
+- ride completion stops map tracking
+- reassignment replaces Driver safely
+- no page-level re-render destroys map/composer
+
+NATIVE CONFIG
+
+- Android key absent from tracked source
+- iOS key absent from tracked source
+- Android manifest/foreground-service configuration
+- Rider does not request background permission
+- usage descriptions exist
+- platform-specific config validated
+
+PRIVACY
+
+- no coordinates in public APIs
+- no coordinates in normal logs
+- no coordinates in receipts/CSV
+- service worker does not cache location endpoints
+- Owner exact access audited
+- retention/pruning works
+
+COST
+
+- autocomplete request count bounded
+- route request count bounded
+- matrix candidate cap
+- no rapid repeated route calls on marker movement
+- field masks verified
+
+REGRESSION
+
+- existing ride lifecycle
+- dispatch
+- PIN
+- chat
+- Rider history
+- Driver history
+- Owner ride details
+- finance/statements
+- tips
+- settlements
+- PDF/CSV
+- Marketplace/Professional/Merchant
+- PWA
+- deterministic Render build
+
+Run the complete existing HAPA suite plus the new Maps/GPS suite.
+
+==================================================
+27. PERFORMANCE AND SOAK TEST
+==================================================
+
+Run isolated tests for:
+
+- 100 simulated online Drivers with location updates
+- 500 simulated Rider connections
+- 20 ride requests per minute
+- route matrix candidate batches
+- websocket reconnects
+- Driver location backlog flushing
+
+Acceptance:
+
+- no cross-user location leak
+- no unbounded memory growth
+- no unbounded database growth
+- no sequence corruption
+- no double assignment
+- stable p95 API latency documented
+- route-provider calls remain within configured caps
+- location storage pruning confirmed
+
+Do not call real Google APIs during large load tests.
+
+==================================================
+28. STAGING ACCEPTANCE WITHOUT REAL KEYS
+==================================================
+
+Before requesting credentials:
+
+- all code complete
+- all fake-provider tests pass
+- configuration validation complete
+- web UI complete
+- native source/configuration complete
+- privacy docs updated
+- launch gates updated
+- no secrets committed
+
+Verify mock mode remains clearly labelled and functional for synthetic testing.
+
+Then request only these staging values if absent:
+
+- GOOGLE_MAPS_WEB_STAGING_KEY
+- GOOGLE_MAPS_SERVER_STAGING_KEY
+
+Do not request production, Android signing or iOS signing credentials in the same prompt.
+
+Explain exactly where each staging key must be restricted before use.
+
+==================================================
+29. STAGING ACCEPTANCE WITH REAL GOOGLE KEYS
+==================================================
+
+After the Owner securely provides restricted staging keys:
+
+1. Set only staging configuration.
+2. Deploy staging.
+3. Verify Maps provider reports google.
+4. Verify map loads.
+5. Verify autocomplete using real Embu/Kenya places.
+6. Verify map tap and marker drag.
+7. Verify current Rider location.
+8. Verify route:
+   - polyline
+   - distance
+   - duration
+9. Verify server route agrees with displayed route.
+10. Verify fare uses server route snapshot.
+11. Verify Driver goes online.
+12. Verify real Driver location updates.
+13. Verify Rider sees Driver movement.
+14. Verify pickup ETA.
+15. Verify Driver navigation link.
+16. Verify active-trip map.
+17. Verify location stops after Driver goes offline.
+18. Verify denied-location fallback.
+19. Verify slow-network/reconnect path.
+20. Verify Owner configuration and location-health panel.
+21. Verify no secret keys appear in responses, logs or source.
+22. Verify no existing financial data is changed.
+23. Clean synthetic ride/location fixtures.
+
+Do not use production keys.
+
+==================================================
+30. GIT AND DEPLOYMENT
+==================================================
+
+Before committing:
+
+- inspect full diff
+- remove debug output
+- remove generated screenshots
+- remove map-provider response dumps
+- remove synthetic coordinates
+- confirm no keys
+- confirm no credentials
+- confirm no private location data
+- confirm no native signing files
+- preserve existing ride/finance records
+- preserve deterministic build
+
+Create clean logical commits, preferably one stage commit:
+
+feat: complete Google Maps and live GPS integration
+
+Push only:
+
+feature/professional-public-profile
+
+Do not merge main.
+Do not deploy production.
+
+Allow staging auto-deploy only after the credential-free candidate passes all local tests.
+
+==================================================
+31. VALID STOP CONDITIONS
+==================================================
+
+Before staging keys are provided, the allowed status is:
+
+BLOCKED ONLY BY RESTRICTED STAGING GOOGLE MAPS KEYS
+
+This status is valid only if:
+
+- provider architecture complete
+- mock and Google adapters complete
+- UI complete
+- server routing complete
+- native configuration complete
+- tests pass
+- no other technical blocker remains
+
+After real staging keys and acceptance, the required status is:
+
+GOOGLE MAPS AND GPS STAGE CLOSED
+
+Do not claim the stage is closed while only mock routing is active.
+
+==================================================
+32. FINAL RESPONSE FORMAT
+==================================================
+
+STATUS:
+- GOOGLE MAPS AND GPS STAGE CLOSED
+or
+- BLOCKED ONLY BY RESTRICTED STAGING GOOGLE MAPS KEYS
+or
+- BLOCKED — MAPS/GPS ACCEPTANCE FAILED
+
+PROVIDER:
+- mock result
+- Google adapter result
+- active staging provider
+
+WEB MAP:
+- display
+- autocomplete
+- markers
+- route
+- accessibility
+- mobile result
+
+ROUTING:
+- Compute Routes
+- route snapshot
+- fare binding
+- zone validation
+- field masks
+
+DISPATCH:
+- Route Matrix
+- candidate limits
+- ETA result
+- degraded mode
+
+RIDER GPS:
+- foreground permission
+- approximate/precise
+- denied fallback
+- manual pin
+
+DRIVER GPS:
+- online tracking
+- assigned tracking
+- in-trip tracking
+- offline stop
+- reconnect
+- stale detection
+
+LIVE RIDE MAP:
+- approach
+- ETA
+- active trip
+- completion stop
+- privacy result
+
+ANDROID:
+- map configuration
+- geolocation
+- foreground service
+- permission declarations
+- external build/device blockers
+
+IOS:
+- map configuration
+- Core Location
+- usage descriptions
+- external Xcode/device blockers
+
+SECURITY:
+- key separation
+- restrictions
+- server-key privacy
+- public API privacy
+- audit result
+
+COST CONTROLS:
+- autocomplete tokens/debounce
+- Routes field masks
+- Route Matrix cap
+- quotas/budget documentation
+
+TESTS:
+- passed
+- failed
+- Maps/GPS
+- authorization
+- privacy
+- performance
+- regression
+
+STAGING:
+- deployed SHA
+- health
+- mock result
+- real Google acceptance result if credentials supplied
+- cleanup result
+
+GIT:
+- commit SHA
+- push result
+- branch
+- main untouched
+- production untouched
+
+EXTERNAL OWNER ACTIONS:
+- exact staging key names still required
+- exact Google Cloud APIs to enable
+- exact application/API restrictions
+- no production credentials requested
+
+DATA SAFETY:
+- existing rides unchanged
+- financial data unchanged
+- no coordinates leaked
+- no secrets committed
+
+Do not return another plan.
+
+Implement the complete Maps/GPS stage now.

@@ -72,3 +72,12 @@ Rule: any customer-facing receipt surface (modal, PDF, share text) must exclude 
 - `FINANCE_FAULT_INJECT_DRIVER` (test-only, ignored when NODE_ENV=production) forces a reconciliation failure; supports `domain:<email-domain>` so tests can create the faulty user after server start.
 - Test fixtures: vehicle registration numbers are UNIQUE across the whole DB — randomize per run or reruns fail with silent "no offer" (vehicle create 409 → driver never truly online). M-Pesa test rides need POST /api/rides/:id/pay-mpesa (mock) after complete, or the ride stays payment_pending and blocks the rider's next ride.
 - Cross-month accrual in tests: backdate `ride_requests.completed_at` via psql on the run's own synthetic rides; boundary is Africa/Nairobi (use UTC-crossing timestamps like 23:00Z = 02:00 EAT next day to prove it).
+
+## Maps/GPS stage (Aug 2026)
+- All Google calls go through `lib/maps.js` only (mock|google, auto by GOOGLE_MAPS_SERVER_KEY). Mock label is the exact string "Development route estimate — Google Maps not configured" — tests assert it verbatim.
+- Quotes bind immutable `route_snapshots` rows with an HMAC (SESSION_SECRET-keyed) integrity hash; ride create re-verifies hash + 150 m coordinate tolerance → 409 on tamper.
+- Test recipe additions: server env needs `MAPS_ALLOW_CLIENT_DISTANCE=true LOC_MIN_INTERVAL_MS=0` for fixture suites. Beware falsy-zero env parsing: `Number(env)||default` swallows `0` overrides.
+- Location ingest gates: accuracy ≤ LOC_MAX_ACCURACY_M(250), speed ≤ 70 m/s, heading 0–360, recorded_at ≤ 120 s old, per-driver pace LOC_MIN_INTERVAL_MS(350 ms), monotonic seq.
+- Frontend must never fabricate coordinates: no fallback Embu coords on geolocation failure (driver skips tick), rider quote/request blocked until pickup+dest resolved via autocomplete/GPS/reverse-geocode.
+- launch-readiness greps AndroidManifest for the literal string ACCESS_BACKGROUND_LOCATION — keep it out even of comments.
+- Web key env renamed to GOOGLE_MAPS_WEB_KEY (BROWSER_KEY still a fallback); ride-gates test asserts the new gate name. Key matrix + ops in docs/maps-gps-setup.md.
