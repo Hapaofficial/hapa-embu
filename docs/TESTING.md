@@ -33,10 +33,15 @@ node scripts/test/run.js integration --only=maps-gps,ride-hailing
 4. **Runs every suite from the manifest** with per-suite session cleanup in
    between. The manifest in `scripts/test/run.js` must classify every
    `tests/*.test.js` (static / integration / self-managed); an unlisted file
-   fails the run, so a new suite can never be silently skipped.
-5. **Cleans up**: kills all child processes (also on failure/CTRL-C),
-   terminates connections and drops the test database. Failed cleanup makes
-   the run fail.
+   fails the run, so a new suite can never be silently skipped. Invalid
+   modes, unknown `--only` suite names, and selections that would execute
+   zero suites all fail with a non-zero exit code.
+5. **Cleans up and verifies it**: sends SIGTERM to every tracked child
+   process, waits (bounded) for real exit, escalates to SIGKILL for any
+   straggler, and confirms none remain. It then terminates connections and
+   drops the test database. This same verified cleanup also runs on
+   CTRL-C/SIGTERM and on runner errors before exiting. Incomplete process
+   or database cleanup makes the run fail.
 6. **Prints one summary**: per-suite pass/fail with timing and counts,
    elapsed time, first failing suite with its rerun command, cleanup result.
    Exit code is non-zero on any failed suite, boot failure, incomplete
@@ -57,7 +62,9 @@ Test-only flags the suites rely on (never set in production):
 
 `.github/workflows/ci.yml` runs on pushes to
 `feature/professional-public-profile`, on pull requests, and manually. It
-uses Node.js 22 with an isolated `postgres:16` service container, installs
-dependencies with the same command Render uses (`npm install`), then runs
-`npm run test:syntax` and `npm test`. It contains no real credentials and
-never deploys.
+uses Node.js 22 with an isolated `postgres:16` service container (synthetic
+credentials), minimal `contents: read` permissions, installs dependencies
+deterministically with `npm ci` from the committed `package-lock.json`
+(note: Render's own build currently uses `npm install` per `render.yaml`),
+then runs `npm run test:syntax` and `npm test`. It contains no real
+credentials and never deploys.

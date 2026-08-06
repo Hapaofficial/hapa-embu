@@ -62,16 +62,67 @@ const SYNTH = {
   OWNER_EMAIL: 'trader2027@protonmail.com', // fixed owner identity enforced by server.js
 };
 
+const MODES = ['syntax', 'static', 'integration', 'all'];
 const only = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 const mode = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'all';
 const pick = list => (only.length ? list.filter(s => only.includes(s)) : list);
+function validateArgs() { // fail closed on bad invocations
+  if (!MODES.includes(mode)) {
+    console.error(`FATAL: unknown mode "${mode}" (valid: ${MODES.join(', ')})`);
+    return false;
+  }
+  const known = new Set([...STATIC, ...INTEGRATION, ...SELF_MANAGED]);
+  const bad = only.filter(s => !known.has(s));
+  if (bad.length) {
+    console.error(`FATAL: unknown --only suite name(s): ${bad.join(', ')}`);
+    return false;
+  }
+  if (only.length) {
+    const selectable = mode === 'static' ? STATIC : mode === 'integration' ? [...INTEGRATION, ...SELF_MANAGED] : [...STATIC, ...INTEGRATION, ...SELF_MANAGED];
+    if (!selectable.some(s => only.includes(s))) {
+      console.error(`FATAL: --only selection matches zero suites runnable in mode "${mode}"`);
+      return false;
+    }
+  }
+  return true;
+}
 
 const children = new Set();
+let activeDb = null; // disposable DB currently in use (dropped on any exit path)
 function track(p) { children.add(p); p.on('exit', () => children.delete(p)); return p; }
-function killAll() { for (const p of children) { try { p.kill('SIGTERM'); } catch {} } }
-process.on('exit', killAll);
-process.on('SIGINT', () => { killAll(); process.exit(130); });
-process.on('SIGTERM', () => { killAll(); process.exit(143); });
+
+// Verified child-process teardown: SIGTERM every tracked process, wait for
+// real exit (bounded), escalate to SIGKILL for stragglers, wait again, and
+// report whether the tracked set actually drained. Incomplete cleanup = false.
+async function killAllAndWait() {
+  const waitDrained = async (ms) => {
+    const deadline = Date.now() + ms;
+    while (children.size && Date.now() < deadline) await sleep(100);
+    return children.size === 0;
+  };
+  for (const p of children) { try { p.kill('SIGTERM'); } catch {} }
+  if (await waitDrained(5000)) return true;
+  for (const p of children) { try { p.kill('SIGKILL'); } catch {} }
+  if (await waitDrained(3000)) return true;
+  console.error(`[cleanup] FAILED: ${children.size} tracked child process(es) still alive`);
+  return false;
+}
+function killAllSync() { for (const p of children) { try { p.kill('SIGKILL'); } catch {} } }
+process.on('exit', killAllSync); // last-resort; normal paths use killAllAndWait
+
+let interrupting = false;
+async function onSignal(code) {
+  if (interrupting) return; // second signal: let 'exit' SIGKILL handle it
+  interrupting = true;
+  console.error('\n[signal] interrupted — cleaning up child processes and test database…');
+  const procsOk = await killAllAndWait();
+  const dbOk = await dropTestDb(activeDb);
+  activeDb = null;
+  console.error(`[signal] cleanup ${procsOk && dbOk ? 'complete' : 'INCOMPLETE'}`);
+  process.exit(code);
+}
+process.on('SIGINT', () => { onSignal(130); });
+process.on('SIGTERM', () => { onSignal(143); });
 
 function freePort() {
   return new Promise((res, rej) => {
@@ -262,7 +313,7 @@ async function runStatic(t0, results) {
 async function runIntegration(t0, results) {
   let db = null, cleanupOk = true;
   try {
-    db = await createTestDb();
+    db = activeDb = await createTestDb();
     const [port, faultPort] = [await freePort(), await freePort()];
     const base = `http://127.0.0.1:${port}`;
     console.log(`[server] booting main test server (port ${port}) + fault-injected server (port ${faultPort})`);
@@ -291,9 +342,10 @@ async function runIntegration(t0, results) {
       results.push(r);
     }
   } finally {
-    killAll();
-    await sleep(500);
-    cleanupOk = await dropTestDb(db);
+    const procsOk = await killAllAndWait();
+    const dbOk = await dropTestDb(db);
+    activeDb = null;
+    cleanupOk = procsOk && dbOk; // incomplete process cleanup fails the run
   }
   return cleanupOk;
 }
@@ -302,6 +354,7 @@ async function runIntegration(t0, results) {
   const t0 = Date.now();
   const results = [];
   const extras = {};
+  if (!validateArgs()) process.exit(1);
   extras['manifest complete (all tests/*.test.js classified)'] = checkManifest();
   if (!extras['manifest complete (all tests/*.test.js classified)']) { report(results, extras, t0); process.exit(1); }
 
@@ -311,6 +364,17 @@ async function runIntegration(t0, results) {
   let cleanupOk = true;
   if (mode === 'integration' || mode === 'all') cleanupOk = await runIntegration(t0, results);
   extras['test database cleanup'] = cleanupOk;
+  if (results.length === 0) { // a test run that ran no suites is a failure
+    console.error('FATAL: no suites were executed for this selection');
+    extras['at least one suite executed'] = false;
+  }
   const ok = report(results, extras, t0);
   process.exit(ok ? 0 : 1);
-})().catch(async e => { console.error('RUNNER ERROR:', e.message); killAll(); process.exit(1); });
+})().catch(async e => {
+  console.error('RUNNER ERROR:', e.message);
+  const procsOk = await killAllAndWait();
+  const dbOk = await dropTestDb(activeDb);
+  activeDb = null;
+  if (!procsOk || !dbOk) console.error('RUNNER ERROR cleanup INCOMPLETE');
+  process.exit(1);
+});

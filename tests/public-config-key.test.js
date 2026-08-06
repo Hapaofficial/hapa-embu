@@ -8,6 +8,14 @@
 // same as the other suites). Test values are obvious fakes, never real keys.
 // Usage: node tests/public-config-key.test.js
 const { spawn } = require('child_process');
+const net = require('net');
+
+// Allocate a safe ephemeral port from the OS instead of hardcoding one.
+const freePort = () => new Promise((res, rej) => {
+  const s = net.createServer();
+  s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); });
+  s.on('error', rej);
+});
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
@@ -31,7 +39,8 @@ async function unitChecks() {
 }
 
 // Integration level: the actual public endpoint on a booted server.
-async function withServer(port, extraEnv, fn) {
+async function withServer(extraEnv, fn) {
+  const port = await freePort();
   const env = { ...process.env, PORT: String(port), PUBLIC_MEDIA_STORAGE_MODE: 'local', DOCUMENT_STORAGE_MODE: 'local', JWT_SECRET: 'hapa_local_dev_secret', OWNER_PASSWORD: 'LocalDev2024', OWNER_NAME: 'HAPA Owner' };
   delete env.GOOGLE_MAPS_WEB_KEY; delete env.GOOGLE_MAPS_BROWSER_KEY; delete env.GOOGLE_MAPS_SERVER_KEY;
   Object.assign(env, extraEnv);
@@ -48,7 +57,7 @@ const cfg = async b => (await fetch(b + '/api/public/config')).json();
 (async () => {
   await unitChecks();
 
-  await withServer(5311, { GOOGLE_MAPS_WEB_KEY: 'FAKE-WEB-KEY-1', GOOGLE_MAPS_BROWSER_KEY: 'FAKE-LEGACY-KEY-1', GOOGLE_MAPS_SERVER_KEY: 'FAKE-SERVER-KEY-1' }, async b => {
+  await withServer({ GOOGLE_MAPS_WEB_KEY: 'FAKE-WEB-KEY-1', GOOGLE_MAPS_BROWSER_KEY: 'FAKE-LEGACY-KEY-1', GOOGLE_MAPS_SERVER_KEY: 'FAKE-SERVER-KEY-1' }, async b => {
     const c = await cfg(b);
     ok('endpoint: GOOGLE_MAPS_WEB_KEY returned as mapsBrowserKey (wins over legacy)', c.mapsBrowserKey === 'FAKE-WEB-KEY-1', c);
     ok('endpoint: server key never returned', !JSON.stringify(c).includes('FAKE-SERVER-KEY-1'), c);
@@ -56,13 +65,13 @@ const cfg = async b => (await fetch(b + '/api/public/config')).json();
     ok('endpoint: no unrelated secrets in public config', !/secret|password|jwt|token|s3|encryption/i.test(body), body);
   });
 
-  await withServer(5312, { GOOGLE_MAPS_BROWSER_KEY: 'FAKE-LEGACY-KEY-2', GOOGLE_MAPS_SERVER_KEY: 'FAKE-SERVER-KEY-2' }, async b => {
+  await withServer({ GOOGLE_MAPS_BROWSER_KEY: 'FAKE-LEGACY-KEY-2', GOOGLE_MAPS_SERVER_KEY: 'FAKE-SERVER-KEY-2' }, async b => {
     const c = await cfg(b);
     ok('endpoint: legacy GOOGLE_MAPS_BROWSER_KEY still works alone', c.mapsBrowserKey === 'FAKE-LEGACY-KEY-2', c);
     ok('endpoint: server key never returned (legacy mode)', !JSON.stringify(c).includes('FAKE-SERVER-KEY-2'));
   });
 
-  await withServer(5313, {}, async b => {
+  await withServer({}, async b => {
     const c = await cfg(b);
     ok('endpoint: no configured web key -> null', c.mapsBrowserKey === null, c);
   });
